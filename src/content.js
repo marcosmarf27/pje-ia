@@ -1461,7 +1461,48 @@
     " NÃO assine, não date e não crie cabeçalho de tribunal, vara ou comarca — isso o" +
     " sistema do PJe já acrescenta.";
 
-  panel.onMinuta(async (text, selectedIds) => {
+  // Quando o usuário escolhe uma peça-modelo (biblioteca MLIB), o texto dela
+  // entra no request da minuta como MOLDURA de FORMA — nunca de conteúdo. Vai
+  // como bloco de texto e é o PRIMEIRO do content (antes das peças), para
+  // ficar no prefixo cacheado. A regra anti-contaminação é dura de propósito:
+  // o modelo é de OUTRO processo e traz nomes, valores e datas que NÃO podem
+  // vazar para a minuta. XML (não Markdown) porque o conteúdo interno é
+  // Markdown — a tag é a única fronteira que o modelo não confunde com a
+  // resposta. Tags <modelo…> acidentais no texto do usuário são removidas para
+  // não quebrar a moldura.
+  function molduraModelos(modelo) {
+    if (!modelo || !modelo.texto) return null;
+    const texto = String(modelo.texto).replace(/<\/?modelos?(_de_referencia)?\b[^>]*>/gi, "");
+    const cat = modelo.categoria
+      ? ' categoria="' + String(modelo.categoria).replace(/"/g, "") + '"'
+      : "";
+    const tit = modelo.titulo
+      ? ' titulo="' + String(modelo.titulo).replace(/"/g, "'") + '"'
+      : "";
+    return {
+      type: "text",
+      text:
+        "<modelos_de_referencia>\n" +
+        "O bloco <modelo> abaixo é uma peça-modelo que o usuário cadastrou para você " +
+        "imitar APENAS a FORMA: a estrutura das seções, a ordem, o fraseado e o tom " +
+        "forense. Ela é de OUTRO processo.\n" +
+        "REGRA ABSOLUTA: não copie NENHUM fato do modelo — nomes de partes, números, " +
+        "datas, valores, endereços, dispositivos legais, fundamentos ou trechos " +
+        "específicos. Todo o conteúdo da minuta sai EXCLUSIVAMENTE das peças deste " +
+        "processo, anexadas em seguida. Se o modelo trouxer um dado que não conste " +
+        "dessas peças, use [COMPLETAR: …] no lugar. O modelo é a forma; os autos são " +
+        "o conteúdo.\n" +
+        "<modelo" +
+        cat +
+        tit +
+        ">\n" +
+        texto +
+        "\n</modelo>\n" +
+        "</modelos_de_referencia>",
+    };
+  }
+
+  panel.onMinuta(async (text, selectedIds, modelo) => {
     if (busy) return;
     if (selectedIds.length === 0) {
       panel.setStatus("Marque as peças que devem embasar a minuta.");
@@ -1471,9 +1512,12 @@
     panel.lockInput(true);
 
     const instrucao = (text && text.trim()) || INSTRUCAO_MINUTA_PADRAO;
+    const molduraBloco = molduraModelos(modelo);
     panel.addMessage(
       "user",
-      "📝 Gerar minuta: " + instrucao,
+      "📝 Gerar minuta: " +
+        instrucao +
+        (molduraBloco ? "\n\n📚 Seguindo o modelo: " + (modelo.titulo || "sem título") : ""),
       selectedIds.map((id) => metaDe(id).titulo)
     );
     let assistantEl = null;
@@ -1492,11 +1536,19 @@
 
       // Request ISOLADO, como o mapa mental: não entra em conversation nem em
       // pecasNaConversa — gerar uma minuta não altera a conversa em andamento.
+      // A moldura do modelo (se houver) é o PRIMEIRO bloco: fica antes das
+      // peças, no prefixo cacheado, e o reforço na instrução volta a amarrar
+      // "forma do modelo, fatos das peças".
+      const reforcoModelo = molduraBloco
+        ? " Siga a ESTRUTURA e o estilo do modelo de referência fornecido no início," +
+          " mas com os FATOS exclusivamente das peças deste processo."
+        : "";
       const messages = prepararEnvio(
         [
           {
             role: "user",
             content: [
+              ...(molduraBloco ? [molduraBloco] : []),
               ...blocos,
               {
                 type: "text",
@@ -1507,6 +1559,7 @@
                 text:
                   instrucao +
                   SUFIXO_MINUTA +
+                  reforcoModelo +
                   " Peças anexadas, use exatamente estes ids: " +
                   selectedIds.map((id) => metaDe(id).titulo).join("; ") +
                   ".",

@@ -21,6 +21,7 @@ são enviados diretamente do seu navegador à API do provedor de IA que você es
 | **Preferências** (modelo, nível de raciocínio, instruções personalizadas, modo de layout) | Funcionamento da interface | Somente `chrome.storage.local`. As instruções personalizadas são anexadas ao prompt enviado ao provedor escolhido. |
 | **Prompts salvos** (título e texto que você escreve na biblioteca de prompts) | Reaproveitar instruções suas nas conversas | `chrome.storage.sync`: ficam no seu navegador e, se você usar o Chrome com uma conta Google e a sincronização ligada, o próprio Chrome os replica nos seus outros dispositivos (o desenvolvedor não tem acesso). O texto do prompt vai ao provedor de IA junto da mensagem quando você o usa. |
 | **Rascunhos de minuta** (o texto que o modelo gera ao usar “Minutar” ou “Abrir no editor”, com o que você editar) | Permitir reabrir e continuar a minuta depois, inclusive noutro dia | `chrome.storage.local` — **ficam gravados neste computador**, não sincronizam e não saem dele. São apagados automaticamente após 7 dias (mantidos no máximo os 10 mais recentes); o botão **Descartar**, no editor, remove um rascunho na hora. |
+| **Modelos de peças** (as peças-modelo que você cadastra na biblioteca “Modelos”: título, categoria, descrição e texto) | Servir de referência de **forma** ao gerar minutas — o assistente imita a estrutura e o estilo do modelo | `chrome.storage.local` — **ficam gravados neste computador**, não sincronizam e não saem dele. Se você colar uma peça real, ela pode conter dados de **outro** processo; use o botão **excluir** da biblioteca para removê-la a qualquer momento. O texto do modelo escolhido vai ao provedor de IA junto do pedido de minuta, com a instrução expressa de copiar apenas a forma, nunca os fatos. |
 | **Sessão do PJe** (cookies do tribunal) | Baixar as peças que você marcar, pelo mesmo mecanismo que o próprio PJe usa | Os cookies são gerenciados pelo navegador e **nunca são lidos, armazenados ou exportados pela extensão** — as requisições ao tribunal usam a sessão já aberta por você, e o conteúdo baixado fica em cache temporário na memória da aba. |
 
 Nenhum dado além dos listados acima é tratado. A coleta limita-se ao estritamente
@@ -76,12 +77,19 @@ de ajuda.
 - Todos os dados persistentes (chaves e preferências) ficam no `chrome.storage.local`
   do seu navegador. Caches de sessão (uploads, peças baixadas) vivem na memória da aba
   ou no `chrome.storage.session` e desaparecem ao fechar o navegador.
-- **Rascunhos de minuta** também ficam no `chrome.storage.local` — é a única
-  funcionalidade que grava **trecho dos autos** de forma persistente no disco (para você
+- **Rascunhos de minuta** também ficam no `chrome.storage.local` — é uma das
+  funcionalidades que gravam **trecho dos autos** de forma persistente no disco (para você
   reabrir a minuta depois). São podados sozinhos após 7 dias e limitados aos 10 mais
   recentes; **Descartar**, no editor, apaga na hora. Não sincronizam entre dispositivos.
   Ao gerar o `.docx` ou imprimir a partir do editor, o arquivo resultante é salvo por
   **você**, onde você escolher, e deixa de estar sob controle da extensão.
+- **Modelos de peças** (biblioteca “Modelos”) também ficam no `chrome.storage.local`, sem
+  poda automática e sem sincronizar. Se você cadastrar uma peça real como modelo, o texto
+  pode conter dados de **outro** processo; ele fica só neste navegador e o botão **excluir**
+  da biblioteca o remove quando você quiser. Ao gerar uma minuta com um modelo escolhido, o
+  texto do modelo vai ao provedor de IA numa moldura `<modelos_de_referencia>` com a
+  instrução expressa de que serve **apenas de forma** — nenhum fato do modelo pode entrar na
+  minuta, que se baseia só nas peças do processo em tela.
 - A única exceção são os **prompts salvos**, gravados no `chrome.storage.sync` para
   acompanharem você em outros dispositivos: quem os replica é o próprio Chrome, pela
   sincronização da sua conta Google. Sem conta ou com a sincronização desligada, eles

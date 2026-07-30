@@ -1094,6 +1094,21 @@
   border-radius: 6px;
 }
 .minutabar-x:hover, .mapabar-x:hover { background: #ddeaf2; color: var(--text); }
+/* seletor de peça-modelo: cai na própria linha da faixa (a faixa quebra) */
+.minutabar { flex-wrap: wrap; }
+.minuta-modelo {
+  flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding-top: 2px;
+}
+.minuta-modelo[hidden] { display: none; }
+.minuta-modelo .mm-lab { flex: none; font-weight: 700; color: var(--pje-2); }
+.minuta-modelo-sel {
+  flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
+  border: 1px solid rgba(0, 120, 170, 0.35); border-radius: 7px;
+  padding: 4px 8px; background: #fff; cursor: pointer;
+}
+.minuta-modelo-sel:focus {
+  outline: none; border-color: var(--pje); box-shadow: 0 0 0 3px rgba(0, 120, 170, 0.15);
+}
 /* o botão Enviar vira "✍️ Gerar minuta" / "🧠 Gerar mapa" — halo azul para
    marcar a mudança (a classe .docx é histórica; vale para os dois modos) */
 .send.docx { box-shadow: 0 0 0 3px rgba(0, 120, 170, 0.28); }
@@ -1232,6 +1247,22 @@
   background: linear-gradient(180deg, var(--pje), var(--pje-2)); color: #fff;
   border: none; border-radius: 8px; padding: 7px 16px; font-weight: 700;
   cursor: pointer; font-family: inherit;
+}
+/* Modelos de peças (.mlib): reaproveita todo o visual do .plib — só o próprio */
+.mlib-form select {
+  font: inherit; font-size: var(--fs-ui); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+  outline: none; background: #fff; cursor: pointer;
+}
+.mlib-form select:focus {
+  border-color: var(--pje); box-shadow: 0 0 0 3px rgba(0, 120, 170, 0.15);
+}
+/* etiqueta da categoria na linha do modelo */
+.mlib-cat {
+  display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px;
+  background: #e2eef5; color: var(--pje-2); font-size: var(--fs-nano);
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  vertical-align: middle;
 }
 
 /* ---------- Raciocínio (thinking) colapsável ---------- */
