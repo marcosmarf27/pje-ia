@@ -284,6 +284,9 @@
       }
     );
     panel.setModoCitacoes(modelCaps.citacoesNativas === false ? "textual" : "nativa");
+    // A biblioteca de modelos assume 1M tokens (a minuta manda os autos + vários
+    // modelos): habilitada só nesses; nos menores (Haiku) a feature some.
+    panel.setModelosHabilitado((modelCaps.contextTokens || 0) >= 1000000);
     const prov = modelCaps.provider || "anthropic";
     if (conversation.length && conversaProvider && prov !== conversaProvider) {
       panel.setAlerta(ALERTA_TROCA_PROVEDOR);

@@ -2076,6 +2076,11 @@ var PjePanel = (function () {
     let mlibEditId = null;
     let mlibIdNovo = "";
     let mlibDelArm = null;
+    // A biblioteca de modelos só faz sentido em modelos de 1M tokens (a minuta
+    // manda os autos inteiros + vários modelos): setModelosHabilitado, chamado
+    // pelo content.js quando as caps chegam, desliga a feature nos menores
+    // (Haiku). Começa true para não sumir no harness de teste (sem caps).
+    let modelosHabilitado = true;
 
     // MLIB é content script carregado antes deste; o harness de teste pode não
     // incluí-lo — sem ele a feature some em silêncio, nada quebra.
@@ -2176,16 +2181,27 @@ var PjePanel = (function () {
       return out;
     }
 
-    // Mostra/esconde e popula o seletor conforme o modo minuta e a existência
-    // de modelos. Chamada por setMinutaMode e pelo aoMudar do MLIB.
+    // Mostra/esconde e popula o seletor conforme o modo minuta, a existência de
+    // modelos e o modelo ativo (só 1M). Chamada por setMinutaMode, pelo aoMudar
+    // do MLIB e por setModelosHabilitado.
     function atualizarSeletorMinuta(on) {
       if (!minutaModeloWrap) return;
-      if (!on || !temMlib || !modelosLib.length) {
+      if (!on || !temMlib || !modelosHabilitado || !modelosLib.length) {
         minutaModeloWrap.hidden = true;
         return;
       }
       popularSeletorModelos(detectarCategoria(inEl.value));
       minutaModeloWrap.hidden = false;
+    }
+
+    // Liga/desliga toda a feature de modelos conforme a janela do modelo ativo
+    // (1M tokens). Esconde o botão do CRUD, fecha o modal se aberto e atualiza
+    // o seletor da minuta.
+    function setModelosHabilitado(on) {
+      modelosHabilitado = !!on;
+      if (btnMlib) btnMlib.hidden = !temMlib || !modelosHabilitado;
+      if (!modelosHabilitado && mlibEl && !mlibEl.hidden) fecharMlib();
+      if (minutaMode) atualizarSeletorMinuta(true);
     }
 
     // ----- Gerenciador de modelos (modal .mlib) -----
@@ -2811,6 +2827,9 @@ var PjePanel = (function () {
       onMapa(cb) {
         mapaCb = cb;
       },
+      // Habilita a biblioteca de modelos só nos modelos de 1M tokens (chamada
+      // pelo content.js quando as caps chegam/mudam).
+      setModelosHabilitado,
       // Resultado do mapa mental: em vez do markdown cru (longo e repetitivo)
       // a bolha vira um card com as ações, e o texto fica num <details>
       // recolhido. O card é escrito no __body da bolha — depois disso NÃO se
