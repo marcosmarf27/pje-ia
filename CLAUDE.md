@@ -600,6 +600,47 @@ comum** (sem tools/skills/`container`) — por isso funciona nos dois provedores
 - `vendor/` é **intocado**; nenhum bundle entra em página de tribunal. `src/editor.html`
   está em `web_accessible_resources` (aberto de `*.jus.br`); os subrecursos não precisam.
 
+## Biblioteca de modelos de peças (`modelos.js` + `panel.js` + `content.js`)
+
+Peças-modelo do usuário (sentenças, decisões, despachos, ofícios, atas, mandados) para
+o assistente **imitar a forma** ao gerar minutas. `src/modelos.js` expõe o global `MLIB`,
+irmão do `PLIB`, com diferenças de propósito:
+
+- **`chrome.storage.local`, um item por modelo** (`modelo:<id>`), NÃO `sync`: uma
+  peça-modelo (mesmo real) passa dos 8.192 B/item do sync. `AREA` é o único ponto de
+  troca; o `aoMudar` filtra área `local` + prefixo `modelo:` para não colidir com o
+  `onChanged` de config do content.js nem com o do `PLIB` (área `sync`). Cada item tem
+  **categoria** (a espécie) e descrição além de título + texto. Teto por item
+  `TETO_BYTES` = 60000 (barreira de sanidade, não da API — local não tem cota por item).
+- **Gated a modelos de 1M tokens** (`setModelosHabilitado` no painel, chamado por
+  `aplicarCapsNaUI` com `caps.contextTokens >= 1000000`): a minuta manda os autos
+  inteiros + vários modelos, o que só cabe nas janelas de 1M — no Haiku (200k) o botão
+  **📚 Modelos** e o seletor da minuta somem (a minuta comum segue funcionando). Ao vivo
+  na troca de modelo; fecha o modal se ele estiver aberto quando desabilita.
+- **Seleção por CATEGORIA, não por modelo** (decisão de produto): o seletor da
+  `.minutabar` escolhe uma espécie e `modelosMinutaSelecionados()` reúne TODOS os modelos
+  daquela categoria (ordenados por recência) até dois tetos — `MODELOS_MAX_ENVIO` (12) e
+  `MODELOS_TETO_CHARS` (180000, ~45k tokens; o 1º sempre entra). Corte avisado no console
+  (sem cap silencioso). A categoria é pré-selecionada por `detectarCategoria` (espelha o
+  agrupamento de `MINUTA_ESPECIE`); o usuário pode trocar. Passa via `minutaCb(t, sel,
+  modelos)` — a assinatura ganhou o 3º arg, e sem modelos o comportamento é byte a byte
+  o de antes.
+- **Moldura anti-contaminação** (`molduraModelos` em content.js): o(s) modelo(s) entram
+  como **um bloco de texto** (nunca `document`/`file_id` — não é peça dos autos, não é
+  citável) e é o **PRIMEIRO** do content da minuta (antes das peças, no prefixo
+  cacheado). Vai em **XML** (`<modelos_de_referencia>` com `<modelo n="i">`), não
+  Markdown, porque o conteúdo interno é Markdown e a tag é a única fronteira que o modelo
+  não confunde com a resposta. A instrução manda **analisar, escolher a base mais
+  adequada e reaproveitar estrutura e LINGUAGEM** das outras, mas **nenhum FATO** (nomes,
+  valores, datas, dispositivos) — esses saem só das peças do processo em tela; o que
+  faltar vira `[COMPLETAR: …]`. Tags `<modelo…>` acidentais no texto do usuário são
+  removidas (regex `limpar`) para não quebrar a moldura — o `<` comum do texto jurídico é
+  preservado.
+- **Funciona nos DOIS provedores** (a minuta é chat comum, sem gating por nome de
+  modelo) e grava **trecho de outros processos no disco** (como os rascunhos de minuta):
+  daí a nota no `PRIVACY.md`/`help.html` e a exclusão fácil na biblioteca (dois cliques,
+  nunca `confirm()` nativo). O modal `.mlib` reaproveita todo o visual do `.plib`.
+
 ## Mapa mental (markmap) — página `src/mapa.html`
 
 Botão "🧠 Mapa mental" na barra de ferramentas liga o **modo mapa** (`setMapaMode` em

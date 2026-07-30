@@ -2281,7 +2281,7 @@ var PjePanel = (function () {
       mlibListEl.innerHTML = "";
       if (!modelosLib.length) {
         mlibListEl.innerHTML =
-          '<div class="plib-empty">Nenhum modelo cadastrado ainda.<br>Clique em <b>✚ Novo</b> para cadastrar sua primeira peça-modelo — depois, ao gerar uma minuta, escolha-a em <b>Seguir modelo</b>.</div>';
+          '<div class="plib-empty">Nenhum modelo cadastrado ainda.<br>Clique em <b>✚ Novo</b> para cadastrar sua primeira peça-modelo — depois, ao gerar uma minuta, escolha a categoria em <b>Seguir modelos</b>.</div>';
         return;
       }
       for (const m of modelosLib) {
