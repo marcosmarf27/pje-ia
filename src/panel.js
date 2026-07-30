@@ -397,7 +397,7 @@ var PjePanel = (function () {
                   <button class="btn-minuta" title="Liga o modo minuta: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar minuta” — a resposta abre num editor de texto, em nova aba, de onde você copia para o PJe, baixa em Word (.docx) ou imprime.">📝 Minutar</button>
                   <button class="btn-mapa" title="Liga o modo mapa mental: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar mapa” — a resposta abre num mapa mental interativo, em nova aba.">🧠 Mapa mental</button>
                   <button class="btn-plib" title="Seus prompts salvos: crie instruções reutilizáveis (título + texto) e insira-as na conversa digitando “/” no início do campo de mensagem. Sincronizam entre navegadores logados na mesma conta Google.">✦ Prompts</button>
-                  <button class="btn-mlib" title="Seus modelos de peças (sentenças, decisões, despachos, ofícios…): cadastre peças-modelo por categoria e, ao gerar uma minuta, escolha um para o assistente seguir a ESTRUTURA e o estilo — os fatos continuam saindo só das peças do processo.">📚 Modelos</button>
+                  <button class="btn-mlib" title="Seus modelos de peças (sentenças, decisões, despachos, ofícios…): cadastre várias por categoria e, ao gerar uma minuta, escolha a categoria para o assistente seguir a estrutura e o estilo dos seus modelos — os fatos continuam saindo só das peças do processo.">📚 Modelos</button>
                 </div>
                 <div class="metarow">
                   <div class="gauge" hidden title="${GAUGE_TITLE}">
@@ -2059,6 +2059,7 @@ var PjePanel = (function () {
     // Ao contrário do prompt, um modelo não é despejado no textarea: ele só
     // acompanha o turno da minuta.
     const btnMlib = $(".btn-mlib");
+    const BTN_MLIB_TITLE_ON = btnMlib ? btnMlib.title : ""; // título de HTML (reusado ao reabilitar)
     const mlibEl = $(".mlib");
     const mlibCard = $(".mlib-card");
     const mlibListEl = $(".mlib-list");
@@ -2144,6 +2145,10 @@ var PjePanel = (function () {
       }
       if (anterior && comModelo.has(anterior)) minutaModeloSel.value = anterior;
       else if (preselCat && comModelo.has(preselCat)) minutaModeloSel.value = preselCat;
+      // sem categoria detectada e só UMA categoria com modelos: pré-seleciona
+      // essa — a feature "acontece" sem exigir um clique a mais (o usuário
+      // ainda pode voltar para "nenhum")
+      else if (comModelo.size === 1) minutaModeloSel.value = comModelo.values().next().value;
       else minutaModeloSel.value = "";
     }
 
@@ -2195,11 +2200,20 @@ var PjePanel = (function () {
     }
 
     // Liga/desliga toda a feature de modelos conforme a janela do modelo ativo
-    // (1M tokens). Esconde o botão do CRUD, fecha o modal se aberto e atualiza
-    // o seletor da minuta.
+    // (1M tokens). Em vez de SUMIR nos menores (o usuário ficaria sem saber por
+    // quê), o botão do CRUD fica DESABILITADO com tooltip explicando; o seletor
+    // da minuta some (o botão já é a explicação) e o modal fecha se aberto.
+    const BTN_MLIB_TITLE_OFF =
+      "A biblioteca de modelos está disponível apenas nos modelos de 1 milhão de tokens " +
+      "(Sonnet 5 da Anthropic, Gemini Flash). Troque o modelo nas opções para usá-la.";
     function setModelosHabilitado(on) {
       modelosHabilitado = !!on;
-      if (btnMlib) btnMlib.hidden = !temMlib || !modelosHabilitado;
+      if (btnMlib) {
+        btnMlib.hidden = !temMlib; // some só no harness sem MLIB
+        btnMlib.disabled = temMlib && !modelosHabilitado;
+        if (temMlib && !modelosHabilitado) btnMlib.title = BTN_MLIB_TITLE_OFF;
+        else if (temMlib) btnMlib.title = BTN_MLIB_TITLE_ON;
+      }
       if (!modelosHabilitado && mlibEl && !mlibEl.hidden) fecharMlib();
       if (minutaMode) atualizarSeletorMinuta(true);
     }
