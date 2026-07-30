@@ -1461,48 +1461,52 @@
     " NÃO assine, não date e não crie cabeçalho de tribunal, vara ou comarca — isso o" +
     " sistema do PJe já acrescenta.";
 
-  // Quando o usuário escolhe uma peça-modelo (biblioteca MLIB), o texto dela
-  // entra no request da minuta como MOLDURA de FORMA — nunca de conteúdo. Vai
-  // como bloco de texto e é o PRIMEIRO do content (antes das peças), para
-  // ficar no prefixo cacheado. A regra anti-contaminação é dura de propósito:
-  // o modelo é de OUTRO processo e traz nomes, valores e datas que NÃO podem
-  // vazar para a minuta. XML (não Markdown) porque o conteúdo interno é
+  // Quando o usuário escolhe uma categoria de modelos (biblioteca MLIB), TODAS
+  // as peças-modelo daquela espécie (o painel já aplica o teto) entram no
+  // request da minuta como MOLDURA de FORMA — nunca de conteúdo. Vai como bloco
+  // de texto e é o PRIMEIRO do content (antes das peças), para ficar no prefixo
+  // cacheado. A regra anti-contaminação é dura de propósito: os modelos são de
+  // OUTROS processos e trazem nomes, valores e datas que NÃO podem vazar para a
+  // minuta. A IA escolhe a base mais adequada e pode aproveitar estrutura e
+  // linguajar das outras. XML (não Markdown) porque o conteúdo interno é
   // Markdown — a tag é a única fronteira que o modelo não confunde com a
   // resposta. Tags <modelo…> acidentais no texto do usuário são removidas para
   // não quebrar a moldura.
-  function molduraModelos(modelo) {
-    if (!modelo || !modelo.texto) return null;
-    const texto = String(modelo.texto).replace(/<\/?modelos?(_de_referencia)?\b[^>]*>/gi, "");
-    const cat = modelo.categoria
-      ? ' categoria="' + String(modelo.categoria).replace(/"/g, "") + '"'
-      : "";
-    const tit = modelo.titulo
-      ? ' titulo="' + String(modelo.titulo).replace(/"/g, "'") + '"'
-      : "";
+  function molduraModelos(modelos) {
+    if (!Array.isArray(modelos) || !modelos.length) return null;
+    const limpar = (t) => String(t).replace(/<\/?modelos?(_de_referencia)?\b[^>]*>/gi, "");
+    const partes = modelos.map((m, i) => {
+      const cat = m.categoria ? ' categoria="' + String(m.categoria).replace(/"/g, "") + '"' : "";
+      const tit = m.titulo ? ' titulo="' + String(m.titulo).replace(/"/g, "'") + '"' : "";
+      return '<modelo n="' + (i + 1) + '"' + cat + tit + ">\n" + limpar(m.texto) + "\n</modelo>";
+    });
+    const varios = modelos.length > 1;
+    const intro = varios
+      ? "Os " + modelos.length + " blocos <modelo> abaixo são peças-modelo da MESMA " +
+        "espécie que o usuário cadastrou. ANALISE todos, escolha como base o que melhor " +
+        "se ajusta a este caso e aproveite a ESTRUTURA, a ordem das seções, o fraseado e " +
+        "o tom forense — inclusive combinando trechos de LINGUAGEM (fórmulas de praxe, " +
+        "conectivos, jargão) de mais de um. Eles são de OUTROS processos.\n"
+      : "O bloco <modelo> abaixo é uma peça-modelo que o usuário cadastrou para você " +
+        "imitar a FORMA: a estrutura das seções, a ordem, o fraseado e o tom forense. " +
+        "Ela é de OUTRO processo.\n";
     return {
       type: "text",
       text:
         "<modelos_de_referencia>\n" +
-        "O bloco <modelo> abaixo é uma peça-modelo que o usuário cadastrou para você " +
-        "imitar APENAS a FORMA: a estrutura das seções, a ordem, o fraseado e o tom " +
-        "forense. Ela é de OUTRO processo.\n" +
-        "REGRA ABSOLUTA: não copie NENHUM fato do modelo — nomes de partes, números, " +
+        intro +
+        "REGRA ABSOLUTA: não copie NENHUM fato dos modelos — nomes de partes, números, " +
         "datas, valores, endereços, dispositivos legais, fundamentos ou trechos " +
-        "específicos. Todo o conteúdo da minuta sai EXCLUSIVAMENTE das peças deste " +
-        "processo, anexadas em seguida. Se o modelo trouxer um dado que não conste " +
-        "dessas peças, use [COMPLETAR: …] no lugar. O modelo é a forma; os autos são " +
-        "o conteúdo.\n" +
-        "<modelo" +
-        cat +
-        tit +
-        ">\n" +
-        texto +
-        "\n</modelo>\n" +
-        "</modelos_de_referencia>",
+        "específicos do caso. Aproveite só a forma e a linguagem. Todo o conteúdo da " +
+        "minuta sai EXCLUSIVAMENTE das peças deste processo, anexadas em seguida. Se um " +
+        "modelo trouxer um dado que não conste dessas peças, use [COMPLETAR: …] no lugar. " +
+        "Os modelos são a forma; os autos são o conteúdo.\n" +
+        partes.join("\n") +
+        "\n</modelos_de_referencia>",
     };
   }
 
-  panel.onMinuta(async (text, selectedIds, modelo) => {
+  panel.onMinuta(async (text, selectedIds, modelos) => {
     if (busy) return;
     if (selectedIds.length === 0) {
       panel.setStatus("Marque as peças que devem embasar a minuta.");
@@ -1512,12 +1516,19 @@
     panel.lockInput(true);
 
     const instrucao = (text && text.trim()) || INSTRUCAO_MINUTA_PADRAO;
-    const molduraBloco = molduraModelos(modelo);
+    const molduraBloco = molduraModelos(modelos);
+    const catModelos =
+      molduraBloco && typeof MLIB !== "undefined"
+        ? MLIB.rotuloCategoria(modelos[0].categoria)
+        : "";
     panel.addMessage(
       "user",
       "📝 Gerar minuta: " +
         instrucao +
-        (molduraBloco ? "\n\n📚 Seguindo o modelo: " + (modelo.titulo || "sem título") : ""),
+        (molduraBloco
+          ? "\n\n📚 Seguindo " + modelos.length + " modelo(s) de referência" +
+            (catModelos ? " — " + catModelos : "")
+          : ""),
       selectedIds.map((id) => metaDe(id).titulo)
     );
     let assistantEl = null;
@@ -1540,8 +1551,9 @@
       // peças, no prefixo cacheado, e o reforço na instrução volta a amarrar
       // "forma do modelo, fatos das peças".
       const reforcoModelo = molduraBloco
-        ? " Siga a ESTRUTURA e o estilo do modelo de referência fornecido no início," +
-          " mas com os FATOS exclusivamente das peças deste processo."
+        ? " Baseie a FORMA (estrutura, seções, linguagem) nos modelos de referência" +
+          " fornecidos no início — escolhendo o mais adequado e aproveitando o linguajar" +
+          " dos demais —, mas com os FATOS exclusivamente das peças deste processo."
         : "";
       const messages = prepararEnvio(
         [

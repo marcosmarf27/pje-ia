@@ -415,8 +415,8 @@ var PjePanel = (function () {
                 <span class="docxbar-t">📝 <b>Modo minuta ligado</b> — revise a instrução abaixo e clique em <b>Gerar minuta</b>: a resposta abre num editor, em nova aba, pronta para revisar e levar ao PJe.</span>
                 <button class="minutabar-x" title="Cancelar a geração da minuta (Esc)">✕</button>
                 <label class="minuta-modelo" hidden>
-                  <span class="mm-lab">Seguir modelo:</span>
-                  <select class="minuta-modelo-sel" title="Escolha uma peça-modelo cadastrada para o assistente imitar a estrutura e o estilo — os fatos continuam vindo só das peças do processo."></select>
+                  <span class="mm-lab">Seguir modelos:</span>
+                  <select class="minuta-modelo-sel" title="Escolha uma categoria: o assistente recebe as suas peças-modelo daquela espécie e segue a estrutura e o estilo da mais adequada ao caso — os fatos continuam vindo só das peças do processo."></select>
                 </label>
               </div>
               <div class="mapabar" hidden>
@@ -2051,11 +2051,13 @@ var PjePanel = (function () {
 
     // ----- Biblioteca de MODELOS (peças-modelo, MLIB/storage.local) ----------
     // Irmã do PLIB, com dois papéis: (1) o modal .mlib faz o CRUD (título,
-    // categoria, descrição, texto); (2) o seletor da .minutabar oferece, ao
-    // gerar a minuta, um modelo daquela categoria para o assistente imitar a
-    // FORMA — o texto do modelo vira uma moldura XML no request (content.js),
-    // NUNCA fonte de fatos. Ao contrário do prompt, um modelo não é despejado
-    // no textarea: ele só acompanha o turno da minuta.
+    // categoria, descrição, texto); (2) o seletor da .minutabar escolhe uma
+    // CATEGORIA e, ao gerar a minuta, TODAS as peças-modelo daquela espécie
+    // (até um teto) vão ao request numa moldura XML (content.js): a IA analisa,
+    // escolhe a base mais adequada e pode aproveitar estrutura e linguajar das
+    // outras — mas os FATOS saem só das peças do processo, NUNCA dos modelos.
+    // Ao contrário do prompt, um modelo não é despejado no textarea: ele só
+    // acompanha o turno da minuta.
     const btnMlib = $(".btn-mlib");
     const mlibEl = $(".mlib");
     const mlibCard = $(".mlib-card");
@@ -2114,33 +2116,64 @@ var PjePanel = (function () {
       return null;
     }
 
-    // Reconstrói o <select> do modo minuta agrupando por categoria. Preserva a
-    // escolha MANUAL anterior; sem ela, pré-seleciona pela categoria detectada.
+    // Reconstrói o <select> do modo minuta: uma opção por CATEGORIA que tenha
+    // modelos, com a contagem. Preserva a escolha MANUAL anterior; sem ela,
+    // pré-seleciona pela categoria detectada na instrução.
     function popularSeletorModelos(preselCat) {
       if (!minutaModeloSel) return;
-      const anterior = minutaModeloSel.value;
+      const anterior = minutaModeloSel.value; // valor = categoria
       minutaModeloSel.innerHTML = "";
       const nenhum = document.createElement("option");
       nenhum.value = "";
       nenhum.textContent = "— nenhum (estilo padrão) —";
       minutaModeloSel.appendChild(nenhum);
-      let preselId = "";
+      const comModelo = new Set();
       for (const cat of MLIB.CATEGORIAS) {
-        const doGrupo = modelosLib.filter((m) => (m.categoria || "outro") === cat.valor);
-        if (!doGrupo.length) continue;
-        const og = document.createElement("optgroup");
-        og.label = cat.rotulo;
-        for (const m of doGrupo) {
-          const op = document.createElement("option");
-          op.value = m.id;
-          op.textContent = m.titulo;
-          og.appendChild(op);
-          if (!preselId && preselCat && cat.valor === preselCat) preselId = m.id;
-        }
-        minutaModeloSel.appendChild(og);
+        const n = modelosLib.filter((m) => (m.categoria || "outro") === cat.valor).length;
+        if (!n) continue;
+        comModelo.add(cat.valor);
+        const op = document.createElement("option");
+        op.value = cat.valor;
+        op.textContent = cat.rotulo + " (" + n + ")";
+        minutaModeloSel.appendChild(op);
       }
-      if (anterior && modelosLib.some((m) => m.id === anterior)) minutaModeloSel.value = anterior;
-      else minutaModeloSel.value = preselId;
+      if (anterior && comModelo.has(anterior)) minutaModeloSel.value = anterior;
+      else if (preselCat && comModelo.has(preselCat)) minutaModeloSel.value = preselCat;
+      else minutaModeloSel.value = "";
+    }
+
+    // Modelos enviados por minuta: TODOS os da categoria escolhida, do mais
+    // recente ao mais antigo, até dois tetos — nº de modelos e total de
+    // caracteres (guarda de contexto: a minuta não tem pré-voo de tokens). O
+    // primeiro modelo sempre entra, mesmo acima do teto de caracteres.
+    const MODELOS_MAX_ENVIO = 12;
+    const MODELOS_TETO_CHARS = 180000; // ~45 mil tokens no total
+    function modelosMinutaSelecionados() {
+      if (!minutaModeloSel || !minutaModeloWrap || minutaModeloWrap.hidden) return [];
+      const cat = minutaModeloSel.value;
+      if (!cat) return [];
+      const doGrupo = modelosLib
+        .filter((m) => (m.categoria || "outro") === cat && m.texto)
+        .sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0));
+      const out = [];
+      let chars = 0;
+      for (const m of doGrupo) {
+        if (out.length >= MODELOS_MAX_ENVIO) break;
+        const tam = String(m.texto).length;
+        if (out.length && chars + tam > MODELOS_TETO_CHARS) break;
+        out.push(m);
+        chars += tam;
+      }
+      // "sem cap silencioso": avisa no console quando corta modelos da categoria
+      if (doGrupo.length > out.length) {
+        try {
+          console.info(
+            "[PJe IA] minuta: enviando " + out.length + " de " + doGrupo.length +
+              " modelos da categoria (teto de contexto)."
+          );
+        } catch (e) {}
+      }
+      return out;
     }
 
     // Mostra/esconde e popula o seletor conforme o modo minuta e a existência
@@ -2153,14 +2186,6 @@ var PjePanel = (function () {
       }
       popularSeletorModelos(detectarCategoria(inEl.value));
       minutaModeloWrap.hidden = false;
-    }
-
-    // Modelo escolhido para a minuta pendente (ou null). Lido ANTES de
-    // setMinutaMode(false) no doSend — depois o wrap fica oculto.
-    function modeloMinutaSelecionado() {
-      if (!minutaModeloSel || !minutaModeloWrap || minutaModeloWrap.hidden) return null;
-      const id = minutaModeloSel.value;
-      return (id && modelosLib.find((m) => m.id === id)) || null;
     }
 
     // ----- Gerenciador de modelos (modal .mlib) -----
@@ -2377,10 +2402,10 @@ var PjePanel = (function () {
           statusEl.textContent = "Marque as peças que devem embasar a minuta.";
           return;
         }
-        // lê o modelo escolhido ANTES de desligar o modo (o seletor some com ele)
-        const modelo = modeloMinutaSelecionado();
+        // lê os modelos da categoria ANTES de desligar o modo (o seletor some)
+        const modelos = modelosMinutaSelecionados();
         setMinutaMode(false);
-        minutaCb(t, sel, modelo);
+        minutaCb(t, sel, modelos);
         inEl.value = "";
         inEl.style.height = "auto";
         setPromptAtivo(null); // consumido no envio
