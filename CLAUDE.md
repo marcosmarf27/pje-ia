@@ -3,8 +3,8 @@
 Extensão Chrome (Manifest V3, JavaScript puro, **sem build step**) que adiciona um painel
 de chat com IA à tela de autos digitais do PJe. O usuário seleciona peças do
 processo e conversa sobre elas; os PDFs são enviados diretamente à API do provedor do
-modelo escolhido — **Anthropic (Claude)** ou **Google (Gemini)**, ver a seção
-"Provedor Gemini".
+modelo escolhido — **Anthropic (Claude)**, **Google (Gemini)** ou **OpenAI (GPT)**, ver as
+seções "Provedor Gemini" e "Provedor OpenAI".
 
 ## Arquitetura
 
@@ -61,8 +61,8 @@ erro é 429/529/5xx ou queda de rede no meio do SSE (flag `retryable` posta pelo
 `claude.js`). `max_tokens` é 32000 (OBRIGATÓRIO na Anthropic; 32K é o teto de saída
 aceito por todos os modelos Claude).
 
-`MODEL_CAPS` em `background.js` governa por modelo: `provider` (anthropic|gemini),
-`contextTokens`, `maxPages` (600 nos modelos de 1M; 100 no Haiku; 1000 no Gemini),
+`MODEL_CAPS` em `background.js` governa por modelo: `provider` (anthropic|gemini|openai),
+`contextTokens`, `maxPages` (600 nos modelos de 1M; 100 no Haiku; 1000 no Gemini; 500 nos GPT),
 versões de `web_search`/`web_fetch` (variantes `_20260209` no Sonnet 5/Opus 4.8;
 básicas no Fable/Haiku), `thinking` (adaptive+summarized; omitido no Haiku) e `effort`
 (não suportado no Haiku; no Gemini vira `thinking_level`). Entradas Gemini têm ainda
@@ -140,6 +140,77 @@ quebrar:
 - countTokens Gemini: `POST /models/{model}:countTokens` com `contents` traduzidos
   (file_data/inline_data/texto; steps opacos viram texto) — aproximação aceitável, a
   guarda de 90% e o `usageReq` pós-turno corrigem.
+
+## Provedor OpenAI (Responses API)
+
+`src/openai.js` é o TERCEIRO irmão de `claude.js` (INTOCADO) e `gemini.js`: emite o MESMO
+vocabulário de eventos (`{kind:"text"|"thinking"|"citation"|"tool"|"trunc"|"final"}`) a
+partir do SSE da **Responses API** (`POST /v1/responses`, header `Authorization: Bearer`;
+GA, **sem header beta** — a API antiga `/chat/completions` NÃO é usada). `background.js`
+despacha por `providerDe(model)` (prefixo `gpt-`); `content.js` e `panel.js` só condicionam
+por **caps**, nunca por nome de modelo. Modelos: `gpt-5.6-sol` (topo, alias "GPT-5.6"),
+`gpt-5.6-terra` (equilibrado), `gpt-5.6-luna` (rápido/barato) — todos 1,05M de contexto.
+Regras que NÃO podem quebrar:
+
+- **Modo stateless obrigatório** (`store:false`): o histórico interno continua nos blocos
+  estilo Anthropic (com `__pecaId`) e `traduzirHistorico` em openai.js converte NO REQUEST —
+  o filtro de peças desmarcadas (`prepararEnvio`) funciona igual nos três provedores. O
+  system prompt vai em `instructions` (nível superior), NÃO no `input`.
+- **Itens de raciocínio criptografados**: cada item `{type:"reasoning", id, encrypted_content}`
+  da resposta é gravado no histórico como `{type:"x-openai-item", raw: item}` e devolvido
+  VERBATIM no reenvio — reasoning criptografado precisa voltar byte a byte (regra análoga ao
+  thinking assinado da Anthropic e ao `thought_signature` do Gemini). O request declara
+  `include:["reasoning.encrypted_content"]` (para o conteúdo voltar no stateless) e
+  `reasoning:{effort, summary:"auto", context:"all_turns"}`. `sanearCitacoes`/`prepararEnvio`
+  não tocam nesses blocos por construção. A ordem `[reasoning, message]` é preservada na
+  tradução — a API exige que um item reasoning seja seguido pelo item que ele produziu.
+- **effort** (o eixo que o usuário pediu para conferir): a escala da OpenAI é a MAIS RICA —
+  `none|minimal|low|medium|high|xhigh|max` (+ um eixo separado `reasoning.mode`
+  standard|pro|ultra). O suporte a `xhigh`/`max` é dependente da variante e não documentado
+  por modelo (Luna/Terra podem rejeitar com 400). `EFFORT_PARA_OPENAI` em background.js mapeia
+  os três níveis da extensão para o subconjunto COMUM `low/medium/high` (aceito por todos os
+  provedores e todas as variantes 5.6); expor `xhigh`/`max` seria só aqui, provavelmente só no
+  Sol. Anthropic/Gemini/OpenAI compartilham low/medium/high.
+- **usage normalizado** para as 4 categorias da Anthropic em openai.js
+  (`input = input_tokens − cached`; `cache_read = input_tokens_details.cached_tokens`;
+  `cache_creation = 0`; `output = output_tokens`, que já inclui os tokens de raciocínio) —
+  custo, tooltip e gauge funcionam sem mudança. `custoUsdDe` usa `preco.cacheRead` (10% do
+  input; cache automático, sem cobrança de gravação).
+- **Uploads por provedor**: a Files API da OpenAI (`POST /v1/files`, `purpose:"user_data"`)
+  devolve um `file_id` que persiste na conta (não expira por padrão) — o cache de sessão usa
+  namespace `ofile:` (sem validação de expiração, ao contrário do `gfile:` do Gemini), e cada
+  peça em `docsCache` guarda `d.fileProvider`: um `file_id` da OpenAI nunca entra num request
+  Anthropic/Gemini (e vice-versa; `montarBlocos`/`subirPecas` conferem). PDF: ≤ 50 MB/arquivo
+  e ≤ 50 MB somados por request; fallback base64 com teto `MAX_TOTAL_B64_CHARS_OPENAI` (40 MB).
+- **Sem citações por página na OpenAI** (`citacoesNativas:false`, igual ao Gemini): o system
+  prompt alternativo (`SYSTEM_PROMPT_CIT_TEXTUAL`) manda citar peça e folha no próprio texto;
+  `panel.setModoCitacoes("textual")` mostra o `ⓘ`. Annotations `url_citation` da busca viram
+  citações web normais (`web_search_result_location`), ao vivo pelo evento
+  `response.output_text.annotation.added`; `file_citation` é ignorada (sem página).
+- **Busca**: toggle Jurisprudência na OpenAI declara `[{type:"web_search"}]` — sem
+  `allowed_domains` (a priorização de fontes .jus.br vai por instrução no system prompt, como
+  no Gemini).
+- **Troca de provedor no meio da conversa é BLOQUEADA** (`conversaProvider`): o histórico de
+  um provedor não roda no outro (raciocínio assinado/criptografado). `ALERTA_TROCA_PROVEDOR`
+  cobre os três; "Nova conversa" resolve.
+- **Sem pause_turn na OpenAI**: o loop de continuações de `executarTurno` sai na 1ª iteração;
+  retry transitório (429/5xx, `err.retryable`) funciona igual. Stream que termina SEM
+  `response.completed`/`response.incomplete`, ou eventos `response.failed`/`error`, LANÇAM erro
+  retryable — resposta parcial nunca passa por completa. `response.incomplete` com
+  `reason:max_output_tokens` vira `trunc` + stopReason `max_tokens`; recusa (`content_filter`
+  ou content-part `refusal`) vira `refusal`.
+- **Teto de saída na OpenAI: `max_output_tokens = 65536` SEMPRE explícito** — generoso (folga
+  enorme para minuta + resumo de raciocínio; o máximo dos 5.6 é 128.000) e limitado para custo
+  previsível. NUNCA repassar o `req.max_tokens` de 32000 do caminho Anthropic. Cache: só
+  automático (implicit) — `cache_control` não é gravado nos blocos quando o provedor não é
+  anthropic (`montarBlocos` só marca o breakpoint no Anthropic).
+- **Config**: chave em `chrome.storage.local.openaiApiKey` (Anthropic = `apiKey`, Gemini =
+  `geminiApiKey`); `chaveDe(cfg, provider)` escolhe e dá erro claro. popup/options têm os TRÊS
+  campos e uma lista única de modelos com `<optgroup>`; o chip e o `refreshKey` olham a chave do
+  provedor do modelo selecionado. `manifest.json` inclui `https://api.openai.com/*`.
+- countTokens OpenAI: `POST /v1/responses/input_tokens` (mesmo corpo do `/responses`) →
+  `{input_tokens}` — endpoint dedicado e exato (conta arquivos/imagens/tools), análogo ao
+  count_tokens da Anthropic. A guarda de 90% fica precisa.
 
 ## Invariantes importantes
 

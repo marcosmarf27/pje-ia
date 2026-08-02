@@ -10,14 +10,14 @@ descreve, de forma completa, quais dados a extensão trata, para onde eles vão 
 **Resumo em uma frase:** a extensão não tem servidor próprio, não coleta telemetria e o
 desenvolvedor **nunca tem acesso a nenhum dado seu** — os documentos que você selecionar
 são enviados diretamente do seu navegador à API do provedor de IA que você escolheu
-(Anthropic ou Google), autenticados pela **sua própria chave de API**.
+(Anthropic, Google ou OpenAI), autenticados pela **sua própria chave de API**.
 
 ## 1. Dados tratados e finalidade
 
 | Dado | Finalidade | Para onde vai |
 |---|---|---|
-| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — é o propósito único da extensão | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`) ou **Google** (`generativelanguage.googleapis.com`). Nenhum outro serviço intermedia. |
-| **Chaves de API** (Anthropic e/ou Google) fornecidas por você | Autenticar as chamadas à API do respectivo provedor | Armazenadas **somente** no `chrome.storage.local` do seu navegador (não sincronizam entre dispositivos). Enviadas exclusivamente ao provedor correspondente, como cabeçalho de autenticação. Nunca chegam ao contexto da página do PJe. |
+| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — é o propósito único da extensão | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`), **Google** (`generativelanguage.googleapis.com`) ou **OpenAI** (`api.openai.com`). Nenhum outro serviço intermedia. |
+| **Chaves de API** (Anthropic, Google e/ou OpenAI) fornecidas por você | Autenticar as chamadas à API do respectivo provedor | Armazenadas **somente** no `chrome.storage.local` do seu navegador (não sincronizam entre dispositivos). Enviadas exclusivamente ao provedor correspondente, como cabeçalho de autenticação. Nunca chegam ao contexto da página do PJe. |
 | **Preferências** (modelo, nível de raciocínio, instruções personalizadas, modo de layout) | Funcionamento da interface | Somente `chrome.storage.local`. As instruções personalizadas são anexadas ao prompt enviado ao provedor escolhido. |
 | **Prompts salvos** (título e texto que você escreve na biblioteca de prompts) | Reaproveitar instruções suas nas conversas | `chrome.storage.sync`: ficam no seu navegador e, se você usar o Chrome com uma conta Google e a sincronização ligada, o próprio Chrome os replica nos seus outros dispositivos (o desenvolvedor não tem acesso). O texto do prompt vai ao provedor de IA junto da mensagem quando você o usa. |
 | **Rascunhos de minuta** (o texto que o modelo gera ao usar “Minutar” ou “Abrir no editor”, com o que você editar) | Permitir reabrir e continuar a minuta depois, inclusive noutro dia | `chrome.storage.local` — **ficam gravados neste computador**, não sincronizam e não saem dele. São apagados automaticamente após 7 dias (mantidos no máximo os 10 mais recentes); o botão **Descartar**, no editor, remove um rascunho na hora. |
@@ -58,6 +58,11 @@ modelo que **você** escolheu e configurou:
   para melhorar produtos; no nível **pago**, não. Recomendamos usar chave de conta com
   faturamento ativo para dados sensíveis. Arquivos enviados à File API do Google expiram
   automaticamente em 48 horas.
+- **OpenAI (modelos GPT)** — [política de privacidade](https://openai.com/policies/privacy-policy)
+  e [termos de uso da API](https://openai.com/policies/row-terms-of-use). Pela política
+  vigente, a OpenAI não treina modelos com os dados enviados pela API por padrão. Arquivos
+  enviados à Files API permanecem na **sua** conta OpenAI (você pode excluí-los pelo painel
+  ou pela API).
 
 A relação contratual com o provedor de IA é **sua** (a chave de API é sua); a extensão é
 apenas o cliente técnico dessa comunicação.
@@ -92,8 +97,8 @@ de ajuda.
 - Toda comunicação usa HTTPS.
 - **Exclusão**: desinstalar a extensão apaga todos os dados locais. As chaves também
   podem ser apagadas a qualquer momento na tela de opções. Arquivos na Files API da
-  Anthropic são geridos pela sua conta Anthropic; os da File API do Google expiram em
-  48 h.
+  Anthropic e da OpenAI são geridos pela sua respectiva conta; os da File API do Google
+  expiram em 48 h.
 
 ## 6. Alterações desta política
 

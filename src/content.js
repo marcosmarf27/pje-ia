@@ -114,6 +114,9 @@
   // normal as peças são referenciadas por file_id/uri e o teto não se aplica.
   const MAX_TOTAL_B64_CHARS = 24 * 1024 * 1024;
   const MAX_TOTAL_B64_CHARS_GEMINI = 15 * 1024 * 1024;
+  // OpenAI aceita 50 MB (arquivo e somados por request); 40 MB de base64 (~30 MB
+  // decodificados) fica com folga confortável sob o limite.
+  const MAX_TOTAL_B64_CHARS_OPENAI = 40 * 1024 * 1024;
 
   // Betas enviadas em todos os requests de chat (documentos por file_id).
   const BETAS_CHAT = ["files-api-2025-04-14"];
@@ -146,6 +149,10 @@
   function toolsBusca() {
     if (!modelCaps) return [];
     if (modelCaps.provider === "gemini") return [{ type: "google_search" }];
+    // OpenAI: web_search embutida da Responses API. Não declara allowed_domains
+    // (a priorização de fontes .jus.br vai por instrução no system prompt, como
+    // no Gemini — SYSTEM_PROMPT_CIT_TEXTUAL).
+    if (modelCaps.provider === "openai") return [{ type: "web_search" }];
     return [
       {
         type: modelCaps.webSearch,
@@ -177,7 +184,11 @@
       conversaUsd: custoConversaUsd,
       usage: fim.usage,
       provedorNome:
-        modelCaps && modelCaps.provider === "gemini" ? "Google" : "Anthropic",
+        modelCaps && modelCaps.provider === "gemini"
+          ? "Google"
+          : modelCaps && modelCaps.provider === "openai"
+            ? "OpenAI"
+            : "Anthropic",
     });
   }
   // Peças cujos blocos document JÁ estão no histórico desta conversa. Anexamos
@@ -190,9 +201,10 @@
   // (mesmo com o toggle desligado) — remover trocaria o conjunto de tools,
   // invalidando o cache de prefixo e arriscando rejeição do histórico.
   let buscaNaConversa = false;
-  // Provedor (anthropic|gemini) do PRIMEIRO turno da conversa: o histórico de
-  // um provedor não é traduzível para o outro (thinking assinado da Anthropic
-  // vs. thought signatures do Gemini) — trocar no meio exige "Nova conversa".
+  // Provedor (anthropic|gemini|openai) do PRIMEIRO turno da conversa: o
+  // histórico de um provedor não é traduzível para o outro (thinking assinado
+  // da Anthropic vs. thought signatures do Gemini vs. reasoning criptografado
+  // da OpenAI) — trocar no meio exige "Nova conversa".
   let conversaProvider = null;
   let alertaTrocaLigado = false; // o alerta atual é o de troca de provedor
   let busy = false;
@@ -210,9 +222,9 @@
     "Novas mensagens não serão aceitas — desmarque peças na lista para liberar espaço " +
     "(elas saem do contexto na hora) ou comece uma nova conversa.";
   const ALERTA_TROCA_PROVEDOR =
-    "Você trocou entre um modelo Claude e um Gemini no meio da conversa — o histórico de um " +
-    "não é compatível com o outro (raciocínio assinado pelo provedor). Clique em ⟲ Nova " +
-    "conversa para usar o novo modelo, ou volte ao modelo anterior nas opções.";
+    "Você trocou de provedor de IA no meio da conversa (entre Claude, Gemini e OpenAI) — o " +
+    "histórico de um não é compatível com o outro (raciocínio assinado pelo provedor). Clique " +
+    "em ⟲ Nova conversa para usar o novo modelo, ou volte ao modelo anterior nas opções.";
 
   const panel = PjePanel.mount();
 
@@ -340,23 +352,35 @@
   function refreshKey() {
     if (!extensaoViva()) return;
     try {
-      // a chave exigida é a do PROVEDOR do modelo escolhido (Anthropic ou
-      // Google) — o provedor sai do prefixo do id, sem esperar o caps chegar.
-      // customPrompt pega carona na mesma leitura (evita um get a mais).
-      chrome.storage.local.get(["apiKey", "geminiApiKey", "model", "customPrompt"], (v) => {
-        customPrompt = (v.customPrompt || "").trim();
-        const gemini = String(v.model || "").startsWith("gemini-");
-        panel.setConfigured(gemini ? !!v.geminiApiKey : !!v.apiKey);
-      });
+      // a chave exigida é a do PROVEDOR do modelo escolhido (Anthropic, Google
+      // ou OpenAI) — o provedor sai do prefixo do id, sem esperar o caps
+      // chegar. customPrompt pega carona na mesma leitura (evita um get a mais).
+      chrome.storage.local.get(
+        ["apiKey", "geminiApiKey", "openaiApiKey", "model", "customPrompt"],
+        (v) => {
+          customPrompt = (v.customPrompt || "").trim();
+          const m = String(v.model || "");
+          const configurado = m.startsWith("gemini-")
+            ? !!v.geminiApiKey
+            : m.startsWith("gpt-")
+              ? !!v.openaiApiKey
+              : !!v.apiKey;
+          panel.setConfigured(configurado);
+        }
+      );
     } catch {
       avisarContextoPerdido();
     }
   }
   refreshKey();
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === "local" && (ch.apiKey || ch.geminiApiKey || ch.model)) refreshKey();
+    if (area === "local" && (ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.model))
+      refreshKey();
     // effort entra aqui por causa do selo do modelo (mostra o nível ativo)
-    if (area === "local" && (ch.model || ch.apiKey || ch.geminiApiKey || ch.effort))
+    if (
+      area === "local" &&
+      (ch.model || ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.effort)
+    )
       refreshCaps();
     if (area === "local" && ch.customPrompt) {
       customPrompt = String(ch.customPrompt.newValue || "").trim();
@@ -683,17 +707,22 @@
       }
     }
     const tetoB64 =
-      provAtual === "gemini" ? MAX_TOTAL_B64_CHARS_GEMINI : MAX_TOTAL_B64_CHARS;
+      provAtual === "gemini"
+        ? MAX_TOTAL_B64_CHARS_GEMINI
+        : provAtual === "openai"
+          ? MAX_TOTAL_B64_CHARS_OPENAI
+          : MAX_TOTAL_B64_CHARS;
     if (totalB64 > tetoB64) {
       const mb = Math.round(totalB64 / 1024 / 1024);
       throw new Error(
         `as peças selecionadas somam ~${mb} MB — acima do limite da análise. Desmarque algumas peças maiores e tente de novo.`
       );
     }
-    // Breakpoint de cache é conceito da Anthropic; o Gemini usa implicit
-    // caching (automático) e o gemini.js nem copiaria o campo — mas não
-    // sujar o histórico evita surpresas se o usuário voltar ao Claude.
-    if (blocks.length && provAtual !== "gemini") {
+    // Breakpoint de cache é conceito EXCLUSIVO da Anthropic; Gemini e OpenAI
+    // usam cache automático (implicit) e os clientes deles nem copiariam o
+    // campo — mas não sujar o histórico evita surpresas se o usuário voltar ao
+    // Claude.
+    if (blocks.length && provAtual === "anthropic") {
       blocks[blocks.length - 1].cache_control = { type: "ephemeral" };
     }
     return blocks;

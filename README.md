@@ -19,7 +19,7 @@
 
 **TecJustiça PJe** é uma extensão Chrome que adiciona um assistente de IA à tela de autos digitais
 do **PJe (Processo Judicial Eletrônico)**. Você marca as peças do processo, pergunta em
-linguagem natural e o modelo — **Claude (Anthropic)** ou **Gemini (Google)**, à sua
+linguagem natural e o modelo — **Claude (Anthropic)**, **Gemini (Google)** ou **GPT (OpenAI)**, à sua
 escolha — responde com base no conteúdo real dos documentos — resumos, linhas do tempo,
 partes, pedidos, provas — direto na página do processo, com a interface na paleta visual
 do próprio PJe.
@@ -59,13 +59,13 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 ### Conversa e modelos
 
 - **Chat sobre os autos** — converse com o modelo sobre as peças selecionadas, com histórico multi-turno e streaming em tempo real (raciocínio do modelo em bloco colapsável).
-- **Dois provedores de IA** — modelos **Claude (Anthropic)** e **Gemini (Google)** na mesma extensão: cadastre a chave do provedor que preferir (ou as duas) e troque de modelo nas opções. Ver a tabela [Qual modelo escolher?](#-qual-modelo-escolher) abaixo.
+- **Três provedores de IA** — modelos **Claude (Anthropic)**, **Gemini (Google)** e **GPT (OpenAI)** na mesma extensão: cadastre a chave do provedor que preferir (ou as três) e troque de modelo nas opções. Ver a tabela [Qual modelo escolher?](#-qual-modelo-escolher) abaixo.
 - **Selo do modelo ativo** — a barra de ferramentas mostra o modelo e o nível de raciocínio em uso (ex.: "Gemini 3.6 Flash · raciocínio alto"), atualizado na hora ao salvar as opções; clique nele para abrir a configuração.
 - **Custo por resposta** — o rodapé estima o custo em US$ de cada resposta e o acumulado da conversa, calculado pela tabela de preços do provedor (com o desconto de cache).
 - **Citações com página** *(modelos Claude)* — as afirmações vêm com marcadores `[n]` e a lista de fontes ("Contestação, fl. 12") no rodapé; nos modelos Gemini a citação vem no próprio texto ("conforme a Contestação, fl. 12").
 - **Busca de jurisprudência** 🔍 — toggle que libera pesquisa na web (fontes oficiais: STF, STJ, Planalto, LexML…), com a consulta em andamento exibida em tempo real. Nos modelos Gemini usa o Google Search.
-- **Minutar** ✍️ *(nos dois provedores)* — peça ao modelo o texto de um ato (despacho, decisão, sentença, parecer…) e ele abre num **editor de texto** próprio, em nova aba, já com a formatação forense (A4, margens 3/2 cm, Times 12, entrelinha 1,5, parágrafos justificados). Do editor você **⎘ copia formatado** para colar no editor de minutas do PJe, **⬇ baixa em `.docx`** (Word, gerado no próprio navegador) ou **🖨 imprime/salva em PDF**. Toda afirmação leva a origem `(peça · id · fl.)` e o que faltar nas peças vira `[COMPLETAR: …]`. Toda resposta longa do chat também ganha um botão **Abrir no editor**. O rascunho fica guardado no computador (7 dias) para reabrir depois.
-- **Mapa mental** 🧠 *(nos dois provedores)* — o modelo organiza as peças marcadas nos eixos da análise processual (partes, fatos, pedidos, teses, provas, audiências, decisões, prazos, situação) e a extensão abre um **mapa interativo** em nova aba (markmap): cada eixo com ícone e cor próprios, **tabelas** onde a informação é tabular, **pílulas** de folha, id da peça, data, valor e norma, e a origem (`peça · id · fl.`) em cada tópico. Nasce recolhido, com níveis de detalhe, zoom, tema escuro, impressão/PDF e download do texto em `.md`.
+- **Minutar** ✍️ *(nos três provedores)* — peça ao modelo o texto de um ato (despacho, decisão, sentença, parecer…) e ele abre num **editor de texto** próprio, em nova aba, já com a formatação forense (A4, margens 3/2 cm, Times 12, entrelinha 1,5, parágrafos justificados). Do editor você **⎘ copia formatado** para colar no editor de minutas do PJe, **⬇ baixa em `.docx`** (Word, gerado no próprio navegador) ou **🖨 imprime/salva em PDF**. Toda afirmação leva a origem `(peça · id · fl.)` e o que faltar nas peças vira `[COMPLETAR: …]`. Toda resposta longa do chat também ganha um botão **Abrir no editor**. O rascunho fica guardado no computador (7 dias) para reabrir depois.
+- **Mapa mental** 🧠 *(nos três provedores)* — o modelo organiza as peças marcadas nos eixos da análise processual (partes, fatos, pedidos, teses, provas, audiências, decisões, prazos, situação) e a extensão abre um **mapa interativo** em nova aba (markmap): cada eixo com ícone e cor próprios, **tabelas** onde a informação é tabular, **pílulas** de folha, id da peça, data, valor e norma, e a origem (`peça · id · fl.`) em cada tópico. Nasce recolhido, com níveis de detalhe, zoom, tema escuro, impressão/PDF e download do texto em `.md`.
 - **Biblioteca de prompts** ✦ — salve instruções que você repete (título + texto) e insira-as digitando **`/`** no início do campo: o prompt vira um chip elegante acima da caixa de texto e é enviado antes da sua mensagem. Gerenciamento (criar/editar/excluir) no botão **✦ Prompts**, e os prompts acompanham você em outros navegadores pela sincronização da conta Google.
 - **OCR nativo** — peças digitalizadas (imagem) são lidas pelo próprio modelo, sem OCR externo.
 
@@ -84,7 +84,7 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 
 - **Medidor de contexto dinâmico** — barra mostra quanto da janela do modelo (tokens e páginas de PDF) a conversa ocupa, atualizada ao marcar/desmarcar peças **antes mesmo do envio**, com alertas em 70% e 90%. Desmarcar uma peça **libera contexto de verdade** no request seguinte.
 - **Files API + anexo incremental** — cada peça sobe uma única vez; os turnos seguintes reaproveitam o que já está na conversa.
-- **Cache automático** — os PDFs anexados são cacheados pela API (~90% mais barato nos turnos seguintes), nos dois provedores.
+- **Cache automático** — os PDFs anexados são cacheados pela API (~90% mais barato nos turnos seguintes), nos três provedores.
 - **Retry automático** — sobrecarga da API, limites momentâneos e quedas de conexão no meio do streaming são re-tentados sozinhos, sem duplicar texto na tela.
 - **PDF × HTML detectados automaticamente** — peças HTML viram texto puro (fração do custo de um PDF); a detecção confere o content-type **e** a assinatura `%PDF-` do binário.
 - **Erros amigáveis** — chave inválida, conta sem crédito, limites e sobrecarga explicados em português.
@@ -107,8 +107,11 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 | **Claude Fable 5** | 1M / 600 págs. | 10 / 50 | O mais capaz — e o mais caro e lento |
 | **Gemini 3.6 Flash** | 1M / 1000 págs. | 1,50 / 7,50 | Rápido e multimodal, ótimo custo para autos grandes |
 | **Gemini 3.5 Flash-Lite** | 1M / 1000 págs. | 0,30 / 2,50 | O mais barato e veloz — triagens e resumos |
+| **GPT-5.6 Luna** | 1,05M tokens | 0,20 / 1,20 | O GPT rápido e econômico; citações no texto |
+| **GPT-5.6 Terra** | 1,05M tokens | 2 / 12 | GPT equilibrado entre custo e capacidade; citações no texto |
+| **GPT-5.6 (Sol)** | 1,05M tokens | 5 / 30 | O GPT mais capaz; citações no texto |
 
-> Nos modelos Gemini, as citações de página vêm no próprio texto (sem os marcadores `[n]` clicáveis) — essa é a única diferença; minutar e o mapa mental funcionam igual nos dois provedores. Trocar entre Claude e Gemini no meio de uma conversa pede "Nova conversa".
+> Nos modelos Gemini e GPT, as citações de página vêm no próprio texto (sem os marcadores `[n]` clicáveis) — essa é a única diferença; minutar e o mapa mental funcionam igual nos três provedores. Trocar de provedor (Claude, Gemini ou GPT) no meio de uma conversa pede "Nova conversa".
 
 ## 🚀 Instalação
 
@@ -181,7 +184,7 @@ ids de peça, datas, valores e artigos ganham **destaque colorido**.
 quantos tópicos vieram com peça e folha. Ainda dá para alternar o **tema escuro**,
 baixar o texto em **`.md`** e **imprimir** (ou salvar em PDF, já enquadrado).
 
-> O mapa mental funciona **nos dois provedores** — Claude e Gemini —, porque é um
+> O mapa mental funciona **nos três provedores** — Claude, Gemini e GPT —, porque é um
 > chat comum, sem execução de código. Os mapas ficam disponíveis enquanto o
 > navegador estiver aberto.
 
@@ -211,7 +214,7 @@ No editor você revisa, ajusta e então:
 o modelo deixa `[COMPLETAR: …]` para quem assina preencher — nada de número, data ou
 precedente inventado. O rascunho fica **guardado no computador por 7 dias** para você
 reabrir e continuar; **Descartar**, no editor, apaga na hora. Como o mapa, minutar é um
-chat comum: funciona **em qualquer modelo**, Claude ou Gemini.
+chat comum: funciona **em qualquer modelo**, Claude, Gemini ou GPT.
 
 > A minuta é uma sugestão de trabalho, não um ato: revise o texto e confira as citações
 > nos autos antes de usar.
@@ -262,7 +265,7 @@ flowchart LR
 | `src/panel.js` / `panel.css` | UI do chat em Shadow DOM (isolada do CSS do PJe): seletor de peças, menção `@`, prompts salvos `/`, chips de contexto, card de progresso e renderizador markdown próprio e seguro. |
 | `src/prompts.js` | Biblioteca de prompts do usuário: CRUD no `chrome.storage.sync` (um item por prompt), sincronizado entre os navegadores da mesma conta Google. |
 | `src/content.js` | Orquestra: downloads paralelos, cache por peça, prompt caching, conversa multi-turno. |
-| `src/background.js` + `claude.js` / `gemini.js` | Service worker que guarda as chaves e chama a API do provedor do modelo escolhido (Anthropic ou Google) com streaming. **As chaves nunca são expostas à página.** |
+| `src/background.js` + `claude.js` / `gemini.js` / `openai.js` | Service worker que guarda as chaves e chama a API do provedor do modelo escolhido (Anthropic, Google ou OpenAI) com streaming. **As chaves nunca são expostas à página.** |
 | `src/mapa.html` + `mapa.js` / `mapa.css` | Página do **mapa mental**: converte o Markdown da resposta em árvore de nós (com ícones por eixo, tabelas e realces de fl./id) e desenha com markmap (d3), em aba própria da extensão. |
 | `vendor/` | `d3.min.js` e `markmap-view.js` oficiais, sem modificação, usados **só** pela página do mapa (nunca carregados nas páginas do PJe). Licenças em `vendor/LICENSES.md`. |
 | `src/popup.html` | Configuração em 1 clique no ícone da barra (chave, modelo, guia de primeiros passos). |
@@ -270,7 +273,7 @@ flowchart LR
 ## 🔒 Privacidade e segurança
 
 - As chaves de API ficam **somente** no `chrome.storage.local` do seu navegador (não sincronizam, não passam por servidores de terceiros).
-- Os documentos marcados são enviados **diretamente à API do provedor do modelo escolhido** (Anthropic ou Google) — nenhum outro serviço intermedia.
+- Os documentos marcados são enviados **diretamente à API do provedor do modelo escolhido** (Anthropic, Google ou OpenAI) — nenhum outro serviço intermedia.
 - A extensão só roda em sites da Justiça (`*.jus.br`), só injeta o painel em telas de autos do PJe e não coleta telemetria.
 - Política completa em [PRIVACY.md](PRIVACY.md) — sem servidor próprio, sem analytics, o desenvolvedor nunca tem acesso a nenhum dado.
 
@@ -286,8 +289,9 @@ flowchart LR
 - [x] Suporte a outros tribunais que usam PJe (TJs/TRFs/TRTs) — automático em qualquer `*.jus.br`
 - [x] Carregamento automático da timeline completa (peças fora da rolagem)
 - [x] Segundo provedor de IA — Google Gemini (3.6 Flash / 3.5 Flash-Lite)
+- [x] Terceiro provedor de IA — OpenAI GPT-5.6 (Luna / Terra / Sol)
 - [x] Preview de peças, modo lateral e "ver na timeline"
-- [x] Mapa mental interativo das peças (markmap), nos dois provedores
+- [x] Mapa mental interativo das peças (markmap), nos três provedores
 - [x] Biblioteca de prompts do usuário (`/` no campo, sincronizada entre navegadores)
 - [ ] Compaction para conversas muito longas
 - [ ] Limpeza de uploads antigos na Files API
@@ -403,4 +407,4 @@ em qual tribunal, e cole a mensagem de erro do painel (o Console do F12 também 
 
 ---
 
-<p align="center"><sub>Feito com ⚖️ para quem lê autos o dia inteiro. Não afiliado ao CNJ, à Anthropic nem ao Google.</sub></p>
+<p align="center"><sub>Feito com ⚖️ para quem lê autos o dia inteiro. Não afiliado ao CNJ, à Anthropic, ao Google nem à OpenAI.</sub></p>

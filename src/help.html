@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <title>TecJustiça PJe — Como criar sua chave da API (Anthropic ou Google)</title>
+    <title>TecJustiça PJe — Como criar sua chave da API (Anthropic, Google ou OpenAI)</title>
     <link rel="stylesheet" href="ui.css" />
     <style>
       body { display: block; padding: 0 0 60px; }
@@ -82,10 +82,11 @@
     <div class="page">
       <h1 class="serif">Criar sua chave da API da Anthropic</h1>
       <p class="lead">
-        A extensão funciona com os modelos <strong>Claude (Anthropic)</strong> e
-        <strong>Gemini (Google)</strong> — basta ter a chave do provedor do modelo escolhido.
-        Esta seção cobre a Anthropic; a chave do Google está
-        <a class="link" href="#gemini">logo abaixo</a>. Você precisa de uma
+        A extensão funciona com os modelos <strong>Claude (Anthropic)</strong>,
+        <strong>Gemini (Google)</strong> e <strong>GPT (OpenAI)</strong> — basta ter a chave do
+        provedor do modelo escolhido. Esta seção cobre a Anthropic; a chave do Google está
+        <a class="link" href="#gemini">mais abaixo</a> e a da OpenAI
+        <a class="link" href="#openai">na sequência</a>. Você precisa de uma
         <strong>chave de API própria</strong> e de <strong>crédito</strong> na sua conta. Leva ~3 minutos.
       </p>
 
@@ -174,6 +175,38 @@
         inclusive gerar minutas e o mapa mental — funciona igual.</em></p>
       </div>
 
+      <h1 class="serif" id="openai">Criar sua chave da API da OpenAI (GPT)</h1>
+      <p class="lead">
+        Para usar os modelos <strong>GPT-5.6</strong> (Luna, Terra e Sol), crie uma chave na
+        plataforma de desenvolvedores da OpenAI. Leva ~3 minutos e exige crédito na conta.
+      </p>
+
+      <div class="card">
+        <div class="head"><div class="num">1</div><h2>Acesse a plataforma da OpenAI</h2></div>
+        <p>Crie uma conta (ou entre) no painel de desenvolvedores — é diferente do ChatGPT.</p>
+        <a class="gobtn" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Abrir platform.openai.com ↗</a>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">2</div><h2>Adicione crédito</h2></div>
+        <p>Vá em <strong>Settings → Billing</strong> e adicione crédito pré-pago. Um valor pequeno
+        já basta para começar — a OpenAI cobra por uso.</p>
+        <a class="gobtn" href="https://platform.openai.com/settings/organization/billing" target="_blank" rel="noopener">Abrir Billing ↗</a>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">3</div><h2>Crie a API Key e cole na extensão</h2></div>
+        <p>Em <strong>API keys → Create new secret key</strong>, gere a chave (começa com
+        <code>sk-...</code>) e copie na hora — ela aparece uma única vez.</p>
+        <ul>
+          <li>Clique no ícone <strong>⚖️ TecJustiça PJe</strong> na barra do Chrome.</li>
+          <li>Cole a chave no campo <strong>"Chave da API — OpenAI (GPT)"</strong>, escolha um modelo GPT e clique em <strong>Salvar</strong>.</li>
+        </ul>
+        <p style="margin-top:10px"><em>Como no Gemini, as citações de página aparecem no próprio
+        texto da resposta (sem os marcadores [n] clicáveis). Todo o resto — inclusive minutas e o
+        mapa mental — funciona igual.</em></p>
+      </div>
+
       <h1 class="serif" id="modelos">Qual modelo escolher?</h1>
       <div class="card">
         <p>O selo na barra de ferramentas do chat mostra sempre o modelo e o nível de
@@ -188,10 +221,14 @@
           <tr><td><strong>Claude Fable 5</strong></td><td>1M tokens / 600 págs.</td><td>10 / 50</td><td>O mais capaz — e o mais caro e lento. Para casos excepcionais.</td></tr>
           <tr><td><strong>Gemini 3.6 Flash</strong></td><td>1M tokens / 1000 págs.</td><td>1,50 / 7,50</td><td>Rápido, multimodal e com ótimo custo para autos grandes. Citações no texto.</td></tr>
           <tr><td><strong>Gemini 3.5 Flash-Lite</strong></td><td>1M tokens / 1000 págs.</td><td>0,30 / 2,50</td><td>O mais barato e veloz de todos — ideal para triagens e resumos rápidos. Citações no texto.</td></tr>
+          <tr><td><strong>GPT-5.6 Luna</strong></td><td>1,05M tokens</td><td>0,20 / 1,20</td><td>O GPT rápido e econômico — bom para triagens e o dia a dia. Citações no texto.</td></tr>
+          <tr><td><strong>GPT-5.6 Terra</strong></td><td>1,05M tokens</td><td>2 / 12</td><td>GPT equilibrado entre custo e capacidade. Citações no texto.</td></tr>
+          <tr><td><strong>GPT-5.6 (Sol)</strong></td><td>1,05M tokens</td><td>5 / 30</td><td>O GPT mais capaz — para análises delicadas. Citações no texto.</td></tr>
         </table>
         <p style="margin-top:10px"><em>Regra prática: Haiku para o dia a dia; Gemini 3.5
-        Flash-Lite quando o custo importa mais; Sonnet 5 ou Gemini 3.6 Flash para autos
-        volumosos; Opus/Fable quando a qualidade da análise vale o preço.</em></p>
+        Flash-Lite ou GPT-5.6 Luna quando o custo importa mais; Sonnet 5, Gemini 3.6 Flash ou
+        GPT-5.6 Terra para autos volumosos; Opus/Fable ou GPT-5.6 (Sol) quando a qualidade da
+        análise vale o preço.</em></p>
       </div>
 
       <h1 class="serif">Como usar bem o chat (fluxo recomendado)</h1>
@@ -210,13 +247,13 @@
           copia para o PJe, baixa em Word (.docx) ou imprime; e <strong>🧠 Mapa mental</strong>
           para ver a estrutura do feito — partes, fatos, pedidos, teses, provas, decisões e
           situação atual — num mapa interativo. Minutar e o mapa funcionam em <strong>qualquer
-          modelo</strong>, Claude ou Gemini, sempre com a peça, o <em>id</em> e a folha de origem.</li>
+          modelo</strong>, Claude, Gemini ou GPT, sempre com a peça, o <em>id</em> e a folha de origem.</li>
           <li>Siga a conversa: <strong>adicionar</strong> peças no meio é barato; para
           <strong>remover</strong> várias ou mudar de assunto, prefira ⟲ Nova conversa.</li>
           <li><strong>Personalize o assistente</strong>: nas opções, o campo
           <strong>"Instruções personalizadas"</strong> diz ao modelo quem você é e como quer as
           respostas (ex.: "Sou assessor de vara criminal; destaque prazos prescricionais") —
-          vale para os modelos Claude e Gemini, no chat, nas minutas e no mapa.</li>
+          vale para os modelos Claude, Gemini e GPT, no chat, nas minutas e no mapa.</li>
         </ol>
       </div>
 
@@ -231,7 +268,7 @@
           ponto em diante (o turno seguinte re-paga o envio das peças restantes). Use quando o medidor
           encher; para trocar de assunto ou remodelar a seleção inteira, prefira <strong>⟲ Nova conversa</strong>.</li>
           <li><strong>O medidor no rodapé é o guia</strong>: perto de 90% da janela do modelo, desmarque
-          peças ou abra uma conversa nova. Vale para Claude e Gemini (ambos têm cache automático).</li>
+          peças ou abra uma conversa nova. Vale para Claude, Gemini e GPT (todos têm cache automático).</li>
         </ul>
       </div>
 
@@ -255,7 +292,7 @@
 
       <div class="warn-box">
         🔒 Suas chaves ficam só neste navegador (não são enviadas a lugar nenhum além das próprias APIs
-        da Anthropic e do Google). As peças que você marcar são enviadas ao modelo escolhido para
+        da Anthropic, do Google e da OpenAI). As peças que você marcar são enviadas ao modelo escolhido para
         análise — processos podem conter dados sigilosos, use com critério.
         <strong>As minutas geradas ficam guardadas neste computador</strong> (para você reabri-las
         depois) e são apagadas automaticamente após 7 dias — use <strong>Descartar</strong>, no

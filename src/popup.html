@@ -30,7 +30,7 @@
       <img src="../icons/icon48.png" alt="" />
       <div>
         <div class="t">TecJustiça PJe</div>
-        <div class="s">Análise de autos com IA — Claude ou Gemini</div>
+        <div class="s">Análise de autos com IA — Claude, Gemini ou GPT</div>
       </div>
     </div>
 
@@ -71,6 +71,20 @@
         </div>
       </details>
 
+      <details class="keybox" id="boxO">
+        <summary>
+          Chave da API — OpenAI (GPT)
+          <span class="kstate" id="kstateO">não configurada</span>
+        </summary>
+        <div class="keybox-in">
+          <div class="pw-row">
+            <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" aria-label="Chave da API da OpenAI" />
+            <button class="toggle-pw" id="togglePwO" type="button">mostrar</button>
+          </div>
+          <span class="hint">Opcional. Crie em platform.openai.com — <a href="help.html#openai" target="_blank">passo a passo →</a></span>
+        </div>
+      </details>
+
       <label class="field" for="model">Modelo</label>
       <select id="model">
         <optgroup label="Claude (Anthropic)">
@@ -82,6 +96,11 @@
         <optgroup label="Gemini (Google)">
           <option value="gemini-3.6-flash">Gemini 3.6 Flash (1M tokens — rápido)</option>
           <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (1M tokens — o mais barato)</option>
+        </optgroup>
+        <optgroup label="GPT (OpenAI)">
+          <option value="gpt-5.6-luna">GPT-5.6 Luna (1M tokens — rápido e barato)</option>
+          <option value="gpt-5.6-terra">GPT-5.6 Terra (1M tokens — equilibrado)</option>
+          <option value="gpt-5.6-sol">GPT-5.6 (Sol — o mais capaz)</option>
         </optgroup>
       </select>
 
@@ -96,7 +115,7 @@
       </div>
 
       <label class="field" for="customPrompt">Instruções personalizadas (opcional)
-        <span class="hint">Quem você é e como quer as respostas — vale para Claude e Gemini.</span>
+        <span class="hint">Quem você é e como quer as respostas — vale para Claude, Gemini e GPT.</span>
       </label>
       <textarea id="customPrompt" rows="2" maxlength="4000" placeholder="Ex.: Sou advogado(a) da parte autora; aponte riscos e teses favoráveis…"></textarea>
 

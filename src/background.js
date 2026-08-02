@@ -3,9 +3,10 @@
 // Também resolve sozinho as continuações de turno (stop_reason "pause_turn",
 // quando o loop de ferramentas do servidor atinge o teto de iterações) — o
 // content script enxerga um único turno lógico.
-// Dois provedores: Anthropic (claude.js) e Google Gemini (gemini.js). O
-// provedor é inferido do id do modelo (prefixo "gemini-") e os dois clientes
-// emitem o MESMO vocabulário de eventos — o resto deste arquivo não distingue.
+// Três provedores: Anthropic (claude.js), Google Gemini (gemini.js) e OpenAI
+// (openai.js). O provedor é inferido do id do modelo (prefixos "gemini-" e
+// "gpt-") e os três clientes emitem o MESMO vocabulário de eventos — o resto
+// deste arquivo não distingue.
 import {
   streamClaude,
   uploadFile,
@@ -17,6 +18,11 @@ import {
   uploadFileGemini,
   countTokensGemini,
 } from "./gemini.js";
+import {
+  streamOpenAI,
+  uploadFileOpenAI,
+  countTokensOpenAI,
+} from "./openai.js";
 
 // Capacidades por modelo. Governam limites de páginas/contexto, as versões das
 // ferramentas web, a configuração de thinking/effort aceita por cada um e o
@@ -93,18 +99,69 @@ const MODEL_CAPS = {
     tokensPagina: 258,
     preco: { in: 0.3, out: 2.5, cacheRead: 0.03 },
   },
+  // Modelos OpenAI GPT-5.6 (Responses API). Família de três níveis: Sol
+  // (topo, alias "gpt-5.6"), Terra (equilibrado) e Luna (rápido/barato). Como
+  // o Gemini, a OpenAI não tem citação estruturada por página — o system
+  // prompt pede citações TEXTUAIS ("na Contestação, id 123456, fl. 12") e a UI
+  // mostra a nota (citacoesNativas:false). O effort vira reasoning.effort. Sem
+  // limite oficial de páginas de PDF (o limite é 50 MB/request) — maxPages é
+  // uma heurística de segurança. preco: US$/1M (in/out) + cacheRead (10% do
+  // input, cache automático sem cobrança de gravação). Contexto 1.05M tokens.
+  "gpt-5.6-sol": {
+    provider: "openai",
+    contextTokens: 1050000,
+    maxPages: 500,
+    webSearch: true,
+    citacoesNativas: false,
+    thinking: null,
+    effort: true, // vira reasoning.effort
+    preco: { in: 5, out: 30, cacheRead: 0.5 },
+  },
+  "gpt-5.6-terra": {
+    provider: "openai",
+    contextTokens: 1050000,
+    maxPages: 500,
+    webSearch: true,
+    citacoesNativas: false,
+    thinking: null,
+    effort: true,
+    preco: { in: 2, out: 12, cacheRead: 0.2 },
+  },
+  "gpt-5.6-luna": {
+    provider: "openai",
+    contextTokens: 1050000,
+    maxPages: 500,
+    webSearch: true,
+    citacoesNativas: false,
+    thinking: null,
+    effort: true,
+    preco: { in: 0.2, out: 1.2, cacheRead: 0.02 },
+  },
 };
 
 // Provedor do modelo (prefixo do id — a lista de modelos vive nos <option>
 // do popup/options; ids desconhecidos caem no default Anthropic via capsDe).
 function providerDe(model) {
-  return model && model.startsWith("gemini-") ? "gemini" : "anthropic";
+  if (!model) return "anthropic";
+  if (model.startsWith("gemini-")) return "gemini";
+  if (model.startsWith("gpt-")) return "openai";
+  return "anthropic";
 }
 
 // effort salvo (high/medium/low) → thinking_level do Gemini. A escala do
 // Gemini tem os mesmos três nomes (há também "minimal", que não usamos: o
 // "low" já é a opção econômica equivalente ao effort baixo da Anthropic).
 const EFFORT_PARA_THINKING_LEVEL = { high: "high", medium: "medium", low: "low" };
+
+// effort salvo → reasoning.effort da OpenAI. A escala da OpenAI é a MAIS RICA
+// dos três provedores: none | minimal | low | medium | high | xhigh | max (e
+// ainda um eixo separado reasoning.mode standard|pro|ultra). Mapeamos os três
+// níveis da extensão para o subconjunto COMUM low/medium/high — o único aceito
+// por todos os provedores E por todas as variantes 5.6 (o suporte a xhigh/max
+// é dependente do modelo e não documentado por variante; Luna/Terra podem
+// rejeitá-los com 400). "Alto" = high. Se um dia quiser expor xhigh/max, é
+// aqui (e provavelmente só para o Sol).
+const EFFORT_PARA_OPENAI = { high: "high", medium: "medium", low: "low" };
 
 // Custo estimado (US$) de um usage acumulado, pela tabela de preços do modelo.
 // A API não devolve valor monetário — só as contagens de tokens por categoria.
@@ -131,13 +188,16 @@ function capsDe(model) {
 // (1M) no popup/opções; o MODEL_CAPS e o medidor cuidam dos limites.
 function getCfg() {
   return new Promise((resolve) =>
-    chrome.storage.local.get(["apiKey", "geminiApiKey", "model", "effort"], (v) =>
-      resolve({
-        apiKey: v.apiKey,
-        geminiApiKey: v.geminiApiKey,
-        model: v.model || "claude-haiku-4-5",
-        effort: v.effort || "high",
-      })
+    chrome.storage.local.get(
+      ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort"],
+      (v) =>
+        resolve({
+          apiKey: v.apiKey,
+          geminiApiKey: v.geminiApiKey,
+          openaiApiKey: v.openaiApiKey,
+          model: v.model || "claude-haiku-4-5",
+          effort: v.effort || "high",
+        })
     )
   );
 }
@@ -151,6 +211,14 @@ function chaveDe(cfg, provider) {
       );
     }
     return cfg.geminiApiKey;
+  }
+  if (provider === "openai") {
+    if (!cfg.openaiApiKey) {
+      throw new Error(
+        "configure sua chave da API da OpenAI nas opções da extensão (o modelo escolhido é GPT)"
+      );
+    }
+    return cfg.openaiApiKey;
   }
   if (!cfg.apiKey) {
     throw new Error("configure sua ANTHROPIC_API_KEY nas opções da extensão");
@@ -214,6 +282,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           if (key) await sessSet(key, { uri: r.fileUri, exp: r.expiraEm });
           return sendResponse({ fileId: r.fileUri, provider });
         }
+        if (provider === "openai") {
+          // namespace próprio ("ofile:"): um file_id da OpenAI nunca pode ser
+          // lido num request Anthropic/Gemini (e vice-versa). Os arquivos da
+          // OpenAI persistem na conta, então não há validação de expiração.
+          const key = msg.payload.cacheKey ? "ofile:" + msg.payload.cacheKey : null;
+          if (key) {
+            const cached = await sessGet(key);
+            if (cached) return sendResponse({ fileId: cached, provider });
+          }
+          const fileId = await uploadFileOpenAI({
+            apiKey,
+            filename: msg.payload.filename,
+            b64: msg.payload.b64,
+            mime: msg.payload.mime,
+          });
+          if (key) await sessSet(key, fileId);
+          return sendResponse({ fileId, provider });
+        }
         const key = msg.payload.cacheKey ? "file:" + msg.payload.cacheKey : null;
         if (key) {
           const cached = await sessGet(key);
@@ -240,22 +326,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const cfg = await getCfg();
         const provider = providerDe(cfg.model);
         const apiKey = chaveDe(cfg, provider);
-        const tokens =
-          provider === "gemini"
-            ? await countTokensGemini({
-                apiKey,
-                model: cfg.model,
-                system: msg.payload.system,
-                messages: msg.payload.messages,
-              })
-            : await countTokens({
-                apiKey,
-                model: cfg.model,
-                system: msg.payload.system,
-                messages: msg.payload.messages,
-                tools: msg.payload.tools,
-                betas: msg.payload.betas,
-              });
+        let tokens;
+        if (provider === "gemini") {
+          tokens = await countTokensGemini({
+            apiKey,
+            model: cfg.model,
+            system: msg.payload.system,
+            messages: msg.payload.messages,
+          });
+        } else if (provider === "openai") {
+          tokens = await countTokensOpenAI({
+            apiKey,
+            model: cfg.model,
+            system: msg.payload.system,
+            messages: msg.payload.messages,
+            tools: msg.payload.tools,
+          });
+        } else {
+          tokens = await countTokens({
+            apiKey,
+            model: cfg.model,
+            system: msg.payload.system,
+            messages: msg.payload.messages,
+            tools: msg.payload.tools,
+            betas: msg.payload.betas,
+          });
+        }
         sendResponse({ tokens, contextTokens: capsDe(cfg.model).contextTokens });
       } catch (e) {
         sendResponse({ error: String((e && e.message) || e) });
@@ -344,10 +440,16 @@ async function executarTurno(port, payload) {
   const caps = capsDe(model);
   const provider = caps.provider || "anthropic";
   const apiKey = chaveDe(cfg, provider);
-  // Os dois clientes emitem o mesmo vocabulário de eventos — daqui em diante
-  // o turno não distingue provedor (o Gemini nunca emite pause_turn, então o
-  // loop de continuações sai naturalmente na primeira iteração).
-  const streamFn = provider === "gemini" ? streamGemini : streamClaude;
+  // Os três clientes emitem o mesmo vocabulário de eventos — daqui em diante
+  // o turno não distingue provedor (nem o Gemini nem a OpenAI emitem
+  // pause_turn, então o loop de continuações sai naturalmente na primeira
+  // iteração para eles).
+  const streamFn =
+    provider === "gemini"
+      ? streamGemini
+      : provider === "openai"
+        ? streamOpenAI
+        : streamClaude;
 
   const baseReq = {
     apiKey,
@@ -360,6 +462,11 @@ async function executarTurno(port, payload) {
     // Gemini: sem betas/thinking/output_config; o effort vira thinking_level.
     if (caps.effort) {
       baseReq.thinkingLevel = EFFORT_PARA_THINKING_LEVEL[effort] || "medium";
+    }
+  } else if (provider === "openai") {
+    // OpenAI: sem betas/thinking/output_config; o effort vira reasoning.effort.
+    if (caps.effort) {
+      baseReq.effort = EFFORT_PARA_OPENAI[effort] || "medium";
     }
   } else {
     if (payload.betas && payload.betas.length) baseReq.betas = payload.betas;
