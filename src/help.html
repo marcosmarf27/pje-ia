@@ -259,7 +259,29 @@
       </div>
 
       <div class="card">
-        <div class="head"><div class="num">2</div><h2>Para peças digitalizadas, a chave da Mistral</h2></div>
+        <div class="head"><div class="num">2</div><h2>Uma peça de cada vez, ou todas de uma vez</h2></div>
+        <p>
+          São <strong>dois caminhos</strong>, e o individual costuma ser o melhor:
+        </p>
+        <ul>
+          <li><strong>Peça a peça</strong> — passe o mouse sobre a linha da peça e clique no ícone
+          <strong>⌁</strong>. Extrai só aquela. É o caminho para quando você já sabe qual peça
+          quer em texto (a contestação de 80 páginas, o inquérito digitalizado) e não quer mexer
+          no resto.</li>
+          <li><strong>Em lote</strong> — a faixa abaixo da lista mostra quantas peças
+          <em>marcadas</em> ainda vão como documento, e o botão extrai todas elas. Útil no começo,
+          quando você quer o processo inteiro em texto.</li>
+        </ul>
+        <p>
+          Peça já extraída ganha uma <strong>marca verde</strong> na lista — é assim que se sabe
+          que funcionou. Ao terminar, um resumo no chat diz quantas foram lidas de graça, quantas
+          por OCR (e quanto custou), quantas <strong>já eram texto e não precisaram de nada</strong>
+          (peças escritas no editor do PJe) e quais não deram — com o motivo.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">3</div><h2>Para peças digitalizadas, a chave da Mistral</h2></div>
         <p>
           Quando a peça é uma <strong>digitalização</strong> (uma imagem do papel), não há texto a
           ler: aí entra o OCR. Crie uma chave em <strong>console.mistral.ai</strong>, cole no campo
@@ -275,12 +297,18 @@
       </div>
 
       <div class="card">
-        <div class="head"><div class="num">3</div><h2>Quando NÃO vale a pena</h2></div>
+        <div class="head"><div class="num">4</div><h2>Quando NÃO vale a pena</h2></div>
         <p>
           Extrair o texto <strong>apaga o que é visual</strong>: assinaturas, carimbo de protocolo,
           selo de autenticidade, RG digitalizado, fotos de laudo pericial. Se a sua pergunta
-          depende disso, deixe a peça como documento — a extensão avisa antes de extrair peças que
-          contêm imagens, e <strong>Voltar ao documento</strong> desfaz a qualquer momento.
+          depende disso, deixe a peça como documento — ao extrair um lote com peças que contêm
+          imagens, a extensão oferece <strong>extrair só as que não perdem nada</strong>.
+        </p>
+        <p>
+          Para conferir, <strong>passe o mouse sobre a peça</strong>: o preview tem as abas
+          <strong>Documento</strong> e <strong>Texto</strong>, e um ponto verde marca qual das
+          duas versões está indo para a IA. Se o texto saiu ruim — o caso típico de um documento
+          de identidade —, o botão <strong>Voltar ao documento</strong> ali mesmo desfaz.
         </p>
         <p>
           Sobre custo, a conta muda com o modelo. No <strong>Gemini</strong> e no

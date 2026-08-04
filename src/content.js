@@ -721,7 +721,13 @@
     // Devolver null aqui foi o que fez o botão dizer "Extrair 44" e não
     // extrair nada: a contagem incluía as não baixadas e este filtro as
     // removia. Os dois têm de enxergar a MESMA coisa.
-    if (!d) return { podeExtrair: true, imagens: 0, escaneado: false, naoMedida: true };
+    // A peça que falhou sai da FILA automática, mas o botão dela continua: um
+    // clique naquela linha é o usuário dizendo "tente de novo", e o erro pode
+    // ter sido transitório. O motivo vai no rótulo para a tentativa ser
+    // informada, não às cegas.
+    const falhouAntes = extracaoFalhou.get(id) || null;
+    if (!d)
+      return { podeExtrair: true, imagens: 0, escaneado: false, naoMedida: true, falhouAntes };
     if (d.kind !== "pdf" || d.txtUsar) return null;
     // digitalizada sem chave de OCR: não há o que oferecer
     if (d.escaneado && !d.txt && !ocrPronto) return null;
@@ -731,6 +737,7 @@
       // sentido — o texto já existe e o usuário já decidiu uma vez
       imagens: d.txt ? 0 : d.imagens || 0,
       escaneado: !!d.escaneado,
+      falhouAntes,
     };
   });
 
@@ -749,6 +756,9 @@
       return;
     }
     extraindo = true;
+    // Clique deliberado nesta peça = retentativa: o registro da falha anterior
+    // sai antes de tentar, e só volta se falhar de novo.
+    extracaoFalhou.delete(id);
     try {
       // Duas etapas, dois status: baixar do PJe leva ~5,6 s por peça e a leitura
       // local leva menos de meio segundo. Dizer "extraindo" durante o download
@@ -782,7 +792,9 @@
         );
       }
     } catch (e) {
-      panel.setStatus("Não foi possível extrair: " + ((e && e.message) || e));
+      const msg = (e && e.message) || String(e);
+      extracaoFalhou.set(id, msg);
+      panel.setStatus("Não foi possível extrair: " + msg);
     } finally {
       extraindo = false;
       atualizarEstadoExtracao();
@@ -1099,6 +1111,20 @@
   let extraindo = false; // guarda mútua com envio/exportação/timeline
   let selecaoAtual = []; // projeção dos checkboxes (fonte de verdade segue lá)
 
+  // Peças que JÁ tentaram e não deram — id -> motivo.
+  //
+  // Sem este registro a fila não tem dreno: o PJe devolve 404 em peças que
+  // existem na lista mas não têm download servível (ato ordinatório de sistema
+  // anterior é o caso clássico), `extraiveis` as recolocava em `pendentes` a
+  // cada recálculo, e a faixa prometia "⌁ Extrair 1" para sempre — cada clique
+  // reproduzindo o mesmo erro. Trabalho pendente tem TRÊS estados, não dois:
+  // feito, a fazer e impossível.
+  //
+  // O registro governa só o LOTE (a fila automática). O botão da própria peça
+  // continua disponível como retentativa deliberada: um clique naquela linha é
+  // o usuário dizendo "tente de novo", e um erro pode ter sido transitório.
+  const extracaoFalhou = new Map();
+
   // --- iframe do extrator (pdf.js) -------------------------------------------
   // Um único iframe por aba, criado sob demanda. Páginas em
   // web_accessible_resources não são barradas pela CSP da página que as embute,
@@ -1388,6 +1414,7 @@
       locais: 0, // dessas, quantas sabemos que são nativas (grátis)
       ocr: 0, // quantas sabemos que são digitalizadas (pagas)
       naoMedidas: 0, // ainda não baixadas: o tipo só se sabe depois
+      indisponiveis: 0, // já tentaram e falharam — fora da fila (ver extracaoFalhou)
       paginasOcr: 0,
     };
     for (const id of ids) {
@@ -1400,6 +1427,11 @@
         out.jaTexto++; // peça do editor do PJe: já é texto, nada a fazer
         continue;
       }
+      // Fora da fila: insistir sozinho produziria o mesmo erro para sempre.
+      if (extracaoFalhou.has(id)) {
+        out.indisponiveis++;
+        continue;
+      }
       if (!d) {
         out.pendentes.push(id);
         out.naoMedidas++;
@@ -1407,8 +1439,14 @@
       }
       if (d.kind !== "pdf") continue;
       if (d.escaneado) {
-        // sem chave de OCR não há o que fazer com uma digitalização
-        if (!ocrPronto) continue;
+        // Sem chave de OCR não há o que fazer com uma digitalização — mas ela
+        // conta como INDISPONÍVEL, não some da soma: "1 de 54 ainda em
+        // documento" quando 54 = jaTexto + pendentes + nada seria aritmética
+        // que não fecha, e é o usuário quem paga para entender por quê.
+        if (!ocrPronto) {
+          out.indisponiveis++;
+          continue;
+        }
         out.pendentes.push(id);
         out.ocr++;
         out.paginasOcr += d.pages || 1;
@@ -1448,12 +1486,31 @@
       return;
     }
     const jaNoContexto = bloqueadaNaConversa(ids);
-    const alvo = ids.filter((id) => !jaNoContexto.includes(id));
+    let alvo = ids.filter((id) => !jaNoContexto.includes(id));
+
+    // Peça que a extensão JÁ SABE ser texto fica FORA do card de progresso.
+    // Ver o título dela sob "Extraindo o texto de 54 peças…" e depois virar ✓
+    // afirma que ela foi processada — quando não havia o que processar. Era daí
+    // que vinha "não fica claro se ele está lendo só os PDFs": o card listava
+    // todas, sem distinguir. O card mostra TRABALHO; o relatório final é que
+    // presta contas do conjunto inteiro.
+    const jaEramTexto = [];
+    alvo = alvo.filter((id) => {
+      const d = docsCache.get(id);
+      if (d && (d.kind === "text" || (d.txtUsar && d.txt))) {
+        jaEramTexto.push(id);
+        return false;
+      }
+      return true;
+    });
+
     if (!alvo.length) {
       panel.setStatus(
         jaNoContexto.length
           ? "Estas peças já estão no contexto desta conversa — use “Nova conversa” para extrair o texto delas."
-          : "Nenhuma peça para extrair."
+          : jaEramTexto.length
+            ? "Todas as peças marcadas já vão para a IA como texto."
+            : "Nenhuma peça para extrair."
       );
       return;
     }
@@ -1472,8 +1529,10 @@
     });
     const fila = alvo.slice();
     let okN = 0;
-    let erroN = 0;
-    let jaTextoN = 0;
+    let locaisN = 0; // lidas no navegador, sem custo
+    let ocrN = 0; // digitalizadas, lidas por OCR (pago)
+    let jaTextoN = jaEramTexto.length;
+    const falhas = [];
     let custo = 0;
     let tDown = 0;
     let tExtrai = 0;
@@ -1506,11 +1565,18 @@
           tExtrai += Date.now() - t2;
           custo += r.custoUsd || 0;
           okN++;
+          if (r.fonte === "mistral") ocrN++;
+          else locaisN++;
+          extracaoFalhou.delete(id);
           panel.setPrepState(id, "done");
         } catch (e) {
-          erroN++;
+          const msg = (e && e.message) || String(e);
+          // Registrado para sair da FILA: sem isto a faixa prometeria extrair
+          // esta peça para sempre, e cada clique repetiria o mesmo erro.
+          extracaoFalhou.set(id, msg);
+          falhas.push({ id, titulo: metaDe(id).titulo, erro: msg });
           panel.setPrepState(id, "erro");
-          console.debug("[PJe IA] extração da peça", id, "falhou:", e && e.message);
+          console.debug("[PJe IA] extração da peça", id, "falhou:", msg);
         }
       }
     }
@@ -1528,18 +1594,25 @@
       // Conferido também DEPOIS do laço: cancelar durante a última peça
       // escaparia da guarda do topo (mesma regra da exportação).
       panel.endPrep(sinal.cancelado);
+      // Prestação de contas no CHAT, não no `.status`.
+      //
+      // O `.status` é transitório e some — e uma operação que levou minutos e
+      // pode ter custado dinheiro não pode terminar sem deixar rastro do que
+      // fez. Era esta a queixa "não fica claro quais foram as peças, nem se
+      // está lendo só os PDFs": o card de progresso sumia e restava um número.
+      // Mesmo contrato do relatório de falhas de download.
+      panel.mostrarRelatorioExtracao({
+        locais: locaisN,
+        ocr: ocrN,
+        jaTexto: jaTextoN,
+        falhas,
+        bloqueadas: jaNoContexto.length,
+        custoUsd: custo,
+        segDown: Math.round(tDown / 1000),
+        segLer: Math.round(tExtrai / 1000),
+        cancelado: sinal.cancelado,
+      });
       if (sinal.cancelado) panel.setStatus("Extração cancelada.");
-      else if (erroN) {
-        panel.setStatus(
-          "Texto extraído de " + okN + " peça(s); " + erroN + " falhou(ram) e seguem como documento."
-        );
-      }
-      if (jaNoContexto.length) {
-        panel.setStatus(
-          jaNoContexto.length +
-            " peça(s) já estavam no contexto e ficaram como documento — “Nova conversa” permite extraí-las."
-        );
-      }
     } finally {
       extraindo = false;
       atualizarEstadoExtracao();
@@ -1547,7 +1620,7 @@
       ultimaChaveEst = "";
       if (modelCaps && selecaoAtual.length) mostrarEstimativaLocal(selecaoAtual);
     }
-    return { okN, erroN, custo };
+    return { okN, erroN: falhas.length, custo };
   }
 
   // Estado da extração para o painel: o glifo por peça (só as que JÁ vão como
@@ -1575,10 +1648,16 @@
         ? {
             marcadas: e.marcadas,
             jaTexto: e.jaTexto,
+            // A LISTA, não só o número. O painel não pode rederivar o alvo do
+            // clique por outro caminho: quando ele recontava sozinho, o botão
+            // dizia "Extrair 44" e processava zero — as duas contas divergiam.
+            // Uma fonte, uma verdade.
+            ids: e.pendentes,
             pendentes: e.pendentes.length,
             locais: e.locais,
             ocr: e.ocr,
             naoMedidas: e.naoMedidas,
+            indisponiveis: e.indisponiveis,
             // O custo só existe no nível 2 (OCR). O nível 1 (pdf.js) é grátis.
             // Só contamos o que JÁ foi medido — peça não baixada ainda não tem
             // tipo conhecido, e chutar o custo dela seria pior que omitir.

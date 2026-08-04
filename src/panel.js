@@ -189,6 +189,12 @@ var PjePanel = (function () {
     // marca da peça que JÁ vai como texto: três linhas, discretas
     emTexto:
       '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7"/></svg>',
+    // voltar ao documento: seta em U para uma folha. Precisa ser um ícone
+    // DIFERENTE do de extrair — antes o desfazer reusava o mesmo glifo e só
+    // trocava o title, então terminar a extração não mudava nada na tela e o
+    // botão parecia estar oferecendo a mesma coisa de novo.
+    voltarDoc:
+      '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 2.4h-4a1 1 0 0 0-1 1v9.2a1 1 0 0 0 1 1h5.8a1 1 0 0 0 1-1V4.8z"/><path d="M9.6 2.4v2.4h2.8"/><path d="M9.2 9.4H6.4M7.6 8.1L6.3 9.4l1.3 1.3"/></svg>',
     close:
       '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>',
     reset:
@@ -1453,29 +1459,50 @@ var PjePanel = (function () {
         const badge = row.querySelector(".d-emtexto");
         const btn = row.querySelector(".d-extrai");
         const usando = !!(st && st.usando);
-        // Marca por peça REMOVIDA de propósito. Num processo em que 43 de 44
-        // peças estão em texto, o ícone repetido em toda linha não informa
-        // nada — vira o muro que a lista existe para evitar. O estado
-        // agregado vive na linha de status (.extrai-bar) e o estado de UMA
-        // peça, no preview, que é onde se vai olhar por ela.
-        if (badge) badge.hidden = true;
-        row.classList.remove("em-texto");
+        // A marca por peça VOLTOU, e é permanente (não depende de hover).
+        //
+        // Ela tinha saído porque num processo com 43 de 44 peças extraídas o
+        // mesmo ícone em toda linha vira um muro. Mas o muro honesto é melhor
+        // que o estado invisível: sem marca, terminar a extração de UMA peça
+        // não mudava absolutamente nada na tela — não havia como saber se
+        // funcionou. E o uso peça a peça, que é o principal, ficava sem
+        // qualquer confirmação. É o único estado que altera o que o modelo
+        // recebe, então é o único que merece marca permanente.
+        if (badge) {
+          badge.hidden = !usando;
+          if (usando) {
+            if (!badge.firstChild) badge.innerHTML = SVG.emTexto;
+            const fonte = st.fonte === "mistral" ? "OCR" : "leitura local";
+            badge.title =
+              "Esta peça vai para a IA como TEXTO — " +
+              (st.paginas || 0) + " folha(s), por " + fonte +
+              ". Passe o mouse sobre a peça para comparar com o documento original.";
+            badge.setAttribute("aria-label", badge.title);
+          }
+        }
+        row.classList.toggle("em-texto", usando);
         if (btn) {
           const info = extraivelCb ? extraivelCb(id) : null;
           // O botão só existe onde há o que fazer: peça já em texto ganha
-          // "voltar ao documento"; peça que não pode ser extraída não mostra
-          // nada (não adianta oferecer o que vai falhar).
+          // "voltar ao documento" — com ÍCONE PRÓPRIO, senão ele fica idêntico
+          // ao de extrair e parece oferecer a mesma ação de novo.
           if (usando) {
             btn.hidden = false;
             btn.classList.add("desfaz");
+            btn.innerHTML = SVG.voltarDoc;
             btn.title = "Voltar a usar o documento original desta peça";
             btn.setAttribute("aria-label", btn.title);
           } else if (info && info.podeExtrair) {
             btn.hidden = false;
             btn.classList.remove("desfaz");
-            btn.title = info.escaneado
-              ? "Esta peça é digitalizada — extrair o texto dela com OCR"
-              : "Extrair o texto desta peça (leitura local, sem custo)";
+            btn.innerHTML = SVG.extrair;
+            // Retentativa informada: dizer só "extrair" numa peça que já
+            // falhou convida ao mesmo erro sem explicar nada.
+            btn.title = info.falhouAntes
+              ? "Tentar de novo — a última tentativa falhou: " + info.falhouAntes
+              : info.escaneado
+                ? "Esta peça é digitalizada — extrair o texto dela com OCR"
+                : "Extrair o texto desta peça (leitura local, sem custo)";
             btn.setAttribute("aria-label", btn.title);
           } else {
             btn.hidden = true;
@@ -1509,30 +1536,74 @@ var PjePanel = (function () {
     // Renderizado no Shadow DOM: confirm() nativo vive fora dele e CONGELA a
     // extensão (mesma razão da exclusão em dois cliques na biblioteca).
     function pedirExtracao(ids, ancora) {
+      const disparar = (alvo) => {
+        if (!alvo.length) return;
+        if (extrairCb && alvo.length === 1) extrairCb(alvo[0], {});
+        else if (extrairLoteCb) extrairLoteCb(alvo, {});
+      };
       const comImagens = [];
+      const semImagens = [];
       let imagens = 0;
+      let naoMedidas = 0;
       for (const id of ids) {
         const info = extraivelCb ? extraivelCb(id) : null;
+        if (info && info.naoMedida) naoMedidas++;
         if (info && info.imagens > 0) {
           comImagens.push(id);
           imagens += info.imagens;
-        }
+        } else semImagens.push(id);
       }
       if (!comImagens.length) {
-        if (extrairCb && ids.length === 1) extrairCb(ids[0], {});
-        else if (extrairLoteCb) extrairLoteCb(ids, {});
+        // Peça ainda não baixada não tem como ser classificada — o tipo dela só
+        // se conhece depois do download, que acontece DENTRO do lote. Avisar é
+        // o máximo honesto aqui; o desfazer de um clique no preview é a rede de
+        // segurança para o que se descobrir depois.
+        if (naoMedidas && ids.length > 1) {
+          // A espera vai no diálogo porque ela é do PJe, não da extração: ~5,6 s
+          // por peça, serializados pelo tribunal. Sem esse número na tela, uma
+          // operação de cinco minutos parece travamento e a culpa cai na
+          // leitura, que leva menos de meio segundo por peça.
+          const min = Math.round((naoMedidas * 5.6) / 60);
+          const espera =
+            min >= 2
+              ? " Baixar " + naoMedidas + " peças do PJe leva cerca de " + min +
+                " minutos — o tribunal serve uma de cada vez, e é aí que vai quase todo o tempo."
+              : "";
+          confirmarVisual(
+            naoMedidas + " das " + ids.length + " peças ainda não foram baixadas: se alguma for " +
+              "digitalizada (RG, foto de laudo, assinatura), em texto o modelo deixa de ver a imagem — " +
+              "dá para voltar ao documento peça a peça depois, pelo preview." + espera,
+            "Extrair " + ids.length,
+            ancora,
+            () => disparar(ids)
+          );
+          return;
+        }
+        disparar(ids);
         return;
       }
+      if (ids.length === 1) {
+        confirmarVisual(
+          "Esta peça tem " + imagens + " imagem(ns). Em texto, o modelo deixa de ver assinaturas, " +
+            "carimbos e fotos — e num documento digitalizado isso costuma ser justamente a pergunta.",
+          "Extrair mesmo assim",
+          ancora,
+          () => disparar(ids)
+        );
+        return;
+      }
+      // Lote: a ação PRIMÁRIA é a segura. Aplicar a decisão em bloco sobre um
+      // conjunto misto foi o que transformou documentos de identidade em texto
+      // ilegível — e o modelo perdeu a imagem, que era todo o conteúdo deles.
       confirmarVisual(
-        comImagens.length === 1
-          ? "Esta peça tem " + imagens + " imagem(ns). Em texto, o modelo deixa de ver assinaturas, carimbos e fotos."
-          : comImagens.length + " das " + ids.length + " peças têm imagens. Em texto, o modelo deixa de ver assinaturas, carimbos e fotos.",
-        "Extrair",
+        comImagens.length + " das " + ids.length + " peças têm imagens (assinatura, carimbo, " +
+          "documento digitalizado). Em texto, o modelo deixa de ver isso.",
+        semImagens.length ? "Extrair só as " + semImagens.length + " sem imagem" : "Extrair",
         ancora,
-        () => {
-          if (extrairCb && ids.length === 1) extrairCb(ids[0], {});
-          else if (extrairLoteCb) extrairLoteCb(ids, {});
-        }
+        () => disparar(semImagens.length ? semImagens : ids),
+        semImagens.length
+          ? { rotulo: "Extrair todas as " + ids.length, onOk: () => disparar(ids) }
+          : null
       );
     }
 
@@ -1541,7 +1612,11 @@ var PjePanel = (function () {
       if (confirmEl) confirmEl.remove();
       confirmEl = null;
     }
-    function confirmarVisual(texto, rotuloOk, ancora, onOk) {
+    // `alt` é uma segunda ação OPCIONAL — a menos segura das duas. Ela existe
+    // porque numa decisão em bloco sobre um conjunto misto "sim ou não" é uma
+    // escolha falsa: o que se quer quase sempre é "faça na parte que não perde
+    // nada". Ela fica visualmente subordinada à primária (ver .cb-alt no CSS).
+    function confirmarVisual(texto, rotuloOk, ancora, onOk, alt) {
       fecharConfirm();
       const box = document.createElement("div");
       box.className = "confirmbox";
@@ -1550,6 +1625,7 @@ var PjePanel = (function () {
         '<p class="cb-t"></p>' +
         '<div class="cb-acoes">' +
         '<button type="button" class="cb-no">Cancelar</button>' +
+        (alt ? '<button type="button" class="cb-alt"></button>' : "") +
         '<button type="button" class="cb-yes"></button>' +
         "</div>";
       box.querySelector(".cb-t").textContent = texto; // conteúdo dos autos: nunca innerHTML
@@ -1559,6 +1635,14 @@ var PjePanel = (function () {
         fecharConfirm();
         onOk();
       });
+      if (alt) {
+        const b = box.querySelector(".cb-alt");
+        b.textContent = alt.rotulo;
+        b.addEventListener("click", () => {
+          fecharConfirm();
+          alt.onOk();
+        });
+      }
       wrap.appendChild(box);
       confirmEl = box;
       if (ancora && ancora.getBoundingClientRect) {
@@ -1589,6 +1673,7 @@ var PjePanel = (function () {
       extraiBar.hidden = !info || !info.marcadas;
       if (extraiBar.hidden) return;
       const pend = info.pendentes;
+      const indisp = info.indisponiveis || 0;
       extraiBar.classList.toggle("tem-ocr", !!info.ocr);
       extraiBar.classList.toggle("tudo-pronto", !pend);
 
@@ -1596,26 +1681,47 @@ var PjePanel = (function () {
       // "44 marcadas · 43 em texto · 1 em documento · ≈ US$ 0,28" trunca em
       // 420px e vira reticências. Cada estado tem UMA frase curta.
       let frase;
+      let curta; // versão para a coluna estreita (ver as duas versões abaixo)
       if (!pend) {
+        // Peça indisponível (404 no PJe, ou digitalizada sem chave de OCR) não
+        // é trabalho pendente: dizê-la "ainda em documento" ao lado de um botão
+        // fazia a faixa prometer para sempre algo que nunca ia acontecer.
         frase = info.marcadas + (info.marcadas > 1 ? " peças prontas" : " peça pronta");
+        if (indisp) frase += " · " + indisp + " indisponível" + (indisp > 1 ? "eis" : "");
+        curta = indisp ? info.marcadas + " prontas · " + indisp + " fora" : frase;
       } else if (!info.jaTexto) {
         // nada feito ainda: o total já é a informação
         frase = info.marcadas + (info.marcadas > 1 ? " peças marcadas" : " peça marcada");
+        curta = frase;
       } else {
         // o que FALTA é a informação; o que já foi é passado
         frase = pend + " de " + info.marcadas + " ainda em documento";
+        curta = pend + " em documento";
       }
       if (info.ocr) {
         // vírgula decimal: o painel é todo em pt-BR e "US$ 0.28" lê como erro
         // de digitação para quem trabalha com valores em português
-        frase +=
-          " · ≈ US$ " +
-          info.custoUsd.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          });
+        const usd = info.custoUsd.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        frase += " · ≈ US$ " + usd;
+        curta += " · US$ " + usd;
       }
-      ebTexto.textContent = frase;
+      // DUAS versões no DOM, escolhidas pelo CSS — o mesmo padrão do medidor de
+      // contexto (.g-full/.g-short). No modo expandido o painel é largo mas a
+      // COLUNA de peças é estreita (~310px), e a frase completa truncava
+      // exatamente no custo: "4 de 8 ainda em documento · ≈ US…". Custo cortado
+      // é pior que custo abreviado — é o número que decide se vale extrair.
+      ebTexto.textContent = "";
+      const full = document.createElement("span");
+      full.className = "eb-full";
+      full.textContent = frase;
+      const short = document.createElement("span");
+      short.className = "eb-short";
+      short.textContent = curta;
+      ebTexto.appendChild(full);
+      ebTexto.appendChild(short);
 
       ebGo.hidden = !pend;
       ebGo.textContent = "⌁ Extrair " + pend;
@@ -1629,6 +1735,13 @@ var PjePanel = (function () {
         det.push(
           info.naoMedidas +
             " ainda não baixada(s) — o tipo delas só se sabe depois de baixar, e o custo pode subir"
+        );
+      }
+      if (indisp) {
+        det.push(
+          indisp +
+            " indisponível(eis): já tentaram e não deu, ou são digitalizadas sem chave de OCR configurada." +
+            " Elas seguem como documento; o botão da própria peça permite tentar de novo"
         );
       }
       // Diz a verdade do MODELO ATIVO. No Gemini e no gpt-5.6-luna o PDF já é
@@ -1646,10 +1759,10 @@ var PjePanel = (function () {
     }
     ebGo.addEventListener("click", () => {
       if (!extracaoAviso || !extrairLoteCb) return;
-      const ids = getSelected().filter((id) => {
-        const info = extraivelCb ? extraivelCb(id) : null;
-        return info && info.podeExtrair;
-      });
+      // A LISTA que o content script contou, não uma recontagem local. Quando
+      // o painel rederivava o alvo por outro caminho, as duas contas divergiam
+      // e o botão dizia "Extrair 44" processando zero. Uma fonte, uma verdade.
+      const ids = (extracaoAviso.ids || []).slice();
       if (ids.length) pedirExtracao(ids, ebGo);
     });
 
@@ -1756,9 +1869,18 @@ var PjePanel = (function () {
       if (temTexto) {
         const tabs = document.createElement("div");
         tabs.className = "preview-tabs";
+        // A aba que está EM USO leva a marca "•" — sem ela as duas abas
+        // parecem alternativas equivalentes e não se sabe qual delas é a que
+        // vai para a IA, que é a única pergunta que importa aqui.
+        const marca = ' <span class="pv-uso" title="É esta versão que vai para a IA">•</span>';
+        const usaTxt = !!info.txtUsar;
         tabs.innerHTML =
-          '<button type="button" class="pv-tab' + (verTexto ? "" : " on") + '" data-aba="doc">Documento</button>' +
-          '<button type="button" class="pv-tab' + (verTexto ? " on" : "") + '" data-aba="texto">Texto</button>';
+          '<button type="button" class="pv-tab' + (verTexto ? "" : " on") +
+          '" data-aba="doc" title="O arquivo original da peça, como o PJe serve">Documento' +
+          (usaTxt ? "" : marca) + "</button>" +
+          '<button type="button" class="pv-tab' + (verTexto ? " on" : "") +
+          '" data-aba="texto" title="O texto extraído desta peça">Texto' +
+          (usaTxt ? marca : "") + "</button>";
         tabs.addEventListener("click", (e) => {
           const b = e.target.closest(".pv-tab");
           if (!b) return;
@@ -1781,12 +1903,33 @@ var PjePanel = (function () {
         const ft = document.createElement("div");
         ft.className = "preview-ft";
         const fonte = info.txtFonte === "mistral" ? "OCR" : "leitura local";
+        // "Voltar ao documento" mora AQUI, e não só no ícone do hover da row:
+        // é olhando o texto que se descobre que ele não presta — um RG ou uma
+        // foto de laudo viram poucas linhas ilegíveis, e o modelo perdeu a
+        // imagem que era todo o conteúdo. A saída tem de estar na tela onde o
+        // problema aparece, não escondida num ícone de outra linha.
         ft.innerHTML =
           "<span>" + (info.txtPaginas || 0) + " folha(s) · " + fonte + "</span>" +
+          (info.txtUsar
+            ? '<button type="button" class="preview-voltar-doc">Voltar ao documento</button>'
+            : "") +
           '<button type="button" class="preview-abrir-txt">Abrir texto</button>';
         ft.querySelector(".preview-abrir-txt").addEventListener("click", () => {
           if (abrirTextoCb) abrirTextoCb(id);
         });
+        const bVolta = ft.querySelector(".preview-voltar-doc");
+        if (bVolta) {
+          bVolta.addEventListener("click", async () => {
+            if (!desfazerExtracaoCb) return;
+            bVolta.disabled = true;
+            await desfazerExtracaoCb(id);
+            // Mostra o resultado da própria ação: a aba salta para o documento,
+            // que é o que passou a ir para a IA.
+            if (previewId !== id) return;
+            previewAba = "doc";
+            renderPreview(row, info);
+          });
+        }
         previewEl.appendChild(ft);
         return;
       }
@@ -3619,6 +3762,113 @@ var PjePanel = (function () {
         p.textContent =
           "Elas continuam marcadas: no próximo envio a extensão tenta de novo. Se persistir, abra a peça na linha do tempo do PJe uma vez e envie outra vez.";
         el.appendChild(p);
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
+      },
+
+      // Prestação de contas da extração, no CHAT.
+      //
+      // O `.status` é transitório: uma operação que levou minutos e pode ter
+      // custado dinheiro não pode terminar sem deixar rastro do que fez. E o
+      // card de progresso some ao fim. Era daí que vinha "não fica claro quais
+      // foram as peças, nem se está lendo só os PDFs" — o relatório responde
+      // as duas de uma vez, separando POR VIA: leitura local (grátis), OCR
+      // (pago) e as que já eram texto e não precisavam de nada.
+      mostrarRelatorioExtracao(r) {
+        if (!r) return null;
+        const total = (r.locais || 0) + (r.ocr || 0);
+        const falhas = r.falhas || [];
+        // Nada aconteceu e nada falhou: não vale uma bolha no chat.
+        if (!total && !falhas.length && !r.jaTexto && !r.bloqueadas) return null;
+        const el = document.createElement("details");
+        el.className = "extrai-rel";
+        if (falhas.length) el.classList.add("tem-falha");
+        el.open = !!falhas.length; // o que exige atenção abre sozinho
+
+        const sum = document.createElement("summary");
+        sum.textContent = r.cancelado
+          ? "Extração cancelada — " + total + " peça(s) já tinham sido lidas"
+          : total === 1
+            ? "1 peça agora vai para a IA como texto"
+            : total + " peças agora vão para a IA como texto";
+        el.appendChild(sum);
+
+        const ul = document.createElement("ul");
+        const linha = (txt) => {
+          const li = document.createElement("li");
+          li.textContent = txt;
+          ul.appendChild(li);
+        };
+        if (r.locais) {
+          linha(
+            r.locais + (r.locais > 1 ? " peças lidas" : " peça lida") +
+              " no seu navegador, sem custo (o PDF já tinha texto dentro)"
+          );
+        }
+        if (r.ocr) {
+          const usd = (r.custoUsd || 0).toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+          linha(
+            r.ocr + (r.ocr > 1 ? " peças digitalizadas lidas" : " peça digitalizada lida") +
+              " por OCR · US$ " + usd
+          );
+        }
+        if (r.jaTexto) {
+          // Responde diretamente ao "não sei se ele está lendo só os PDFs".
+          linha(
+            r.jaTexto + (r.jaTexto > 1 ? " peças já eram" : " peça já era") +
+              " texto (documento do editor do PJe) — não precisaram de extração"
+          );
+        }
+        if (r.bloqueadas) {
+          linha(
+            r.bloqueadas + (r.bloqueadas > 1 ? " peças já estavam" : " peça já estava") +
+              " no contexto desta conversa e seguem como documento — “Nova conversa” permite extraí-las"
+          );
+        }
+        el.appendChild(ul);
+
+        if (falhas.length) {
+          const h = document.createElement("p");
+          h.className = "rel-sub";
+          h.textContent =
+            falhas.length === 1
+              ? "1 peça não pôde ser extraída e segue como documento:"
+              : falhas.length + " peças não puderam ser extraídas e seguem como documento:";
+          el.appendChild(h);
+          const uf = document.createElement("ul");
+          uf.className = "rel-falhas";
+          for (const f of falhas) {
+            const li = document.createElement("li");
+            const b = document.createElement("b");
+            b.textContent = f.titulo || String(f.id); // conteúdo dos autos: textContent
+            li.appendChild(b);
+            const m = document.createElement("span");
+            m.textContent = " — " + (f.erro || "falha na extração");
+            li.appendChild(m);
+            uf.appendChild(li);
+          }
+          el.appendChild(uf);
+        }
+
+        const p = document.createElement("p");
+        p.className = "rel-dica";
+        p.textContent = falhas.length
+          ? "Elas saíram da fila para o botão não repetir o mesmo erro. O ícone da própria peça, no hover, tenta de novo. Passe o mouse sobre qualquer peça para comparar o texto com o documento original."
+          : "Passe o mouse sobre uma peça para comparar o texto extraído com o documento original — e voltar ao documento se preferir.";
+        el.appendChild(p);
+
+        // Diagnóstico da lentidão fica no title: baixar do PJe é o gargalo
+        // (~5,6 s por peça, serializado pelo tribunal) e a leitura em si leva
+        // menos de meio segundo. Sem separar, "demorou" acusa a extração.
+        if (r.segDown || r.segLer) {
+          el.title =
+            "Tempo: " + (r.segDown || 0) + " s baixando do PJe · " +
+            (r.segLer || 0) + " s lendo o texto";
+        }
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
         return el;

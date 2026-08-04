@@ -105,6 +105,7 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 | Token | Valor | Uso |
 |---|---|---|
 | `--ok` | `#1f9d6b` | Sucesso, salvo |
+| `--ok-bg` | `#eaf5ee` | Fundo de confirmação suave (marca da peça em texto) |
 | `--warn` | `#dd8b2c` | Alerta, contexto quase cheio |
 | `--warn-bg` | `#fbf1dc` | Fundo de aviso suave |
 | `--warn-line` | `#eeddba` | Borda de aviso suave |
@@ -232,7 +233,17 @@ quebrar em quatro linhas em 460px. Estrutura: ícone · retrato da seleção ·
 botão de ação.
 
 ```
-⌁  12 marcadas · 4 em texto · 8 em documento · ≈ US$ 0,28    [⌁ Extrair 8]
+⌁  8 de 12 ainda em documento · ≈ US$ 0,28                   [⌁ Extrair 8]
+```
+
+**Duas versões no DOM** (`.eb-full`/`.eb-short`), como o medidor de contexto —
+mas pelo critério **inverso** ao dele. No `.expanded`/`.livre-wide` o painel é
+largo, porém a lista de peças vira uma **coluna de ~310px**, e a forma longa
+truncava exatamente no custo (`… · ≈ US…`). Custo cortado é pior que custo
+abreviado: é o número que decide se vale extrair.
+
+```
+expandido:   ⌁  8 em documento · US$ 0,28    [⌁ Extrair 8]
 ```
 
 Três estados, e a distinção é semântica, não decorativa:
@@ -253,9 +264,52 @@ O detalhamento (quantas por leitura local, quantas por OCR, quantas ainda não
 medidas, e o veredito de custo do modelo ativo) mora no `title`. Em 420px,
 mostrá-lo custaria a segunda linha que este desenho existe para eliminar.
 
-As ações **por peça** seguem outro padrão: `.d-ver` e `.d-extrai` aparecem só no
-hover da row e dividem uma regra só, pela mesma razão. Um botão a mais ali seria
-o limite — três ícones de 20px já disputam espaço com o id da peça.
+**Peça indisponível não é trabalho pendente.** A que devolve 404 no PJe, ou é
+digitalizada sem chave de OCR, sai da fila e aparece como `· 1 indisponível`.
+Contá-la como pendente fazia a faixa prometer para sempre algo que nunca ia
+acontecer — cada clique reproduzindo o mesmo erro.
+
+As ações **por peça** seguem outro padrão: `.d-ver` e `.d-extrai` dividem uma
+regra só, pela mesma razão. Duas exceções ao "só no hover", ambas por descoberta:
+o `.d-extrai` fica em `opacity: .4` nas rows **marcadas** (invisível até o hover,
+ninguém o descobria, e a extração parecia existir só em lote), e o `.d-emtexto`
+é **permanente** — é a única confirmação de que a extração daquela peça funcionou.
+
+### Marca da peça em texto (`.d-emtexto`)
+
+Verde `--ok` sobre `--ok-bg`, 18×16px, irmã de `.d-t` com `flex: none` (dentro
+dele roubaria a elipse do nome). É o **único** estado que vira marca permanente
+na lista, porque é o único que muda o que o modelo recebe.
+
+Ela chegou a ser removida — num processo com 43 de 44 peças extraídas, o mesmo
+glifo em toda linha vira o muro que a lista existe para evitar — e **voltou**:
+sem ela, terminar a extração de uma peça não mudava nada na tela. Muro honesto
+vence estado invisível. Não usa `--cat-*` (semântica de espécie) nem azul (cor
+de ação), e o itálico que a acompanhava saiu: repetia o sinal cobrando
+legibilidade de títulos que já são truncados.
+
+O par dela é o **desfazer**, com ícone próprio (`SVG.voltarDoc`) e no hover.
+Reusar o glifo de extrair fazia o botão parecer oferecer a mesma ação de novo —
+e um segundo ícone permanente na mesma linha seria ruído sobre estado resolvido.
+
+### Confirmação com saída segura (`.cb-alt`)
+
+`confirmarVisual` aceita uma **segunda ação**, subordinada à primária. Numa
+decisão em bloco sobre conjunto misto, "sim ou não" é escolha falsa: o que se
+quer quase sempre é *"faça na parte que não perde nada"*. A recomendada sobe
+para linha própria em largura total (`order: -1; flex-basis: 100%`) e a arriscada
+fica ao lado do Cancelar — três botões enfileirados em 292px não caberiam, e a
+opção certa não pode disputar espaço com a que destrói informação.
+
+### Relatório de operação longa no chat (`.extrai-rel`)
+
+Operação que leva minutos e pode custar dinheiro **não termina no `.status`**,
+que é transitório, nem no card de progresso, que some. Vai para o chat como
+`<details>`, irmão do `.falhas`: `--accent-bg` com barra `--ok` à esquerda
+quando deu tudo certo (é confirmação, não aviso), trocando para o trio
+`--warn-*` e abrindo sozinho quando alguma peça falhou. Presta contas **por
+via** — o que foi grátis, o que foi pago e quanto, o que já estava pronto e não
+precisou de nada.
 
 ### Card de progresso: `baixando` ≠ `loading`
 

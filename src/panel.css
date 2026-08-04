@@ -42,6 +42,11 @@
   --line-strong: #cadcea;
   --line-check: #c2d3de;
   --ok: #1f9d6b;
+  /* Confirmação SUAVE — o par de --ok, como --warn-bg é o par de --warn.
+     Veste a marca da peça que passou a ir como texto: é o sinal de "deu
+     certo" numa lista onde nada mais mudaria de aparência.
+     ESPELHA o ui.css, onde este token já existia (DESIGN.md §1). */
+  --ok-bg: #eaf5ee;
   --warn: #dd8b2c;
   --erro: #a5301f;
   /* Aviso SUAVE — informa sem impedir de continuar. Veste o relatório de peças
@@ -462,21 +467,33 @@
 .docrow:hover .d-ver, .d-ver:focus-visible,
 .docrow:hover .d-extrai, .d-extrai:focus-visible { opacity: 1; }
 .d-ver:hover, .d-extrai:hover { background: var(--line-strong); color: var(--pje-2); }
+/* O extrair da PEÇA MARCADA fica levemente visível em repouso.
+   Invisível até o hover, ninguém o descobria: a extração parecia existir só em
+   lote pela faixa, e "por que tenho que selecionar todas em vez de fazer uma?"
+   era a pergunta certa sobre uma ação que já existia e não se via. Só nas rows
+   marcadas — nas demais o fantasma seria ruído sem propósito. */
+.docrow:has(input:checked) .d-extrai:not(.desfaz) { opacity: 0.4; }
 /* Estado "desfazer" do .d-extrai: a mesma tecla volta ao documento original.
-   Âmbar de AVISO (não uma cor --cat-*, que é semântica de espécie de peça). */
+   Âmbar de AVISO (não uma cor --cat-*, que é semântica de espécie de peça).
+   Fica no HOVER, ao contrário do "extrair": a peça já extraída não precisa
+   convidar a nada — quem confirma que deu certo é a marca verde, e um segundo
+   ícone permanente na mesma linha seria ruído sobre um estado resolvido. */
 .d-extrai.desfaz { color: var(--warn); }
 .d-extrai.desfaz:hover { background: var(--warn-bg); color: var(--warn-ink); }
 
 /* Marca da peça que JÁ vai como texto. É o ÚNICO estado que ganha marca
-   permanente na lista: ele mudou o que o modelo recebe. Fica FORA das cores
-   --cat-* (semântica de espécie) e do azul (cor de ação); o padrão visual é o
-   do .on-badge do popup @. */
+   permanente na lista: ele mudou o que o modelo recebe — e é a ÚNICA
+   confirmação de que a extração daquela peça funcionou. Fica FORA das cores
+   --cat-* (semântica de espécie) e do azul (cor de ação): usa o verde --ok,
+   que no sistema significa exatamente "deu certo". */
 .d-emtexto {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 16px; border-radius: var(--r-pill);
-  background: var(--accent-bg); color: var(--muted-2);
+  background: var(--ok-bg); color: var(--ok);
 }
-.docrow.em-texto .d-nm { font-style: italic; }
+/* Sem itálico: a marca verde já diz que a peça vai como texto, e itálico em
+   títulos longos de peça (que já são truncados) custa legibilidade para
+   repetir um sinal que o ícone dá melhor. */
 
 .empty { color: var(--muted); padding: 8px 4px; font-size: var(--fs-meta); }
 /* Aviso da lista incompleta + carregar tudo. Em repouso é UMA linha: ícone ⚠️
@@ -537,6 +554,17 @@
   font-size: var(--fs-micro); line-height: 1.35; color: var(--text-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Duas versões do texto, como o medidor de contexto (.g-full/.g-short) — mas
+   pelo critério INVERSO. Lá o .expanded dá espaço ao rodapé; aqui ele é que
+   ESTREITA a faixa, porque a lista de peças vira uma coluna de ~310px. A forma
+   longa truncava exatamente no custo ("… · ≈ US…"), e custo cortado é pior que
+   custo abreviado: é o número que decide se vale extrair. .livre-wide entra
+   junto pelo mesmo motivo — lá a lista também é coluna. */
+.eb-short { display: none; }
+.wrap.expanded .extrai-bar .eb-full,
+.wrap.livre-wide .extrai-bar .eb-full { display: none; }
+.wrap.expanded .extrai-bar .eb-short,
+.wrap.livre-wide .extrai-bar .eb-short { display: inline; }
 .extrai-bar .eb-go {
   flex: none; border: 1px solid var(--pje); background: var(--pje); color: var(--surface);
   border-radius: var(--r-xs); padding: 3px 11px;
@@ -572,13 +600,22 @@
   border-radius: var(--r-md); box-shadow: var(--sh-pop); padding: 12px 13px;
 }
 .cb-t { margin: 0 0 10px; font-size: var(--fs-meta); color: var(--text); line-height: 1.45; }
-.cb-acoes { display: flex; gap: 8px; justify-content: flex-end; }
-.cb-no, .cb-yes {
+.cb-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.cb-no, .cb-yes, .cb-alt {
   border-radius: var(--r-xs); padding: 4px 11px; font-size: var(--fs-micro);
   font-weight: 600; cursor: pointer;
 }
 .cb-no { border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted-2); }
 .cb-no:hover { background: var(--hover); }
+/* Segunda ação (a menos segura) numa decisão sobre conjunto misto. A primária
+   sobe para uma linha própria em largura total — a escolha recomendada não pode
+   disputar espaço com a arriscada numa fila de três botões de 292px. */
+.cb-alt {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted-2);
+}
+.cb-alt:hover { background: var(--hover); color: var(--text-3); }
+.cb-acoes:has(.cb-alt) .cb-yes { order: -1; flex-basis: 100%; }
+.cb-acoes:has(.cb-alt) .cb-no { margin-right: auto; }
 .cb-yes { border: 1px solid var(--pje-2); background: var(--pje-2); color: var(--surface); }
 .cb-yes:hover { background: var(--pje); }
 
@@ -626,6 +663,40 @@
 .falhas-dica {
   margin: 8px 0 0; font-size: var(--fs-micro); color: var(--muted);
   line-height: 1.45;
+}
+
+/* Relatório da extração no chat. É CONFIRMAÇÃO, não aviso: veste o azul frio
+   de informação (--accent-bg) com a barra --ok à esquerda, e só troca para o
+   trio --warn-* quando alguma peça falhou — a mesma fronteira que o DESIGN.md
+   traça entre "informa" e "exige atenção". */
+.extrai-rel {
+  margin: 4px 0 10px; padding: 8px 11px;
+  border: 1px solid var(--line-strong); border-left: 3px solid var(--ok);
+  border-radius: var(--r-sm); background: var(--accent-bg);
+  font-size: var(--fs-meta); color: var(--text-2);
+}
+.extrai-rel > summary {
+  cursor: pointer; font-weight: 600; color: var(--pje-2);
+  list-style: none; display: flex; align-items: center; gap: 6px;
+}
+.extrai-rel > summary::before { content: "⌁"; font-size: var(--fs-meta); }
+.extrai-rel > summary::-webkit-details-marker { display: none; }
+.extrai-rel ul { margin: 8px 0 0; padding-left: 18px; }
+.extrai-rel li { margin: 3px 0; line-height: 1.4; word-break: break-word; }
+.extrai-rel.tem-falha {
+  border-color: var(--warn-line); border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+.extrai-rel.tem-falha > summary { color: var(--warn-ink); }
+.extrai-rel.tem-falha > summary::before { content: "⚠️"; font-size: var(--fs-micro); }
+.rel-sub {
+  margin: 10px 0 0; font-size: var(--fs-micro); font-weight: 600; color: var(--text-3);
+}
+.rel-falhas { margin: 4px 0 0; padding-left: 18px; }
+.rel-falhas li b { font-weight: 600; color: var(--text); }
+.rel-falhas li span { color: var(--muted); }
+.rel-dica {
+  margin: 8px 0 0; font-size: var(--fs-micro); color: var(--muted); line-height: 1.45;
 }
 
 .main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -1110,12 +1181,30 @@
 .pv-tab.on {
   background: var(--accent-bg); border-color: var(--line-strong); color: var(--pje-2);
 }
+/* Marca da versão que VAI PARA A IA. Sem ela as duas abas parecem alternativas
+   equivalentes, e a única pergunta que o preview responde — qual delas o modelo
+   recebe — fica sem resposta. */
+.pv-uso { color: var(--ok); font-size: var(--fs-body); line-height: 0; }
+.pv-tab.on .pv-uso { color: var(--ok); }
 .preview-abrir-txt {
   border: 1px solid var(--pje); background: var(--surface); color: var(--pje-2);
   border-radius: var(--r-xs); padding: 3px 10px;
   font-size: var(--fs-micro); font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .preview-abrir-txt:hover { background: var(--accent-bg); }
+/* Desfazer no lugar onde o problema aparece: é olhando o texto que se descobre
+   que ele não presta. Secundário — a ação normal é seguir com o texto. */
+.preview-voltar-doc {
+  margin-left: auto;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted-2);
+  border-radius: var(--r-xs); padding: 3px 10px;
+  font-size: var(--fs-micro); font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.preview-voltar-doc:hover { background: var(--hover); color: var(--text-3); }
+.preview-voltar-doc:disabled { opacity: 0.55; cursor: default; }
+/* Com o "voltar" presente ele é que empurra; sem ele, o "abrir texto" empurra. */
+.preview-ft > .preview-abrir-txt:first-of-type { margin-left: auto; }
+.preview-ft > .preview-voltar-doc ~ .preview-abrir-txt { margin-left: 0; }
 
 .preview-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .preview-bd embed { width: 100%; height: 100%; border: 0; flex: 1; }

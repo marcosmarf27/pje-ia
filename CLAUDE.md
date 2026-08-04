@@ -744,7 +744,38 @@ Regras que não podem quebrar:
   primeira versão só olhava peças já baixadas — marcar "todas" fazia a opção de
   extrair sumir, o oposto do esperado, e foi a maior fonte de confusão no primeiro
   teste real. Peça não baixada é candidata; o tipo dela só se sabe depois, e isso vai
-  no `title` (`naoMedidas`), não na tela.
+  no `title` (`naoMedidas`), não na tela. Ela escreve **duas versões no DOM**
+  (`.eb-full`/`.eb-short`, padrão do medidor `.g-*`) pelo critério **inverso** ao
+  dele: no `.expanded`/`.livre-wide` a lista de peças vira coluna de ~310px e a
+  frase longa truncava exatamente no custo — o número que decide se vale extrair.
+- **Trabalho pendente tem TRÊS estados, não dois** (`extracaoFalhou`, um Map
+  `id → motivo` em content.js): feito, a fazer e **impossível**. Sem o terceiro, a
+  peça que devolve 404 no PJe voltava a `pendentes` a cada recálculo e a faixa
+  prometia "⌁ Extrair 1" para sempre, cada clique repetindo o mesmo erro — foi o
+  defeito mais visível do segundo teste real. O registro governa só o LOTE: o botão
+  da própria peça segue disponível como **retentativa deliberada** (e o `title` diz
+  o motivo da falha anterior). Digitalizada sem chave de OCR conta em
+  `indisponiveis` pela mesma razão — some da soma faria a aritmética da faixa não
+  fechar.
+- **O painel recebe a LISTA de alvos, nunca reconta** (`setExtracaoAviso({ids})`).
+  Quando `content.js` contava e `panel.js` rederivava o alvo do clique por outro
+  caminho, as duas contas divergiam: o botão dizia "Extrair 44" e processava zero.
+  Uma fonte, uma verdade.
+- **O lote presta contas no CHAT** (`panel.mostrarRelatorioExtracao`), não no
+  `.status`. Uma operação que levou minutos e pode ter custado dinheiro não pode
+  terminar sem rastro — o card de progresso some. O relatório separa **por via**
+  (leitura local grátis × OCR pago, com o custo) e diz quantas **já eram texto e
+  não precisaram de nada**: era a pergunta "não sei se ele está lendo só os PDFs".
+  Peça sabidamente texto fica **fora do card de progresso** pelo mesmo motivo —
+  vê-la virar ✓ afirma um trabalho que não houve. Mesmo contrato do
+  `mostrarFalhasPecas`.
+- **Decisão sobre conjunto misto oferece a saída segura como ação PRIMÁRIA**
+  (`confirmarVisual` com o 5º parâmetro `alt`): "Extrair só as N sem imagem" na
+  frente, "Extrair todas" subordinada. Aplicar sim-ou-não em bloco foi o que
+  transformou documentos de identidade em texto ilegível — e o modelo perdeu a
+  imagem, que era todo o conteúdo deles. Peça ainda não baixada **não tem como ser
+  classificada** (o download acontece dentro do lote), então ali o diálogo só avisa
+  e dá a estimativa de espera; a rede de segurança é o desfazer.
 - **`baixando` ≠ `loading` no card de progresso.** Baixar do PJe leva ~5,6 s/peça e
   ler o texto leva menos de meio segundo. Rotular a espera do tribunal como
   "extraindo" faz o usuário culpar a extração — e foi o que aconteceu. O lote loga no
@@ -756,7 +787,21 @@ Regras que não podem quebrar:
   help). Os rótulos dos pacotes dizem o CONTEÚDO — `⬇ Documentos (.zip)` × `⬇ Texto
   (.zip)` —, porque "Baixar .zip" ao lado de "Texto (.zip)" não deixava claro se o
   primeiro extraía. Só um estado vira marca permanente na row: a peça que **já vai
-  como texto**. O preview **mostra o que o modelo vê**.
+  como texto** (`.d-emtexto`, verde `--ok`/`--ok-bg`). Ela chegou a ser removida
+  (43 de 44 peças com o mesmo glifo vira muro) e **voltou**: sem ela, terminar a
+  extração de UMA peça não mudava nada na tela — não havia como saber se
+  funcionou, e o uso peça a peça, que é o principal, ficava sem confirmação
+  nenhuma. Muro honesto vence estado invisível. O botão de **desfazer tem ícone
+  próprio** (`SVG.voltarDoc`): reusar o glifo de extrair fazia o botão parecer
+  oferecer a mesma ação de novo. O `.d-extrai` fica levemente visível
+  (`opacity: .4`) nas rows **marcadas** — invisível até o hover, ninguém o
+  descobria e a extração parecia existir só em lote.
+- **O preview mostra o que o modelo vê, e é onde se desfaz.** As abas
+  Documento/Texto levam a marca `•` (`.pv-uso`) na versão que **vai para a IA** —
+  sem ela as duas parecem alternativas equivalentes. O botão "Voltar ao documento"
+  vive no rodapé do preview além do ícone da row: é olhando o texto que se
+  descobre que ele não presta (um RG digitalizado vira poucas linhas ilegíveis), e
+  a saída tem de estar na tela onde o problema aparece.
 
 ## Tolerância a falha de download (invariante do envio)
 
