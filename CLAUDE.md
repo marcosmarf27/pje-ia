@@ -804,13 +804,24 @@ Regras que não podem quebrar:
   a saída tem de estar na tela onde o problema aparece. "Refazer com OCR" mora no
   mesmo rodapé, e só quando a leitura foi LOCAL e há chave: ninguém pede OCR antes
   de ver que o texto grátis não serviu.
-- **UMA tela, UMA decisão** (`pedirExtracao`). A escolha chegou a estar espalhada
-  em cinco lugares — diálogo de imagens, aviso de peças não medidas, "forçar OCR",
-  veredito de custo por modelo, "refazer com OCR" — porque um detalhe de
-  IMPLEMENTAÇÃO (ler no navegador quando dá, OCR quando não dá) virou decisão de
-  interface. Não é. O usuário decide **extrair estas peças, pagando OCR ou não**;
-  como a extensão consegue o texto é problema dela. A alternativa "Usar OCR" só
-  aparece com chave configurada — oferecer OCR sem chave é oferecer um erro.
+- **UMA via na interface: o OCR do Mistral.** A escolha entre leitura local e OCR
+  chegou a estar espalhada em cinco lugares, e o sintoma foi o usuário perguntando
+  *"eu estou usando o Mistral ou não?"* diante de um botão escrito "Extrair".
+  **Ter de perguntar isso já é o defeito.** Com chave configurada o botão diz
+  `Extrair com OCR · ≈ US$ 0,28` e não há segunda opção; sem chave, o texto
+  explica que a leitura sai pelo navegador e só funciona em peça com texto
+  próprio. O `pdf.js` continua no código como caminho de quem não configurou a
+  chave — ali não há escolha a oferecer, só um jeito de conseguir o texto.
+  **Consequência no custo**: com chave, `extraiveis` soma as páginas de TODAS as
+  pendentes em `paginasOcr`, não só das digitalizadas — senão a faixa anunciaria
+  um preço menor do que o que vai ser cobrado.
+- **A caixa de confirmação MEDE a própria altura** (`confirmarVisual`). Ela usava
+  um `130` fixo para se afastar da borda inferior; com quatro linhas de texto a
+  caixa passava disso e os botões ficavam abaixo da tela — o usuário via a
+  pergunta e não via as respostas. E como o painel vive no rodapé da página, esse
+  era o caso COMUM. Agora mede o `getBoundingClientRect` depois de inserir, abre
+  ACIMA da âncora quando não cabe abaixo, e o CSS tem `max-height: calc(100vh -
+  16px)` como rede de segurança para janelas muito baixas.
 - **O selo de formato (`.d-fmt`: PDF/HTML/RTF) é o que torna a regra visível.**
   Só PDF aceita extração, e dizer isso em prosa não resolve: o selo responde de
   relance onde o OCR faz sentido. Aparece só depois do download (o formato vem do

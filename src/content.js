@@ -1509,6 +1509,11 @@
       } else {
         out.pendentes.push(id);
         out.locais++;
+        // Com chave configurada, TODA peça pendente vai por OCR — a leitura
+        // local deixou de ser uma opção da interface. O custo precisa refletir
+        // isso, senão a faixa mostra só o preço das digitalizadas e o usuário
+        // paga um valor maior do que o anunciado.
+        if (ocrPronto) out.paginasOcr += d.pages || 1;
       }
     }
     return out;

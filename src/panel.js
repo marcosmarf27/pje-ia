@@ -1638,31 +1638,34 @@ var PjePanel = (function () {
             : comImagens === ids.length
               ? "Todas têm imagens"
               : comImagens + " delas têm imagens") +
-            " (assinatura, carimbo, documento digitalizado): em texto o modelo deixa de ver isso. " +
-            "Dá para voltar ao documento depois."
+            " (assinatura, carimbo, documento digitalizado): em texto o modelo deixa de ver isso."
+        );
+      }
+      // UMA via só: OCR do Mistral.
+      //
+      // A leitura local (pdf.js) saiu da INTERFACE de propósito. Oferecer as
+      // duas obrigava o usuário a escolher entre implementações — e a pergunta
+      // que ele fazia era justamente "estou usando o Mistral ou não?". Ter de
+      // perguntar isso já é o defeito. Agora o botão diz o que faz, com o custo
+      // ao lado, e não há segunda opção para confundir.
+      //
+      // O pdf.js continua no código como caminho de quem NÃO configurou a
+      // chave: ali não há escolha a oferecer, só um jeito de conseguir o texto.
+      if (!temChaveOcr) {
+        partes.push(
+          "Sem a chave da Mistral, a leitura é feita no seu navegador — funciona em " +
+            "peças com texto próprio, mas não em digitalizações."
         );
       }
       confirmarVisual(
         partes.join(" "),
-        "Extrair",
+        temChaveOcr ? "Extrair com OCR" + custoTxt : "Extrair",
         ancora,
         () => {
-          if (extrairCb && ids.length === 1) extrairCb(ids[0], {});
-          else if (extrairLoteCb) extrairLoteCb(ids, {});
-        },
-        // A única alternativa que é decisão de verdade: pagar OCR em tudo, em
-        // vez de deixar a extensão usar a leitura grátis onde ela funciona. Só
-        // aparece com chave configurada — oferecer OCR sem chave é oferecer um
-        // erro.
-        temChaveOcr
-          ? {
-              rotulo: "Usar OCR" + custoTxt,
-              onOk: () => {
-                if (extrairCb && ids.length === 1) extrairCb(ids[0], { forcarOcr: true });
-                else if (extrairLoteCb) extrairLoteCb(ids, { forcarOcr: true });
-              },
-            }
-          : null
+          const opts = temChaveOcr ? { forcarOcr: true } : {};
+          if (extrairCb && ids.length === 1) extrairCb(ids[0], opts);
+          else if (extrairLoteCb) extrairLoteCb(ids, opts);
+        }
       );
     }
 
@@ -1706,9 +1709,27 @@ var PjePanel = (function () {
       confirmEl = box;
       if (ancora && ancora.getBoundingClientRect) {
         // Viewport, não o .wrap (que tem tamanho zero) — ver o CSS do .confirmbox.
+        //
+        // A altura é MEDIDA depois de inserir, nunca presumida. A versão
+        // anterior usava um `130` fixo: com um texto de quatro linhas a caixa
+        // passava disso e os botões ficavam abaixo da borda da tela — o usuário
+        // via a pergunta e não via as respostas. Como o painel vive na parte de
+        // baixo da página, esse é o caso COMUM, não a exceção.
         const r = ancora.getBoundingClientRect();
-        box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 302)) + "px";
-        box.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - 130)) + "px";
+        const cx = box.getBoundingClientRect();
+        const M = 8; // respiro mínimo até a borda da janela
+        box.style.left =
+          Math.max(M, Math.min(r.left, window.innerWidth - cx.width - M)) + "px";
+        // Abaixo da âncora quando couber; senão ACIMA dela; e se não couber em
+        // lugar nenhum, encostada no topo com a altura limitada pelo CSS.
+        const abaixo = r.bottom + 6;
+        const acima = r.top - cx.height - 6;
+        box.style.top =
+          (abaixo + cx.height + M <= window.innerHeight
+            ? abaixo
+            : acima >= M
+              ? acima
+              : Math.max(M, window.innerHeight - cx.height - M)) + "px";
       }
       box.querySelector(".cb-yes").focus();
     }
@@ -1754,10 +1775,11 @@ var PjePanel = (function () {
         frase = pend + (pend > 1 ? " peças em PDF" : " peça em PDF") + " podem virar texto";
         curta = pend + " em PDF";
       }
-      // Custo só quando ele existe de verdade. "US$ 0,00" é mentira: a peça
-      // digitalizada CUSTA (US$ 0,002/folha) e uma folha só arredondava para
-      // zero. Vírgula decimal — o painel é todo em pt-BR.
-      const c = (info.ocr && info.custoUsd) || 0;
+      // Custo só quando ele existe de verdade. "US$ 0,00" é mentira: o OCR
+      // CUSTA (US$ 0,002/folha) e uma folha só arredondava para zero. Sem chave
+      // da Mistral o custo é zero de fato e nada é mostrado. Vírgula decimal —
+      // o painel é todo em pt-BR.
+      const c = info.custoUsd || 0;
       if (c > 0) {
         const usd = c < 0.01
           ? "menos de US$ 0,01"

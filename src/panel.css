@@ -623,6 +623,10 @@
   position: fixed; z-index: 2147483646; width: 292px;
   background: var(--surface); border: 1px solid var(--line-card);
   border-radius: var(--r-md); box-shadow: var(--sh-pop); padding: 12px 13px;
+  /* Rede de segurança do posicionamento: numa janela muito baixa nem acima nem
+     abaixo da âncora sobra espaço, e sem isto a caixa vazaria para fora da tela
+     com os botões inalcançáveis. O texto rola; as ações continuam à vista. */
+  max-height: calc(100vh - 16px); overflow-y: auto;
 }
 .cb-t { margin: 0 0 10px; font-size: var(--fs-meta); color: var(--text); line-height: 1.45; }
 .cb-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
