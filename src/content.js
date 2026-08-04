@@ -602,8 +602,10 @@
         onEtapa: (id, estado) => panel.setPrepState(id, estado),
         // Mesmo caminho do envio: o que já está em cache não baixa de novo, e o
         // que baixar aqui fica disponível para a conversa (prefetch de graça).
+        // garantirBinario (não docsCache.has): a peça pode estar em cache SÓ com
+        // o texto extraído, e este pacote leva os arquivos ORIGINAIS.
         obter: async (id) => {
-          if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
+          await garantirBinario(id);
           return docsCache.get(id);
         },
       });
@@ -678,14 +680,15 @@
         sinal,
         onEtapa: (id, estado) => panel.setPrepState(id, estado),
         obter: async (id) => {
-          if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
           await reidratarTextos([id]);
-          const d = docsCache.get(id);
-          if (!d) return null;
-          // peça já extraída → o texto; peça HTML/RTF → o texto que ela já é;
-          // PDF sem extração → o próprio PDF, para o pacote não ter buraco
-          if (d.kind === "pdf" && d.txt) return { kind: "text", fmt: "md", text: d.txt };
-          return d;
+          let d = docsCache.get(id);
+          // peça já extraída → o texto (e aqui NÃO baixamos o PDF: é justamente
+          // o caso em que ele não é necessário)
+          if (d && d.kind === "pdf" && d.txt) return { kind: "text", fmt: "md", text: d.txt };
+          // sem texto: o pacote leva o arquivo original, para não ter buraco —
+          // e aí o binário é obrigatório
+          d = await garantirBinario(id);
+          return d || null;
         },
       });
       panel.endPrep();
@@ -740,9 +743,22 @@
       return;
     }
     extraindo = true;
-    panel.setStatus("Extraindo o texto…", true);
     try {
-      if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
+      // Duas etapas, dois status: baixar do PJe leva ~5,6 s por peça e a leitura
+      // local leva menos de meio segundo. Dizer "extraindo" durante o download
+      // faz o usuário culpar a extração por uma espera que é do tribunal.
+      const d0 = docsCache.get(id);
+      if (!d0 || d0.semBinario) {
+        panel.setStatus("Baixando a peça do PJe…", true);
+        await garantirBinario(id);
+      }
+      const d = docsCache.get(id);
+      // HTML e RTF do editor do PJe já SÃO texto — não há o que extrair.
+      if (d && d.kind !== "pdf") {
+        panel.setStatus("Esta peça já vai como texto — não precisa de extração.");
+        return;
+      }
+      panel.setStatus("Lendo o texto da peça…", true);
       const r = await extrairPeca(id, o);
       panel.setStatus(
         "Texto extraído: " +
@@ -859,8 +875,9 @@
   panel.onPreviewBaixar(async (id) => {
     if (busy) throw new Error("aguarde a resposta atual terminar para abrir a peça");
     if (exportando) throw new Error("aguarde a exportação terminar para abrir a peça");
-    if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
-    return docsCache.get(id);
+    // garantirBinario (não docsCache.has): a peça pode estar em cache só com o
+    // texto extraído, e o preview em PDF precisa dos bytes.
+    return await garantirBinario(id);
   });
 
   let docsIndex = new Map(); // id -> {id, titulo} (para chips e card de progresso)
@@ -1203,6 +1220,10 @@
       };
     }
 
+    // Daqui para baixo precisamos dos BYTES (o pdf.js e o OCR leem o binário).
+    // Peça reidratada de sessão anterior pode estar em cache só com o texto.
+    const bin = d.semBinario ? await garantirBinario(id) : d;
+
     let folhas = null;
     let fonte = null;
     let custoUsd = 0;
@@ -1210,9 +1231,9 @@
 
     // Nível 1: só faz sentido no PDF que tem camada de texto. Em digitalização
     // pura o pdf.js devolveria zero e teríamos gasto tempo à toa.
-    if (!o.forcarOcr && !d.escaneado) {
+    if (!o.forcarOcr && !bin.escaneado) {
       try {
-        const r = await extrairLocal(d);
+        const r = await extrairLocal(bin);
         folhas = r.folhas;
         fonte = "pdfjs";
         pobre = !!r.pobre;
@@ -1233,7 +1254,7 @@
           );
         }
       } else if (!folhas || o.forcarOcr || o.aceitaOcr) {
-        const r = await extrairOcr(d, id);
+        const r = await extrairOcr(bin, id);
         folhas = r.folhas;
         fonte = "mistral";
         custoUsd = r.custoUsd;
@@ -1245,7 +1266,7 @@
     if (!m.md.trim()) throw new Error("a extração não encontrou texto nesta peça");
 
     const reg = {
-      chave: TEXTOLIB.chaveDe(PJE.getIdProcesso() || "proc", id, d.size || 0),
+      chave: TEXTOLIB.chaveDe(PJE.getIdProcesso() || "proc", id, bin.size || 0),
       proc: PJE.getIdProcesso() || "proc",
       peca: id,
       titulo: metaDe(id).titulo,

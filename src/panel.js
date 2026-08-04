@@ -1839,8 +1839,40 @@ var PjePanel = (function () {
         return;
       }
 
-      // PDF em cache
+      // PDF em cache. `!info.b64` acontece quando a peça veio de uma sessão
+      // anterior só com o texto extraído: o documento existe, mas os bytes dele
+      // não foram baixados de novo (e não precisam ser, para o envio).
       const pesado = (info.size || 0) > PREVIEW_MAX_HOVER_B;
+      if (!info.b64) {
+        modoCompact();
+        const box = document.createElement("div");
+        box.className = "preview-miss";
+        box.innerHTML =
+          "<span>Só o texto desta peça está carregado.</span>" +
+          '<button type="button" class="preview-dl">Abrir documento</button>';
+        const btn = box.querySelector(".preview-dl");
+        btn.addEventListener("click", async () => {
+          if (!previewDlCb) return;
+          btn.disabled = true;
+          btn.textContent = "Abrindo…";
+          previewDlPendente = true;
+          try {
+            const baixado = await previewDlCb(id);
+            if (previewId !== id) return;
+            if (baixado) {
+              renderPreview(row, baixado);
+              const anc = doclist.querySelector('.docrow[data-id="' + CSS.escape(id) + '"]');
+              if (anc) posicionarPreview(anc);
+            }
+          } catch (err) {
+            if (previewId === id) box.textContent = "Falha ao abrir: " + ((err && err.message) || err);
+          } finally {
+            previewDlPendente = false;
+          }
+        });
+        bd.appendChild(box);
+        return;
+      }
       if (previewCspBloqueado || pesado) {
         modoCompact();
         const box = document.createElement("div");
