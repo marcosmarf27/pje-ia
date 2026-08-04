@@ -30,6 +30,11 @@
           </label>
           <button id="flProx" title="Próxima folha" aria-label="Próxima folha">›</button>
         </div>
+        <!-- Comparar: a conferência é a razão de existir desta página. Ler o
+             texto extraído sem o original ao lado obriga a alternar de aba para
+             saber se a extração perdeu algo — e é exatamente por isso que
+             ninguém confere. -->
+        <button id="comparar" hidden>Comparar com o original</button>
         <button id="copiar">Copiar</button>
         <button id="baixar">Baixar .md</button>
       </div>
@@ -39,7 +44,17 @@
       <section id="telaLista" class="col" hidden>
         <div id="lista" class="lista"></div>
       </section>
+      <!-- Coluna do PDF ORIGINAL, à esquerda do texto. Só existe quando a peça
+           foi aberta pelo botão "Comparar" (o binário viaja pela sessão). -->
+      <section id="telaPdf" class="col col-pdf" hidden>
+        <div class="col-hd">
+          <span>Documento original</span>
+          <button id="fecharPdf" title="Fechar a comparação" aria-label="Fechar a comparação">✕</button>
+        </div>
+        <div id="pdfBox" class="pdf-box"></div>
+      </section>
       <section id="telaTexto" class="col" hidden>
+        <div class="col-hd" id="hdTexto" hidden><span>Texto extraído</span></div>
         <div id="corpo" class="folhas"></div>
       </section>
       <p id="aviso" class="aviso" hidden></p>

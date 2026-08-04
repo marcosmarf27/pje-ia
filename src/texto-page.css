@@ -97,6 +97,48 @@ button {
 }
 .col { width: 100%; max-width: 760px; margin: 0 auto; }
 
+/* --------------------------------------------------- comparação lado a lado */
+/* Ler o texto extraído sem o original ao lado é o mesmo que não conferir: a
+   alternância de aba custa o suficiente para ninguém fazer. Em modo comparação
+   a mesa vira duas colunas de altura fixa, cada uma com rolagem própria — a
+   página inteira NÃO rola, senão o PDF sairia da tela ao descer o texto. */
+body.comparando .mesa {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  overflow: hidden; padding: 14px 14px 14px;
+}
+body.comparando .col { max-width: none; margin: 0; min-width: 0; display: flex; flex-direction: column; }
+body.comparando #telaTexto { overflow: auto; }
+.col-hd {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2px 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted, #6b8494);
+}
+.col-hd button {
+  padding: 1px 7px; font-size: 13px; line-height: 1.2;
+  background: transparent; border-color: var(--linha); color: var(--muted, #6b8494);
+}
+.col-hd button:hover { background: #fff; color: var(--text, #123240); }
+.col-pdf { min-height: 0; }
+.pdf-box {
+  flex: 1; min-height: 0;
+  background: #fff; border: 1px solid var(--linha); border-radius: 8px; overflow: hidden;
+}
+/* Toolbar NATIVA do viewer do Chrome (zoom, páginas) — mesma decisão do preview
+   do painel: ela é melhor do que qualquer coisa que se reimplemente aqui. */
+.pdf-box embed { width: 100%; height: 100%; border: 0; display: block; }
+.pdf-miss {
+  padding: 22px 20px; color: var(--muted, #6b8494); font-size: 13.5px; line-height: 1.6;
+}
+.pdf-miss p { margin: 0 0 10px; }
+.pdf-miss b { color: var(--text, #123240); }
+/* Em tela estreita, empilhar seria pior que não comparar (nenhuma das duas
+   caberia). Abaixo de 900px a comparação volta a ser só o texto. */
+@media (max-width: 900px) {
+  body.comparando .mesa { grid-template-columns: 1fr; overflow: auto; }
+  body.comparando .col-pdf { height: 60vh; }
+}
+
 /* ------------------------------------------------------------------ folhas */
 /* Uma "folha" por página do PDF, com o número visível: é assim que o usuário
    confere a citação "(Contestação, id 123456, fl. 7)" que o modelo escreveu. */

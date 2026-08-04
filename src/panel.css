@@ -427,6 +427,17 @@
 }
 /* Exceção: o id da peça é numeral que se copia para procurar no PJe. */
 .d-id { user-select: text; -webkit-user-select: text; }
+/* …mas a exceção QUEBRAVA o arrasto. Com `user-select: text` no .d-id, o
+   ponteiro que cruza os ids inicia uma seleção de TEXTO do navegador: a lista
+   fica pintada de azul nos números e nenhum checkbox é marcado — exatamente o
+   sintoma relatado. A `.docrow` sozinha não bastava, porque a exceção vive
+   DENTRO dela.
+   Suspender só DURANTE o gesto preserva as duas coisas: parado, o id se copia;
+   arrastando, nada é selecionável. A classe entra no pointerdown, antes de o
+   navegador ter qualquer movimento para estender seleção. */
+.doclist.arrastando, .doclist.arrastando * {
+  user-select: none !important; -webkit-user-select: none !important;
+}
 .docrow:hover { background: #eef4f8; }
 .docrow input { flex: none; accent-color: var(--pje); width: 13px; height: 13px; }
 .d-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cat-outro); }
@@ -491,6 +502,20 @@
   width: 18px; height: 16px; border-radius: var(--r-pill);
   background: var(--ok-bg); color: var(--ok);
 }
+
+/* Selo do FORMATO do arquivo. Responde de relance "onde o OCR faz sentido?" —
+   só no PDF. Três letras em --fs-nano mono: um ícone de 11px não distingue PDF
+   de RTF, e a sigla é lida sem esforço. Tom neutro para não competir com o dot
+   da categoria (espécie da peça) nem com a marca verde. */
+.d-fmt {
+  flex: none; font-family: var(--ff-mono); font-size: var(--fs-nano);
+  font-weight: 600; letter-spacing: 0.02em;
+  padding: 1px 4px; border-radius: var(--r-xs);
+  background: var(--surface-2); color: var(--muted-3); border: 1px solid var(--line);
+}
+/* O PDF é o único acionável: ganha um tom levemente mais presente. Os demais
+   ficam quase invisíveis de propósito — são informação de fundo. */
+.d-fmt.fmt-pdf { color: var(--muted-2); border-color: var(--line-strong); }
 /* Sem itálico: a marca verde já diz que a peça vai como texto, e itálico em
    títulos longos de peça (que já são truncados) custa legibilidade para
    repetir um sinal que o ícone dá melhor. */
@@ -1192,6 +1217,17 @@
   font-size: var(--fs-micro); font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .preview-abrir-txt:hover { background: var(--accent-bg); }
+/* "Refazer com OCR": a decisão de gastar só faz sentido DEPOIS de ver que a
+   leitura local não serviu, e é este painel que mostra isso. Âmbar de aviso
+   suave — é uma ação paga. */
+.preview-ocr {
+  margin-left: auto;
+  border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-ink);
+  border-radius: var(--r-xs); padding: 3px 10px;
+  font-size: var(--fs-micro); font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.preview-ocr:hover { background: #f6e7c8; }
+.preview-ocr:disabled { opacity: 0.55; cursor: default; }
 /* Desfazer no lugar onde o problema aparece: é olhando o texto que se descobre
    que ele não presta. Secundário — a ação normal é seguir com o texto. */
 .preview-voltar-doc {
@@ -1202,8 +1238,11 @@
 }
 .preview-voltar-doc:hover { background: var(--hover); color: var(--text-3); }
 .preview-voltar-doc:disabled { opacity: 0.55; cursor: default; }
-/* Com o "voltar" presente ele é que empurra; sem ele, o "abrir texto" empurra. */
+/* O PRIMEIRO botão do rodapé é que empurra o grupo para a direita; os demais
+   ficam colados nele. A ordem no DOM é: OCR, voltar, abrir. */
 .preview-ft > .preview-abrir-txt:first-of-type { margin-left: auto; }
+.preview-ft > .preview-ocr ~ .preview-voltar-doc,
+.preview-ft > .preview-ocr ~ .preview-abrir-txt,
 .preview-ft > .preview-voltar-doc ~ .preview-abrir-txt { margin-left: 0; }
 
 .preview-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; }

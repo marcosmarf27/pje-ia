@@ -476,6 +476,33 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // Vai por storage.session (some ao fechar o navegador, não polui o local) e
   // é o worker quem grava: a página é contexto confiável e lê direto, e o
   // content script não precisa de acesso à área session.
+  // PDF original para a comparação lado a lado na página de texto.
+  //
+  // Passa pelo WORKER pela mesma razão do mapa: `chrome.storage.session` só
+  // aceita escrita de contexto CONFIÁVEL, e content script não é um (o padrão é
+  // TRUSTED_CONTEXTS e o projeto não chama setAccessLevel). Do content, o `set`
+  // falharia calado e a comparação abriria sempre sem o documento.
+  //
+  // Chave ÚNICA e sobrescrita: um PDF por vez, sem poda a fazer e sem risco de
+  // encher os 10 MB da sessão com binários.
+  if (msg.type === "guardarPdfCmp") {
+    (async () => {
+      try {
+        await sessSet("cmp:pdf", {
+          chave: msg.payload.chave,
+          b64: msg.payload.b64,
+          ts: Date.now(),
+        });
+        sendResponse({ ok: true });
+      } catch (e) {
+        // Cota estourada é o caso esperado num PDF grande: não é erro fatal —
+        // a página de texto abre sem a coluna do documento e explica por quê.
+        sendResponse({ error: String((e && e.message) || e) });
+      }
+    })();
+    return true;
+  }
+
   if (msg.type === "guardarMapa") {
     (async () => {
       try {

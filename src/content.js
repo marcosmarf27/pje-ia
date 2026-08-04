@@ -771,6 +771,12 @@
       imagens: d.txt ? 0 : d.imagens || 0,
       escaneado: !!d.escaneado,
       falhouAntes,
+      // Com a chave da Mistral configurada o usuário pode FORÇAR o OCR nesta
+      // peça, em vez de aceitar a decisão automática (local primeiro, OCR só
+      // se o local falhar ou vier pobre). Sem isto o diálogo escolhia por ele
+      // e não havia como pedir o OCR de propósito numa peça específica.
+      ocrDisponivel: ocrPronto,
+      paginas: d.pages || 0,
     };
   });
 
@@ -809,12 +815,19 @@
       }
       panel.setStatus("Lendo o texto da peça…", true);
       const r = await extrairPeca(id, o);
+      // A VIA vem primeiro na frase, e nomeada. "Texto extraído: 3 folhas
+      // (OCR)" deixava a pergunta que o usuário fez em aberto — o Mistral foi
+      // usado ou não? Agora a resposta é a primeira coisa que se lê, com o
+      // custo junto quando houve.
       panel.setStatus(
-        "Texto extraído: " +
-          r.paginas +
-          " folha(s)" +
-          (r.fonte === "mistral" ? " (OCR)" : " (leitura local)") +
-          "."
+        r.fonte === "mistral"
+          ? "Lida por OCR (Mistral): " + r.paginas + " folha(s)" +
+            (r.custoUsd ? " · US$ " + (r.custoUsd < 0.01 ? "0,01" :
+              r.custoUsd.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2})) : "") + "."
+          : r.reaproveitado
+            ? "Texto já extraído antes desta peça — religado, sem novo custo. " +
+              r.paginas + " folha(s)."
+            : "Lida no seu navegador, sem custo: " + r.paginas + " folha(s)."
       );
       // texto pobre vindo do pdf.js: a peça é digitalizada com uma camada de
       // OCR ruim do próprio scanner. Em vez de deixar o usuário descobrir
@@ -843,13 +856,37 @@
   // não 142. window.open no clique (gesto do usuário, não cai no bloqueador) e
   // navegação de topo, imune à CSP do tribunal — mesmo caminho do mapa e do
   // editor de minutas.
-  panel.onAbrirTexto((id) => {
+  // `comparar` abre a página JÁ em modo comparação, com o PDF original ao lado
+  // do texto. O binário vive só na memória desta aba, então ele viaja por
+  // `chrome.storage.session` sob uma chave ÚNICA e sobrescrita — um por vez,
+  // sem acumular na cota. Acima de 8 MB não vale: a cota da sessão é ~10 MB e
+  // estourar faria o `set` falhar sem dizer por quê; a página abre só com o
+  // texto e explica.
+  const TETO_CMP_B64 = 8 * 1024 * 1024;
+  panel.onAbrirTexto((id, opts) => {
     const d = docsCache.get(id);
     if (!d || !d.txtChave) return;
-    window.open(
-      chrome.runtime.getURL("src/texto.html?k=" + encodeURIComponent(d.txtChave)),
-      "_blank"
-    );
+    const comparar = !!(opts && opts.comparar);
+    const url = () =>
+      chrome.runtime.getURL(
+        "src/texto.html?k=" + encodeURIComponent(d.txtChave) + (comparar ? "&cmp=1" : "")
+      );
+    if (!comparar || d.kind !== "pdf" || !d.b64 || d.b64.length > TETO_CMP_B64) {
+      window.open(url(), "_blank");
+      return;
+    }
+    // Via WORKER, não `chrome.storage.session` daqui: a sessão só aceita
+    // escrita de contexto CONFIÁVEL e content script não é um — o `set` falharia
+    // calado e a comparação abriria sempre sem o documento. Mesmo caminho do
+    // mapa mental.
+    //
+    // A aba abre DEPOIS da gravação: sem isso a página correria para ler uma
+    // chave que ainda não existe. É rápido (sem rede) e o gesto do usuário não
+    // expira nesse intervalo. Falha na gravação NÃO impede de abrir: a página
+    // mostra o texto e explica a ausência do original.
+    rpc({ type: "guardarPdfCmp", payload: { chave: d.txtChave, b64: d.b64 } })
+      .catch(() => {})
+      .then(() => window.open(url(), "_blank"));
   });
 
   // Voltar ao documento: um clique, porque o b64 original nunca saiu do cache.
@@ -1652,13 +1689,20 @@
   function atualizarEstadoExtracao() {
     const estado = {};
     for (const [id, d] of docsCache) {
-      if (d && d.kind === "pdf" && d.txt) {
-        estado[id] = {
-          usando: !!d.txtUsar,
-          fonte: d.txtFonte,
-          paginas: d.txtPaginas || 0,
-        };
-      }
+      if (!d) continue;
+      // O FORMATO entra para toda peça já baixada, extraída ou não: é ele que
+      // responde "onde o OCR faz sentido?" sem o usuário precisar tentar. Só
+      // PDF aceita extração — HTML e RTF do editor do PJe já SÃO texto.
+      // `fmt` guarda "html"/"rtf" no ramo de texto (ver lerCorpo em pje.js).
+      const formato =
+        d.kind === "pdf" ? "PDF" : d.fmt ? String(d.fmt).toUpperCase() : d.kind === "text" ? "TXT" : null;
+      if (!formato && !d.txt) continue;
+      estado[id] = {
+        formato,
+        usando: !!(d.txt && d.txtUsar),
+        fonte: d.txtFonte,
+        paginas: d.txtPaginas || 0,
+      };
     }
     panel.setExtracaoEstado(estado);
     const e = extraiveis(selecaoAtual);

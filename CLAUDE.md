@@ -801,7 +801,30 @@ Regras que não podem quebrar:
   sem ela as duas parecem alternativas equivalentes. O botão "Voltar ao documento"
   vive no rodapé do preview além do ícone da row: é olhando o texto que se
   descobre que ele não presta (um RG digitalizado vira poucas linhas ilegíveis), e
-  a saída tem de estar na tela onde o problema aparece.
+  a saída tem de estar na tela onde o problema aparece. "Refazer com OCR" mora no
+  mesmo rodapé, e só quando a leitura foi LOCAL e há chave: ninguém pede OCR antes
+  de ver que o texto grátis não serviu.
+- **UMA tela, UMA decisão** (`pedirExtracao`). A escolha chegou a estar espalhada
+  em cinco lugares — diálogo de imagens, aviso de peças não medidas, "forçar OCR",
+  veredito de custo por modelo, "refazer com OCR" — porque um detalhe de
+  IMPLEMENTAÇÃO (ler no navegador quando dá, OCR quando não dá) virou decisão de
+  interface. Não é. O usuário decide **extrair estas peças, pagando OCR ou não**;
+  como a extensão consegue o texto é problema dela. A alternativa "Usar OCR" só
+  aparece com chave configurada — oferecer OCR sem chave é oferecer um erro.
+- **O selo de formato (`.d-fmt`: PDF/HTML/RTF) é o que torna a regra visível.**
+  Só PDF aceita extração, e dizer isso em prosa não resolve: o selo responde de
+  relance onde o OCR faz sentido. Aparece só depois do download (o formato vem do
+  content-type + assinatura no binário) e some quando a peça já vai como texto,
+  porque aí quem manda é a marca verde.
+- **Comparação lado a lado** (`src/texto.html?k=…&cmp=1`): PDF original à esquerda,
+  texto extraído à direita, cada coluna com rolagem própria. Texto extraído só é
+  confiável se der para bater contra o original, e conferir alternando de aba é o
+  mesmo que não conferir. O binário viaja **pelo worker** (`{type:"guardarPdfCmp"}`
+  → `chrome.storage.session`, chave única `cmp:pdf` sobrescrita): o content script
+  NÃO pode escrever na sessão — ela só aceita contexto confiável e o projeto não
+  chama `setAccessLevel` —, e do content o `set` falharia calado. Mesma razão pela
+  qual o mapa mental grava por RPC. Teto de 8 MB de base64 (a cota da sessão é
+  ~10 MB); acima disso a página abre só com o texto e explica.
 
 ## Tolerância a falha de download (invariante do envio)
 
@@ -829,7 +852,14 @@ visíveis, como o "todas" e o "principais"):
 - **arrastar** — marca/desmarca a faixa por onde o ponteiro passa. Exigiu
   `user-select: none` na `.docrow`: sem isso o gesto pintava a lista de azul de
   seleção de TEXTO e não marcava nada. Exceção: `.d-id` continua `user-select: text`
-  (o número da peça se copia para procurar no PJe).
+  (o número da peça se copia para procurar no PJe) — **e a exceção reintroduziu o
+  bug**: o ponteiro cruzando os ids começava a selecionar texto e o arrasto morria.
+  A classe `.arrastando` no `.doclist` (posta no pointerdown, tirada no pointerup)
+  suspende o `user-select` de TODOS os descendentes durante o gesto; parado, o id
+  volta a ser copiável. A row de ORIGEM é marcada no primeiro `pointerover` de
+  outra row (`origemMarcada`): o `<label>` só a alterna quando o gesto vira clique,
+  então arrastar da peça 1 até a 5 marcava 2,3,4,5 e deixava de fora justamente
+  aquela onde o dedo começou.
 - **Shift+clique** — do último item tocado até este. `preventDefault` no
   `pointerdown`, senão o `<label>` alternaria só a row clicada.
 - **botão direito** — menu com "daqui para baixo/cima", que resolve quando o outro

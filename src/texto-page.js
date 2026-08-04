@@ -29,8 +29,13 @@
   var elFlNum = $("#flNum");
   var elFlTot = $("#flTot");
   var elRodape = $("#rodapeTxt");
+  var elComparar = $("#comparar");
+  var elTelaPdf = $("#telaPdf");
+  var elPdfBox = $("#pdfBox");
+  var elHdTexto = $("#hdTexto");
 
   var reg = null;
+  var blobUrl = null; // no máximo UM vivo; revogado ao trocar/fechar
 
   function avisar(t) {
     elAviso.textContent = t;
@@ -128,6 +133,75 @@
       sec.appendChild(div);
       elCorpo.appendChild(sec);
     });
+  }
+
+  // --- comparação lado a lado ------------------------------------------------
+  //
+  // O texto extraído só é confiável se der para conferir contra o original — e
+  // conferir alternando de aba é o mesmo que não conferir. O binário da peça
+  // vive no docsCache da aba do PJe (memória do content script), então ele
+  // viaja por `chrome.storage.session` sob uma chave ÚNICA e sobrescrita
+  // (`cmp:pdf`): um por vez, sem acumular na cota de 10 MB.
+  var CHAVE_CMP = "cmp:pdf";
+
+  function fecharComparacao() {
+    elTelaPdf.hidden = true;
+    elHdTexto.hidden = true;
+    document.body.classList.remove("comparando");
+    elPdfBox.innerHTML = "";
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+      blobUrl = null;
+    }
+    if (elComparar) elComparar.textContent = "Comparar com o original";
+  }
+
+  function b64ParaBlob(b64) {
+    var bin = atob(b64);
+    var n = bin.length;
+    var buf = new Uint8Array(n);
+    for (var i = 0; i < n; i++) buf[i] = bin.charCodeAt(i);
+    return new Blob([buf], { type: "application/pdf" });
+  }
+
+  function abrirComparacao() {
+    chrome.storage.session.get(CHAVE_CMP, function (v) {
+      var pacote = v && v[CHAVE_CMP];
+      // Só serve se for O PDF DESTA peça: a chave é única e sobrescrita, então
+      // um pacote de outra peça significa que o usuário abriu outra no meio.
+      if (!pacote || !pacote.b64 || pacote.chave !== chave) {
+        elPdfBox.innerHTML =
+          '<div class="pdf-miss"><p><b>O documento original não está disponível nesta aba.</b></p>' +
+          "<p>Na tela do processo, passe o mouse sobre a peça e use " +
+          "<b>Comparar com o original</b> — o PDF é enviado junto.</p></div>";
+      } else {
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        blobUrl = URL.createObjectURL(b64ParaBlob(pacote.b64));
+        var emb = document.createElement("embed");
+        emb.type = "application/pdf";
+        emb.src = blobUrl; // toolbar NATIVA do Chrome: zoom e navegação de graça
+        elPdfBox.innerHTML = "";
+        elPdfBox.appendChild(emb);
+      }
+      elTelaPdf.hidden = false;
+      elHdTexto.hidden = false;
+      document.body.classList.add("comparando");
+      if (elComparar) elComparar.textContent = "Fechar comparação";
+    });
+  }
+
+  function ligarComparacao() {
+    if (!elComparar) return;
+    elComparar.hidden = false;
+    elComparar.addEventListener("click", function () {
+      if (document.body.classList.contains("comparando")) fecharComparacao();
+      else abrirComparacao();
+    });
+    var fechar = $("#fecharPdf");
+    if (fechar) fechar.addEventListener("click", fecharComparacao);
+    // Abre já comparando quando veio do botão do painel — o gesto do usuário
+    // foi "quero comparar", não "quero ler".
+    if (params.get("cmp") === "1") abrirComparacao();
   }
 
   function irParaFolha(p) {
@@ -253,5 +327,6 @@
     }
     montarTexto();
     ligarAcoes();
+    ligarComparacao();
   });
 })();
