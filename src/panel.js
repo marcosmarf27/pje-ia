@@ -1452,6 +1452,23 @@ var PjePanel = (function () {
     let desfazerExtracaoCb = null;
     let extraivelCb = null; // (id) -> {podeExtrair, imagens, escaneado} | null
 
+    // Consulta ao content script protegida: `extraivelCb` é código de FORA do
+    // painel, e um erro dentro dele não pode derrubar quem o chamou. Esta
+    // função roda no meio do `setDocs`, então uma exceção aqui abortava a
+    // montagem da lista de peças — a espinha dorsal do painel — e levava junto
+    // tudo que é registrado depois no content.js. Foi exatamente o que um
+    // `const` fora de ordem causou: sumiram a seleção em faixa E a extração.
+    // Mesmo contrato best-effort do resto dos callbacks.
+    function extraivelSeguro(id) {
+      if (!extraivelCb) return null;
+      try {
+        return extraivelCb(id);
+      } catch (e) {
+        console.debug("[PJe IA] onExtraivel falhou para a peça", id, e && e.message);
+        return null;
+      }
+    }
+
     function aplicarExtracaoNasRows() {
       for (const row of doclist.querySelectorAll(".docrow")) {
         const id = row.dataset.id;
@@ -1482,7 +1499,7 @@ var PjePanel = (function () {
         }
         row.classList.toggle("em-texto", usando);
         if (btn) {
-          const info = extraivelCb ? extraivelCb(id) : null;
+          const info = extraivelSeguro(id);
           // O botão só existe onde há o que fazer: peça já em texto ganha
           // "voltar ao documento" — com ÍCONE PRÓPRIO, senão ele fica idêntico
           // ao de extrair e parece oferecer a mesma ação de novo.
@@ -1546,7 +1563,7 @@ var PjePanel = (function () {
       let imagens = 0;
       let naoMedidas = 0;
       for (const id of ids) {
-        const info = extraivelCb ? extraivelCb(id) : null;
+        const info = extraivelSeguro(id);
         if (info && info.naoMedida) naoMedidas++;
         if (info && info.imagens > 0) {
           comImagens.push(id);

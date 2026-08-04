@@ -1130,7 +1130,28 @@ que não podem quebrar:
 
 ## Desenvolvimento e teste
 
-- Não há bundler. Valide sintaxe com `node --check src/*.js`. Testes de unidade fora do
+- **ARMADILHA DA ZONA MORTA TEMPORAL no `content.js`** (já derrubou o painel
+  inteiro uma vez): o arquivo é um IIFE gigante que REGISTRA callbacks no painel
+  centenas de linhas antes de declarar o estado que eles leem, e chama
+  `refresh()` no meio — que roda `panel.setDocs` → `aplicarExtracaoNasRows` →
+  `onExtraivel` de forma **síncrona**. Todo `const`/`let` do escopo do IIFE
+  declarado DEPOIS de `refresh()` e lido por um desses callbacks lança
+  `Cannot access before initialization` dentro do `setDocs`, que **aborta e leva
+  junto o resto do content.js** — sumiram a seleção em faixa e a extração de uma
+  vez, sem nenhum sintoma que apontasse para a causa. Estado lido por callback
+  vive no TOPO, junto do `const panel`. Duas defesas: `extraivelSeguro` no
+  painel (try/catch em volta do callback do content — a lista de peças não pode
+  morrer por um recurso acessório) e o lint do scratchpad, que lista os
+  candidatos e detecta a classe inteira.
+- Não há bundler. Valide sintaxe com `node --check src/*.js`.
+- **Testar o BOOT do content.js sem PJe** (o único teste que pega erro de ordem
+  de inicialização): HTML com `#divTimeLine` no DOM, stubs de `chrome`, `PJE`
+  (a superfície real é `listarDocumentos`, não `listar`), `TEXTOLIB`, `PLIB`,
+  `MLIB` (**precisa de `CATEGORIAS`**, que o `mount` itera), `ZipW` e
+  `PjeExport`; `eval` do `panel.js` e depois do `content.js`. Conferir por
+  COMPORTAMENTO que os handlers do fim do arquivo subiram — arrastar marca a
+  faixa, Shift+clique estende, botão direito abre o `.selmenu` —, porque um
+  `content.js` abortado no meio ainda monta o painel e lista as peças. Testes de unidade fora do
   navegador no scratchpad da sessão: `renderMd` (escape-first + citações) roda com
   `eval` do `panel.js`; o acumulador SSE de `claude.js` roda com `fetch` fake devolvendo
   um `ReadableStream` de eventos simulados (chat com citação, `pause_turn`);

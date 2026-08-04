@@ -243,6 +243,39 @@
 
   const panel = PjePanel.mount();
 
+  // --- estado da extração, declarado NO TOPO de propósito --------------------
+  //
+  // O content.js REGISTRA callbacks no painel muito antes de declarar o estado
+  // que eles leem, e chama `refresh()` no meio do arquivo — que roda
+  // `panel.setDocs` → `aplicarExtracaoNasRows` → `onExtraivel` de forma
+  // SÍNCRONA. Qualquer `const`/`let` do escopo do IIFE declarado depois dessa
+  // chamada e lido por um desses callbacks cai na ZONA MORTA TEMPORAL e lança
+  // "Cannot access before initialization" DENTRO do setDocs — que aborta no
+  // meio e derruba o resto do content.js junto, levando embora a seleção em
+  // faixa, a extração e tudo que é registrado depois. Uma linha de posição
+  // errada apagou metade do painel.
+  //
+  // As outras três estavam seguras só por ACIDENTE (o `return` antecipado do
+  // `onExtraivel` no cache vazio as protegia). Subiram junto para a classe
+  // inteira do problema desaparecer — e o lint do scratchpad confere isso.
+  let ocrPronto = false; // chave da Mistral configurada
+  let extraindo = false; // guarda mútua com envio/exportação/timeline
+  let selecaoAtual = []; // projeção dos checkboxes (fonte de verdade segue lá)
+
+  // Peças que JÁ tentaram extrair e não deram — id -> motivo.
+  //
+  // Sem este registro a fila não tem dreno: o PJe devolve 404 em peças que
+  // existem na lista mas não têm download servível (ato ordinatório de sistema
+  // anterior é o caso clássico), `extraiveis` as recolocava em `pendentes` a
+  // cada recálculo, e a faixa prometia "⌁ Extrair 1" para sempre — cada clique
+  // reproduzindo o mesmo erro. Trabalho pendente tem TRÊS estados, não dois:
+  // feito, a fazer e impossível.
+  //
+  // O registro governa só o LOTE (a fila automática). O botão da própria peça
+  // continua disponível como retentativa deliberada: um clique naquela linha é
+  // o usuário dizendo "tente de novo", e um erro pode ter sido transitório.
+  const extracaoFalhou = new Map();
+
   // ---------------------------------------------------------------------------
   // Contexto órfão: quando a extensão é atualizada/recarregada em
   // chrome://extensions, o content script antigo continua vivo na aba, mas
@@ -1107,23 +1140,9 @@
   // Acima disto o download está fora do normal e vale dizer ao usuário que o
   // problema é a rede — a ativação JSF de uma peça leva ~5,6 s em condições boas.
   const SEGUNDOS_PECA_LENTO = 12;
-  let ocrPronto = false; // chave da Mistral configurada
-  let extraindo = false; // guarda mútua com envio/exportação/timeline
-  let selecaoAtual = []; // projeção dos checkboxes (fonte de verdade segue lá)
-
-  // Peças que JÁ tentaram e não deram — id -> motivo.
-  //
-  // Sem este registro a fila não tem dreno: o PJe devolve 404 em peças que
-  // existem na lista mas não têm download servível (ato ordinatório de sistema
-  // anterior é o caso clássico), `extraiveis` as recolocava em `pendentes` a
-  // cada recálculo, e a faixa prometia "⌁ Extrair 1" para sempre — cada clique
-  // reproduzindo o mesmo erro. Trabalho pendente tem TRÊS estados, não dois:
-  // feito, a fazer e impossível.
-  //
-  // O registro governa só o LOTE (a fila automática). O botão da própria peça
-  // continua disponível como retentativa deliberada: um clique naquela linha é
-  // o usuário dizendo "tente de novo", e um erro pode ter sido transitório.
-  const extracaoFalhou = new Map();
+  // (`ocrPronto`, `extraindo`, `selecaoAtual` e `extracaoFalhou` são declarados
+  // no TOPO do arquivo, junto do `panel` — ver o comentário lá. Aqui embaixo
+  // ficavam na zona morta temporal do primeiro `refresh()`.)
 
   // --- iframe do extrator (pdf.js) -------------------------------------------
   // Um único iframe por aba, criado sob demanda. Páginas em
