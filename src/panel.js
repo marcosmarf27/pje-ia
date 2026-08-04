@@ -1565,11 +1565,15 @@ var PjePanel = (function () {
             btn.innerHTML = SVG.extrair;
             // Retentativa informada: dizer só "extrair" numa peça que já
             // falhou convida ao mesmo erro sem explicar nada.
+            // O rótulo tem de dizer a MESMA coisa que o botão do diálogo. Ele
+            // dizia "leitura local, sem custo" mesmo com a chave da Mistral
+            // configurada — e é justamente essa contradição ("estou usando o
+            // Mistral ou não?") que a via única veio resolver.
             btn.title = info.falhouAntes
               ? "Tentar de novo — a última tentativa falhou: " + info.falhouAntes
-              : info.escaneado
-                ? "Esta peça é digitalizada — extrair o texto dela com OCR"
-                : "Extrair o texto desta peça (leitura local, sem custo)";
+              : info.ocrDisponivel
+                ? "Extrair o texto desta peça com OCR (pago por folha)"
+                : "Extrair o texto desta peça (lido no seu navegador, sem custo)";
             btn.setAttribute("aria-label", btn.title);
           } else {
             btn.hidden = true;
@@ -1610,12 +1614,18 @@ var PjePanel = (function () {
     function pedirExtracao(ids, ancora) {
       let comImagens = 0;
       let paginas = 0;
+      let semMedida = 0;
       let temChaveOcr = false;
       for (const id of ids) {
         const info = extraivelSeguro(id);
         if (!info) continue;
         if (info.imagens > 0) comImagens++;
         paginas += info.paginas || 0;
+        // Peça ainda não baixada não tem número de páginas — e é por página que
+        // o OCR cobra. Contamos quantas são para dizer que a estimativa está
+        // incompleta, em vez de mostrar um preço que sabemos ser menor que o
+        // real.
+        if (info.naoMedida) semMedida++;
         if (info.ocrDisponivel) temChaveOcr = true;
       }
       const usd = paginas * 0.002;
@@ -1655,6 +1665,16 @@ var PjePanel = (function () {
         partes.push(
           "Sem a chave da Mistral, a leitura é feita no seu navegador — funciona em " +
             "peças com texto próprio, mas não em digitalizações."
+        );
+      } else if (semMedida) {
+        // O OCR cobra por página e a peça ainda não baixada não tem página
+        // conhecida. Anunciar o preço parcial como se fosse o total seria
+        // prometer barato e cobrar caro — a estimativa vem com o aviso do que
+        // falta nela.
+        partes.push(
+          semMedida === ids.length
+            ? "O custo depende do número de folhas, que só será conhecido ao baixar as peças do PJe."
+            : semMedida + " delas ainda não foram baixadas, então o custo real será maior."
         );
       }
       confirmarVisual(
@@ -1992,7 +2012,10 @@ var PjePanel = (function () {
           bOcr.addEventListener("click", () => {
             bOcr.disabled = true;
             bOcr.textContent = "Lendo…";
-            if (extrairCb) extrairCb(id, { forcarOcr: true });
+            // `refazer` é o que diferencia este botão do fluxo normal: aqui o
+            // usuário JÁ tem o texto e está pedindo para ler a peça de novo,
+            // então a guarda de reaproveitamento do cache tem de ser ignorada.
+            if (extrairCb) extrairCb(id, { forcarOcr: true, refazer: true });
           });
         }
         ft.querySelector(".preview-abrir-txt").addEventListener("click", (ev) => {
@@ -3894,13 +3917,21 @@ var PjePanel = (function () {
           );
         }
         if (r.ocr) {
-          const usd = (r.custoUsd || 0).toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          });
+          // "US$ 0,00" é mentira — o OCR cobra por folha e duas folhas
+          // arredondam para zero. Mesma regra da faixa e do status: abaixo de um
+          // centavo a frase diz isso, não finge gratuidade.
+          const c = r.custoUsd || 0;
+          const usd =
+            c > 0 && c < 0.01
+              ? "menos de US$ 0,01"
+              : "US$ " +
+                c.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          // "digitalizadas" era verdade quando o OCR só rodava em digitalização.
+          // Com a via única (chave configurada = tudo por OCR) o rótulo passou a
+          // classificar errado peça nativa — e o usuário conferindo a conta
+          // percebe antes de nós.
           linha(
-            r.ocr + (r.ocr > 1 ? " peças digitalizadas lidas" : " peça digitalizada lida") +
-              " por OCR · US$ " + usd
+            r.ocr + (r.ocr > 1 ? " peças lidas" : " peça lida") + " por OCR · " + usd
           );
         }
         if (r.jaTexto) {

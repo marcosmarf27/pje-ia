@@ -804,6 +804,28 @@ Regras que não podem quebrar:
   a saída tem de estar na tela onde o problema aparece. "Refazer com OCR" mora no
   mesmo rodapé, e só quando a leitura foi LOCAL e há chave: ninguém pede OCR antes
   de ver que o texto grátis não serviu.
+- **`forcarOcr` ≠ `refazer`, e confundir os dois custa dinheiro.** `forcarOcr` diz
+  por qual VIA extrair (com chave configurada é sempre OCR — a via única) e vem em
+  TODO clique; `refazer` é o pedido deliberado de ler a MESMA peça outra vez, e só
+  existe no rodapé do preview ("Refazer com OCR"). A guarda de reaproveitamento em
+  `extrairPeca` (peça já extraída religa de graça, o texto está no disco) tem de
+  olhar `refazer`. Quando ela olhava `forcarOcr`, toda peça já extraída e depois
+  desligada **repagava o OCR** no lote seguinte.
+- **`docsCache.has(id)` NÃO significa "tem o binário".** `reidratarTextos` insere
+  uma entrada `semBinario` (só texto) para não rebaixar peça já extraída — economia
+  legítima de ~5,6 s/peça. Mas se o usuário voltou a peça ao documento, essa entrada
+  não tem bytes NEM texto em uso, e `montarBlocos` a descarta por construção: a peça
+  sumia do request **em silêncio**, sem entrar sequer no relatório de falhas. Todo
+  caminho que precisa dos bytes confere `semBinario` (é o que `garantirBinario`
+  existe para encapsular) — em `baixarSelecionadas` a condição é
+  `!dc || (dc.semBinario && !(dc.txtUsar && dc.txt))`.
+- **O OCR re-tenta o transitório, e transitório não sai da fila.** `mistral.js`
+  classifica 429/5xx com `retryable`, mas o `rpc()` do content descartava a flag ao
+  construir o `Error` — e `extracaoFalhou` gravava a peça, tirando-a da fila para
+  sempre. Com `EXTRACAO_CONCORRENCIA = 3` contra o limite da API, um lote de 50
+  peças se desfazia sozinho. Agora `rpc` preserva `retryable`, `extrairOcr` re-tenta
+  (`OCR_RETENTATIVAS` = 2; 10 s no 429, backoff linear no resto) e só o erro
+  DEFINITIVO entra em `extracaoFalhou`.
 - **UMA via na interface: o OCR do Mistral.** A escolha entre leitura local e OCR
   chegou a estar espalhada em cinco lugares, e o sintoma foi o usuário perguntando
   *"eu estou usando o Mistral ou não?"* diante de um botão escrito "Extrair".
@@ -814,7 +836,14 @@ Regras que não podem quebrar:
   chave — ali não há escolha a oferecer, só um jeito de conseguir o texto.
   **Consequência no custo**: com chave, `extraiveis` soma as páginas de TODAS as
   pendentes em `paginasOcr`, não só das digitalizadas — senão a faixa anunciaria
-  um preço menor do que o que vai ser cobrado.
+  um preço menor do que o que vai ser cobrado. A exceção é a peça que **já tem
+  texto no disco** (religar é grátis): ela entra na fila e fica fora do custo.
+  Peça ainda NÃO BAIXADA não tem páginas conhecidas, então `ocrDisponivel` vale
+  para ela também (é estado da EXTENSÃO, não da peça — sem isso o caso mais comum,
+  marcar "todas" e extrair, dizia "sem a chave da Mistral" COM a chave configurada)
+  e o diálogo avisa que a estimativa está incompleta em vez de prometer barato.
+  Pelo mesmo motivo o relatório do lote diz "N peças lidas por OCR", nunca
+  "digitalizadas": com a via única, peça nativa também passa por lá.
 - **A caixa de confirmação MEDE a própria altura** (`confirmarVisual`). Ela usava
   um `130` fixo para se afastar da borda inferior; com quatro linhas de texto a
   caixa passava disso e os botões ficavam abaixo da tela — o usuário via a

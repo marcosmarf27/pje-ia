@@ -316,7 +316,14 @@
           if (chrome.runtime.lastError)
             return reject(new Error(chrome.runtime.lastError.message));
           if (!resp) return reject(new Error("sem resposta do serviço da extensão"));
-          if (resp.error) return reject(new Error(resp.error));
+          if (resp.error) {
+            // O worker classifica o erro (429/5xx/queda de rede = transitório) e
+            // o `retryable` viajava até aqui só para ser jogado fora na
+            // construção do Error. Quem re-tenta precisa dele.
+            const err = new Error(resp.error);
+            if (resp.retryable) err.retryable = true;
+            return reject(err);
+          }
           resolve(resp);
         });
       } catch {
@@ -760,7 +767,21 @@
     // informada, não às cegas.
     const falhouAntes = extracaoFalhou.get(id) || null;
     if (!d)
-      return { podeExtrair: true, imagens: 0, escaneado: false, naoMedida: true, falhouAntes };
+      return {
+        podeExtrair: true,
+        imagens: 0,
+        escaneado: false,
+        naoMedida: true,
+        falhouAntes,
+        // `ocrDisponivel` vale para a peça NÃO BAIXADA também — e este é o caso
+        // COMUM (marcar "todas" e extrair antes de qualquer download). Sem ele
+        // o diálogo do lote não via chave nenhuma, dizia "sem a chave da
+        // Mistral, a leitura é feita no seu navegador" com a chave configurada,
+        // e ainda por cima não pedia o OCR. Ter chave é estado da EXTENSÃO, não
+        // desta peça.
+        ocrDisponivel: ocrPronto,
+        paginas: 0,
+      };
     if (d.kind !== "pdf" || d.txtUsar) return null;
     // digitalizada sem chave de OCR: não há o que oferecer
     if (d.escaneado && !d.txt && !ocrPronto) return null;
@@ -839,7 +860,8 @@
       }
     } catch (e) {
       const msg = (e && e.message) || String(e);
-      extracaoFalhou.set(id, msg);
+      // Só o definitivo sai da fila — ver a mesma regra em extrairLote.
+      if (!e || !e.retryable) extracaoFalhou.set(id, msg);
       panel.setStatus("Não foi possível extrair: " + msg);
     } finally {
       extraindo = false;
@@ -1067,9 +1089,18 @@
       while (queue.length) {
         const id = queue.shift();
         panel.setPrepState(id, "loading");
-        if (!docsCache.has(id)) {
+        // `has()` sozinho responde "sim" para a entrada SÓ TEXTO que
+        // `reidratarTextos` cria (peça extraída numa sessão anterior, ainda sem
+        // binário nesta). Enquanto o texto está EM USO isso é o certo — é a
+        // economia que evita rebaixar o PDF à toa. Mas se o usuário voltou a
+        // peça ao documento, essa entrada não tem nem bytes nem texto: sem esta
+        // segunda condição, o download era pulado e `montarBlocos` descartava a
+        // peça em SILÊNCIO — ela sumia do request sem nenhum aviso.
+        const dc = docsCache.get(id);
+        if (!dc || (dc.semBinario && !(dc.txtUsar && dc.txt))) {
           try {
-            docsCache.set(id, await PJE.baixar(id));
+            // `garantirBinario` preserva os campos de texto já extraído
+            await garantirBinario(id);
             baixadas++;
             // Throughput real (segundos por peça ENTREGUE), não o tempo de uma
             // peça isolada: é o número que o usuário sente esperando.
@@ -1174,6 +1205,8 @@
   // disso a guarda de 90% da janela já barraria o envio de qualquer jeito.
   const MAX_CHARS_TEXTO = 400000;
   const EXTRACAO_CONCORRENCIA = 3;
+  // Re-tentativas por peça nos erros transitórios do OCR (429/5xx).
+  const OCR_RETENTATIVAS = 2;
   // Acima disto o download está fora do normal e vale dizer ao usuário que o
   // problema é a rede — a ativação JSF de uma peça leva ~5,6 s em condições boas.
   const SEGUNDOS_PECA_LENTO = 12;
@@ -1272,13 +1305,35 @@
     });
   }
 
-  // Extração pelo OCR pago.
+  // Extração pelo OCR pago, com re-tentativa nos erros TRANSITÓRIOS.
+  //
+  // Sem isto o lote se desfazia sozinho em uso real: três peças em paralelo
+  // contra o limite de requisições da Mistral produzem 429 com facilidade, e
+  // cada 429 marcava a peça como impossível — ela saía da fila para sempre,
+  // exibindo um erro que era só "espere um pouco". Mesma política do caminho de
+  // chat: 2 re-tentativas, e o 429 espera mais (o limite é por janela de tempo,
+  // não adianta voltar em 2 s).
   async function extrairOcr(d, id) {
-    const r = await rpc({
-      type: "ocr",
-      payload: { b64: d.b64, paginas: d.pages || 1 },
-    });
-    return { folhas: r.folhas, custoUsd: r.custoUsd || 0, modelo: r.modelo };
+    let ultimo = null;
+    for (let tent = 0; tent <= OCR_RETENTATIVAS; tent++) {
+      try {
+        const r = await rpc({
+          type: "ocr",
+          payload: { b64: d.b64, paginas: d.pages || 1 },
+        });
+        return { folhas: r.folhas, custoUsd: r.custoUsd || 0, modelo: r.modelo };
+      } catch (e) {
+        ultimo = e;
+        if (!e || !e.retryable || tent === OCR_RETENTATIVAS) throw e;
+        const espera = /limite de uso/i.test(e.message || "") ? 10000 : 2000 * (tent + 1);
+        console.debug(
+          "[PJe IA] OCR da peça", id, "falhou (transitório):", e.message,
+          "— nova tentativa em", espera / 1000, "s"
+        );
+        await new Promise((r) => setTimeout(r, espera));
+      }
+    }
+    throw ultimo;
   }
 
   // Interface ÚNICA da extração. Decide a fonte, grava no cache persistente e
@@ -1296,7 +1351,15 @@
     // Já extraída antes (o cache é persistente e pode vir de outra sessão):
     // religar é instantâneo e de graça. Sem esta guarda, "voltar ao documento"
     // seguido de "extrair" pagaria o OCR uma segunda vez pela MESMA peça.
-    if (d.txt && d.txtChave && !o.forcarOcr) {
+    //
+    // A guarda olha `refazer`, NÃO `forcarOcr`. São coisas diferentes e
+    // confundi-las custava dinheiro: `forcarOcr` diz por qual VIA extrair (com
+    // chave configurada, é sempre OCR — a via única da interface) e vem em todo
+    // clique; `refazer` é o pedido deliberado de ler a MESMA peça de novo, que
+    // só existe no rodapé do preview ("Refazer com OCR"), depois de o usuário
+    // ver que o texto não presta. Com a guarda em `forcarOcr`, toda peça já
+    // extraída e desligada repagava o OCR no lote seguinte.
+    if (d.txt && d.txtChave && !o.refazer) {
       d.txtUsar = true;
       await new Promise((res) => TEXTOLIB.marcarUso(d.txtChave, true, res));
       return {
@@ -1494,6 +1557,14 @@
         continue;
       }
       if (d.kind !== "pdf") continue;
+      // Peça JÁ EXTRAÍDA com o texto desligado: religar é instantâneo e de
+      // graça (o texto está no disco). Ela entra na fila, mas NÃO no custo —
+      // cobrá-la de novo anunciaria um preço que a extensão não vai cobrar.
+      if (d.txt && d.txtChave) {
+        out.pendentes.push(id);
+        out.locais++;
+        continue;
+      }
       if (d.escaneado) {
         // Sem chave de OCR não há o que fazer com uma digitalização — mas ela
         // conta como INDISPONÍVEL, não some da soma: "1 de 54 ainda em
@@ -1597,6 +1668,9 @@
     let custo = 0;
     let tDown = 0;
     let tExtrai = 0;
+    const tLote = Date.now();
+    let baixadasN = 0;
+    let avisouLento = false;
     async function w() {
       while (fila.length) {
         if (sinal.cancelado) return;
@@ -1611,6 +1685,22 @@
             const t = Date.now();
             await garantirBinario(id);
             tDown += Date.now() - t;
+            baixadasN++;
+            // MESMA medição do envio, e aqui ela vale ainda mais: extrair 50
+            // peças é a operação mais longa da extensão, e o tempo é quase todo
+            // download do tribunal. Sem esta nota o usuário culpa o OCR por uma
+            // espera que é da rede dele — e não tem como descobrir sozinho.
+            const media = (Date.now() - tLote) / 1000 / baixadasN;
+            if (!avisouLento && baixadasN >= 2 && media > SEGUNDOS_PECA_LENTO) {
+              avisouLento = true;
+              panel.setPrepNota(
+                "Download lento (~" +
+                  Math.round(media) +
+                  " s por peça). O tempo aqui é quase todo espera do PJe, não da " +
+                  "leitura do texto: uma conexão por cabo é bem mais estável que o " +
+                  "Wi-Fi para baixar os autos."
+              );
+            }
           }
           const d = docsCache.get(id);
           // HTML e RTF do editor do PJe JÁ SÃO TEXTO — extrair não faz sentido
@@ -1634,7 +1724,12 @@
           const msg = (e && e.message) || String(e);
           // Registrado para sair da FILA: sem isto a faixa prometeria extrair
           // esta peça para sempre, e cada clique repetiria o mesmo erro.
-          extracaoFalhou.set(id, msg);
+          //
+          // Só o erro DEFINITIVO entra aqui. Um 429 que sobreviveu às
+          // re-tentativas continua sendo "espere um pouco", não "esta peça não
+          // dá" — tirá-la da fila por isso esconderia peças perfeitamente
+          // extraíveis atrás de um pico de uso da API.
+          if (!e || !e.retryable) extracaoFalhou.set(id, msg);
           falhas.push({ id, titulo: metaDe(id).titulo, erro: msg });
           panel.setPrepState(id, "erro");
           console.debug("[PJe IA] extração da peça", id, "falhou:", msg);
