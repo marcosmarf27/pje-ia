@@ -150,7 +150,11 @@ function podarRepetidas(folhas) {
 
 // --- extração ---------------------------------------------------------------
 async function extrair(buf) {
-  const doc = await pdfjsLib.getDocument({
+  // O objeto de LOADING é quem tem destroy() — o PDFDocumentProxy não. Chamar
+  // doc.destroy() lança TypeError DEPOIS de todo o texto já ter sido extraído,
+  // e o resultado se perde na resposta de erro: a extração falhava inteira por
+  // causa da última linha. Pego no primeiro teste com o pdf.js de verdade.
+  const tarefa = pdfjsLib.getDocument({
     data: buf,
     // A CSP de páginas de extensão é `script-src 'self'` — sem eval. As demais
     // desligam trabalho de RENDERIZAÇÃO, que não usamos: só queremos texto.
@@ -160,7 +164,16 @@ async function extrair(buf) {
     isEvalSupported: false,
     useSystemFonts: false,
     disableFontFace: true,
-  }).promise;
+    // Só ERROS no console (0 = ERRORS). Sem isto o pdf.js enche o console da
+    // página do tribunal com avisos inofensivos a cada peça: "TT: undefined
+    // function" (hinting de TrueType) e "Ensure that the standardFontDataUrl
+    // API parameter is provided" — este último porque NÃO vendorizamos as 14
+    // fontes-padrão (416 KB). Testado: peça com Helvetica não-embutida e sem
+    // /ToUnicode extrai com valores, artigos e numeração de folha intactos, que
+    // é o que importa aqui. Erros de verdade continuam vindo por exceção.
+    verbosity: 0,
+  });
+  const doc = await tarefa.promise;
 
   // Guardado ANTES do destroy(): depois de destruído o documento, ler
   // numPages devolve lixo (ou lança).
@@ -180,7 +193,7 @@ async function extrair(buf) {
   }
   const podadas = podarRepetidas(folhas);
   const chars = podadas.reduce((a, f) => a + f.texto.length, 0);
-  await doc.destroy();
+  await tarefa.destroy(); // libera o worker; doc.destroy() NÃO existe na v6
   return {
     folhas: podadas,
     paginas,

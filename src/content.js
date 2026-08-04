@@ -457,7 +457,7 @@
     if (!PJE.scrollAte(id)) {
       panel.setStatus(
         'A peça "' + metaDe(id).titulo +
-          '" ainda não está na linha do tempo — use "⟳ Carregar todas as peças" (abaixo da lista) e tente de novo.'
+          '" ainda não está na linha do tempo — use "⟳ Carregar tudo" (abaixo da lista) e tente de novo.'
       );
     }
   });
@@ -716,7 +716,13 @@
   // então lê só do cache em memória — nunca baixa nada.
   panel.onExtraivel((id) => {
     const d = docsCache.get(id);
-    if (!d || d.kind !== "pdf" || d.txtUsar) return null;
+    // Peça AINDA NÃO BAIXADA é candidata como qualquer outra — o tipo dela só
+    // se conhece depois do download, e é a própria extração que descobre.
+    // Devolver null aqui foi o que fez o botão dizer "Extrair 44" e não
+    // extrair nada: a contagem incluía as não baixadas e este filtro as
+    // removia. Os dois têm de enxergar a MESMA coisa.
+    if (!d) return { podeExtrair: true, imagens: 0, escaneado: false, naoMedida: true };
+    if (d.kind !== "pdf" || d.txtUsar) return null;
     // digitalizada sem chave de OCR: não há o que oferecer
     if (d.escaneado && !d.txt && !ocrPronto) return null;
     return {

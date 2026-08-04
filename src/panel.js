@@ -261,7 +261,7 @@ var PjePanel = (function () {
   // texto só volta a ser visível durante o carregamento, quando vira progresso.
   const TIP_PADRAO_ATTR =
     "O PJe só carrega as peças conforme a linha do tempo é rolada — esta lista " +
-    "pode estar incompleta. Clique em “Carregar todas as peças” para rolar a " +
+    "pode estar incompleta. Clique em “Carregar tudo” para rolar a " +
     "linha do tempo até o fim.";
   const TIP_PADRAO = "⚠️ " + TIP_PADRAO_ATTR;
 
@@ -382,12 +382,12 @@ var PjePanel = (function () {
             <div class="docs-tip">
               <span class="tip-i" role="note" tabindex="0" title="${TIP_PADRAO_ATTR}" aria-label="${TIP_PADRAO_ATTR}">⚠️</span>
               <span class="tip-txt"></span>
-              <button type="button" class="tip-load" title="Rola a linha do tempo do processo automaticamente até o fim para carregar todas as peças na lista">⟳ Carregar todas as peças</button>
-              <button type="button" class="tip-zip" title="Baixa os arquivos ORIGINAIS das peças (PDF, HTML) num único .zip, numerados na ordem do processo e com um índice de tipo, data e autor da juntada. Não faz extração de texto. Exporta as peças MARCADAS; sem nenhuma marcada, exporta todas as da lista.">⬇ Documentos (.zip)</button>
+              <button type="button" class="tip-load" title="Rola a linha do tempo do processo automaticamente até o fim para carregar TODAS as peças do processo na lista">⟳ Carregar tudo</button>
+              <button type="button" class="tip-zip" title="Baixa os arquivos ORIGINAIS das peças (PDF, HTML) num único .zip, numerados na ordem do processo e com um índice de tipo, data e autor da juntada. Não faz extração de texto. Exporta as peças MARCADAS; sem nenhuma marcada, exporta todas as da lista.">⬇ Documentos</button>
               <!-- Pacote de TEXTO: existe só quando há texto extraído. São
                    coisas diferentes — um .zip são os autos, o outro é a leitura
                    deles, e serve para trabalhar fora da extensão. -->
-              <button type="button" class="tip-zipt" hidden title="Baixa as peças em TEXTO num .zip: um arquivo por peça e um autos.md com tudo concatenado. Usa o texto JÁ EXTRAÍDO; peças ainda em documento entram como o arquivo original. Exporta as peças MARCADAS; sem nenhuma marcada, todas as da lista.">⬇ Texto (.zip)</button>
+              <button type="button" class="tip-zipt" hidden title="Baixa as peças em TEXTO num .zip: um arquivo por peça e um autos.md com tudo concatenado. Usa o texto JÁ EXTRAÍDO; peças ainda em documento entram como o arquivo original. Exporta as peças MARCADAS; sem nenhuma marcada, todas as da lista.">⬇ Texto</button>
               <!-- Aviso e ação são UM componente, não um parágrafo solto com um
                    botão órfão embaixo. "Carregar lista" e "baixar" são
                    ferramentas da lista; "extrair" responde a uma condição — são
@@ -601,7 +601,7 @@ var PjePanel = (function () {
         "pergunta e outra.</p>" +
         "<p><b>A lista pode vir incompleta:</b> o PJe só carrega as peças conforme a " +
         "linha do tempo é rolada. Antes de procurar uma peça antiga, use " +
-        "<b>⟳ Carregar todas as peças</b>, abaixo da lista.</p>" +
+        "<b>⟳ Carregar tudo</b>, abaixo da lista.</p>" +
         "<p><b>O contexto é limitado:</b> peças, perguntas e respostas precisam caber " +
         "na janela do modelo. O medidor ao lado das ferramentas mostra o quanto já foi " +
         "usado; se encher, desmarque peças (libera espaço na hora) ou comece uma " +
@@ -1366,7 +1366,7 @@ var PjePanel = (function () {
     // serializado: dois lotes ao mesmo tempo brigariam pela sessão JSF).
     function setZipOcupado(on) {
       tipZip.disabled = !!on;
-      tipZip.textContent = on ? "Baixando…" : "⬇ Baixar .zip";
+      tipZip.textContent = on ? "Baixando…" : "⬇ Documentos";
     }
     // Em repouso o aviso é só o ícone ⚠️ (o texto vive no title dele) — ocupava
     // duas linhas fixas da coluna. Com PROGRESSO ou carregando, o texto volta a
@@ -1386,7 +1386,7 @@ var PjePanel = (function () {
       const { texto = null, carregando = false } = estado || {};
       clearTimeout(tipTimer);
       tipLoad.disabled = carregando;
-      tipLoad.textContent = carregando ? "Carregando…" : "⟳ Carregar todas as peças";
+      tipLoad.textContent = carregando ? "Carregando…" : "⟳ Carregar tudo";
       if (!texto && !carregando) return repousoTip();
       tipTxt.textContent = texto || TIP_PADRAO;
       tipBox.classList.add("carregando");
@@ -1453,19 +1453,13 @@ var PjePanel = (function () {
         const badge = row.querySelector(".d-emtexto");
         const btn = row.querySelector(".d-extrai");
         const usando = !!(st && st.usando);
-        row.classList.toggle("em-texto", usando);
-        if (badge) {
-          badge.hidden = !usando;
-          if (usando) {
-            badge.innerHTML = SVG.emTexto;
-            const fonte = st.fonte === "mistral" ? "OCR" : "leitura local";
-            badge.title =
-              "Esta peça vai para a IA como texto (" +
-              fonte +
-              (st.paginas ? ", " + st.paginas + " folhas" : "") +
-              ")";
-          }
-        }
+        // Marca por peça REMOVIDA de propósito. Num processo em que 43 de 44
+        // peças estão em texto, o ícone repetido em toda linha não informa
+        // nada — vira o muro que a lista existe para evitar. O estado
+        // agregado vive na linha de status (.extrai-bar) e o estado de UMA
+        // peça, no preview, que é onde se vai olhar por ela.
+        if (badge) badge.hidden = true;
+        row.classList.remove("em-texto");
         if (btn) {
           const info = extraivelCb ? extraivelCb(id) : null;
           // O botão só existe onde há o que fazer: peça já em texto ganha
@@ -1598,24 +1592,30 @@ var PjePanel = (function () {
       extraiBar.classList.toggle("tem-ocr", !!info.ocr);
       extraiBar.classList.toggle("tudo-pronto", !pend);
 
-      // Estado do texto à esquerda: sempre o retrato da seleção.
-      const partes = [info.marcadas + (info.marcadas > 1 ? " marcadas" : " marcada")];
-      if (info.jaTexto) partes.push(info.jaTexto + " em texto");
-      if (pend) {
-        let p = pend + " em documento";
-        if (info.ocr) {
-          // vírgula decimal: o painel é todo em pt-BR e "US$ 0.28" lê como erro
-          // de digitação para quem trabalha com valores em português
-          p +=
-            " · ≈ US$ " +
-            info.custoUsd.toLocaleString("pt-BR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            });
-        }
-        partes.push(p);
+      // O texto muda de forma conforme o estado, em vez de acumular cláusulas:
+      // "44 marcadas · 43 em texto · 1 em documento · ≈ US$ 0,28" trunca em
+      // 420px e vira reticências. Cada estado tem UMA frase curta.
+      let frase;
+      if (!pend) {
+        frase = info.marcadas + (info.marcadas > 1 ? " peças prontas" : " peça pronta");
+      } else if (!info.jaTexto) {
+        // nada feito ainda: o total já é a informação
+        frase = info.marcadas + (info.marcadas > 1 ? " peças marcadas" : " peça marcada");
+      } else {
+        // o que FALTA é a informação; o que já foi é passado
+        frase = pend + " de " + info.marcadas + " ainda em documento";
       }
-      ebTexto.textContent = partes.join(" · ");
+      if (info.ocr) {
+        // vírgula decimal: o painel é todo em pt-BR e "US$ 0.28" lê como erro
+        // de digitação para quem trabalha com valores em português
+        frase +=
+          " · ≈ US$ " +
+          info.custoUsd.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+      }
+      ebTexto.textContent = frase;
 
       ebGo.hidden = !pend;
       ebGo.textContent = "⌁ Extrair " + pend;
@@ -3319,7 +3319,7 @@ var PjePanel = (function () {
       },
       setZipTextoOcupado(on) {
         tipZipT.disabled = !!on;
-        tipZipT.textContent = on ? "Baixando…" : "⬇ Texto (.zip)";
+        tipZipT.textContent = on ? "Baixando…" : "⬇ Texto";
       },
       setExtracaoAviso,
       // (id) -> {podeExtrair, imagens, escaneado} | null. SÍNCRONO, como o
