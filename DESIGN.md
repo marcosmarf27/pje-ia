@@ -106,8 +106,18 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 |---|---|---|
 | `--ok` | `#1f9d6b` | Sucesso, salvo |
 | `--warn` | `#dd8b2c` | Alerta, contexto quase cheio |
+| `--warn-bg` | `#fbf1dc` | Fundo de aviso suave |
+| `--warn-line` | `#eeddba` | Borda de aviso suave |
+| `--warn-ink` | `#8a5a12` | Texto sobre aviso suave |
 | `--erro` | `#a5301f` | Erro, exclusão armada |
 | `--erro-hd` | `rgba(220,80,80,0.85)` | Hover do ✕ no cabeçalho |
+
+> **Aviso suave × `.alertbar`.** O trio `--warn-*` veste o que **informa sem
+> impedir de continuar**: o relatório de peças que não baixaram, a nota de
+> download lento, o estado "voltar ao documento". A `.alertbar` é o contrário —
+> ela aparece quando algo **bloqueia** o envio (contexto cheio, troca de
+> provedor) e usa vermelho-tijolo, mais forte de propósito. Não trocar um pelo
+> outro: se tudo alerta com a mesma intensidade, nada alerta.
 
 ---
 
@@ -204,10 +214,63 @@ nome (`--fs-meta`, peso 500, truncado) + **id em `--ff-mono`**, `--fs-nano`, cor
 `--muted-3`. Rodapé com "Mostrando N de M" e o botão ↻ Carregar todas.
 
 A faixa abaixo da lista (`.docs-tip`) hospeda as ações que valem para a **lista
-inteira** — hoje `⟳ Carregar todas as peças` e `⬇ Baixar .zip`. Elas
-compartilham a MESMA regra de estilo (`.tip-load, .tip-zip`) de propósito: são
-pares, e regras separadas divergiriam com o tempo. Ação nova de escopo "lista
-toda" entra aqui, não na `.toolbar` — aquela linha já vive no limite em 484px.
+inteira** — hoje `⟳ Carregar todas as peças`, `⬇ Baixar .zip`, `⌁ Extrair texto`
+e `⬇ Texto (.zip)`. Elas compartilham a MESMA regra de estilo
+(`.tip-load, .tip-zip, .tip-zipt, .tip-txtx`) de propósito: são pares, e regras
+separadas divergiriam com o tempo. Ação nova de escopo "lista toda" entra aqui,
+não na `.toolbar` — aquela linha já vive no limite em 484px.
+
+Os rótulos dizem o CONTEÚDO, não o formato: `⬇ Documentos (.zip)` são os
+arquivos originais e `⬇ Texto (.zip)` é o texto extraído. Com "⬇ Baixar .zip" e
+"⬇ Texto (.zip)" lado a lado ninguém sabia se o primeiro também extraía.
+
+### Linha de status da seleção (`.extrai-bar`)
+
+Ocupa a linha inteira abaixo dos botões (`order: 5`) e é **um componente**, não
+um parágrafo solto com um botão órfão embaixo — foi assim que a faixa chegou a
+quebrar em quatro linhas em 460px. Estrutura: ícone · retrato da seleção ·
+botão de ação.
+
+```
+⌁  12 marcadas · 4 em texto · 8 em documento · ≈ US$ 0,28    [⌁ Extrair 8]
+```
+
+Três estados, e a distinção é semântica, não decorativa:
+
+| Estado | Quando | Veste |
+|---|---|---|
+| convite | só peças com texto próprio a extrair (grátis) | `--accent-bg` + `--line-strong` |
+| aviso (`.tem-ocr`) | há peça digitalizada — vai ser mal lida, e resolver custa | `--warn-bg` + `--warn-line` |
+| pronto (`.tudo-pronto`) | nada pendente; o botão some | `--surface-2` + `--line` |
+
+**Ela nunca some enquanto houver peça marcada.** A primeira versão calculava só
+sobre peças já baixadas, então marcar "todas" fazia a opção de extrair
+desaparecer — o oposto do esperado, e a maior fonte de confusão do recurso. Peça
+não baixada é candidata como qualquer outra; o tipo dela só se conhece depois, e
+isso vai no `title`, não na tela.
+
+O detalhamento (quantas por leitura local, quantas por OCR, quantas ainda não
+medidas, e o veredito de custo do modelo ativo) mora no `title`. Em 420px,
+mostrá-lo custaria a segunda linha que este desenho existe para eliminar.
+
+As ações **por peça** seguem outro padrão: `.d-ver` e `.d-extrai` aparecem só no
+hover da row e dividem uma regra só, pela mesma razão. Um botão a mais ali seria
+o limite — três ícones de 20px já disputam espaço com o id da peça.
+
+### Card de progresso: `baixando` ≠ `loading`
+
+`.prep-ic.baixando` (spinner cinza) e `.prep-ic.loading` (spinner azul) são
+etapas com custos MUITO diferentes: baixar do PJe leva ~5,6 s por peça, porque o
+servidor serializa; ler o texto localmente leva menos de meio segundo. Rotular a
+espera do tribunal como "extraindo" faz o usuário culpar a extração — foi
+exatamente o que aconteceu no primeiro teste real. Nenhum dos dois avança o
+contador: só `done` e `erro`.
+
+### Aviso dentro do card de progresso (`.prep-nota`)
+Nota em aviso suave abaixo da barra, usada quando o download passa de 12 s por
+peça. Aparece **durante** a espera, que é quando a informação vale: o gargalo
+real do produto é a entrega serializada do PJe, e sem isso a extensão parece
+travada quando na verdade está esperando o tribunal. Ver `#rede` no `help.html`.
 
 ### Estado vazio da conversa
 Eyebrow + título serifado centrado; grade de 3 cartões de passo (número em

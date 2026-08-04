@@ -44,6 +44,14 @@
   --ok: #1f9d6b;
   --warn: #dd8b2c;
   --erro: #a5301f;
+  /* Aviso SUAVE — informa sem impedir de continuar. Veste o relatório de peças
+     que falharam, a nota de download lento e a marca de "voltar ao documento".
+     Distinto da .alertbar (que é para o que BLOQUEIA) e das categorias
+     --cat-*, que são semântica de espécie de peça.
+     Os três valores são espelhados em ui.css — ver DESIGN.md §1. */
+  --warn-bg: #fbf1dc;
+  --warn-line: #eeddba;
+  --warn-ink: #8a5a12;
   --erro-hd: rgba(220, 80, 80, 0.85);
   /* categorias de peças (lista, chips, popup @ e mapa mental).
      Petições deixou de ser AZUL porque azul é a cor de AÇÃO do sistema: uma
@@ -407,7 +415,13 @@
 .docrow {
   display: flex; gap: 8px; align-items: center;
   padding: 5px 6px; border-radius: 7px; cursor: pointer;
+  /* Arrastar sobre a lista MARCA PEÇAS — não seleciona texto. Sem isto o
+     gesto natural de "passar o mouse marcando" pintava a lista inteira de azul
+     de seleção do navegador e não marcava nada. */
+  user-select: none; -webkit-user-select: none;
 }
+/* Exceção: o id da peça é numeral que se copia para procurar no PJe. */
+.d-id { user-select: text; -webkit-user-select: text; }
 .docrow:hover { background: #eef4f8; }
 .docrow input { flex: none; accent-color: var(--pje); width: 13px; height: 13px; }
 .d-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cat-outro); }
@@ -435,15 +449,34 @@
 .docrow.cat-decisao .d-nm { color: #7a5115; }
 .docrow.cat-outro .d-nm { color: #55606e; }
 
-/* Botão "ver na timeline" da row: só aparece no hover, para não poluir. */
-.d-ver {
+/* Ações da row ("ver na timeline" e "extrair o texto"): só aparecem no hover,
+   para não poluir. Uma regra SÓ para as duas, de propósito — são pares, e
+   regras separadas divergiriam com o tempo (mesmo contrato de .tip-load /
+   .tip-zip; ver DESIGN.md §5). */
+.d-ver, .d-extrai {
   flex: none; border: none; background: transparent; cursor: pointer;
-  color: #7f97a5; width: 20px; height: 20px; border-radius: 6px;
+  color: var(--muted-3); width: 20px; height: 20px; border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center; padding: 0;
   opacity: 0; transition: opacity 0.12s, background 0.12s, color 0.12s;
 }
-.docrow:hover .d-ver, .d-ver:focus-visible { opacity: 1; }
-.d-ver:hover { background: #d4e4ec; color: var(--pje-2); }
+.docrow:hover .d-ver, .d-ver:focus-visible,
+.docrow:hover .d-extrai, .d-extrai:focus-visible { opacity: 1; }
+.d-ver:hover, .d-extrai:hover { background: var(--line-strong); color: var(--pje-2); }
+/* Estado "desfazer" do .d-extrai: a mesma tecla volta ao documento original.
+   Âmbar de AVISO (não uma cor --cat-*, que é semântica de espécie de peça). */
+.d-extrai.desfaz { color: var(--warn); }
+.d-extrai.desfaz:hover { background: var(--warn-bg); color: var(--warn-ink); }
+
+/* Marca da peça que JÁ vai como texto. É o ÚNICO estado que ganha marca
+   permanente na lista: ele mudou o que o modelo recebe. Fica FORA das cores
+   --cat-* (semântica de espécie) e do azul (cor de ação); o padrão visual é o
+   do .on-badge do popup @. */
+.d-emtexto {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 16px; border-radius: var(--r-pill);
+  background: var(--accent-bg); color: var(--muted-2);
+}
+.docrow.em-texto .d-nm { font-style: italic; }
 
 .empty { color: var(--muted); padding: 8px 4px; font-size: var(--fs-meta); }
 /* Aviso da lista incompleta + carregar tudo. Em repouso é UMA linha: ícone ⚠️
@@ -470,13 +503,130 @@
 /* "Carregar todas as peças" e "Baixar .zip" são ações IRMÃS sobre a lista
    inteira — compartilham a regra de propósito, para não divergirem com o
    tempo. */
-.tip-load, .tip-zip {
+.tip-load, .tip-zip, .tip-zipt {
   border: 1px solid #cfe0e9; background: #eef5f9; color: var(--pje-2);
-  border-radius: 6px; padding: 3px 9px; font-size: var(--fs-micro); font-weight: 600;
-  cursor: pointer; transition: background 0.12s;
+  border-radius: var(--r-sm); padding: 3px 9px;
+  font-size: var(--fs-micro); font-weight: 600;
+  cursor: pointer; transition: background 0.12s; font-family: inherit;
 }
-.tip-load:hover, .tip-zip:hover { background: #d4e4ec; }
-.tip-load:disabled, .tip-zip:disabled { opacity: 0.6; cursor: default; }
+.tip-load:hover, .tip-zip:hover, .tip-zipt:hover {
+  background: var(--line-strong);
+}
+.tip-load:disabled, .tip-zip:disabled, .tip-zipt:disabled {
+  opacity: 0.6; cursor: default;
+}
+
+/* Aviso agregado de extração + a ação que o resolve, como UM componente.
+   Antes eram um parágrafo solto e um botão órfão embaixo dele, e a faixa
+   quebrava em quatro linhas num painel de 420px. "Carregar lista" e "baixar"
+   são ferramentas da lista; "extrair" responde a uma CONDIÇÃO — classes
+   diferentes não dividem a mesma fila de botões.
+   Só existe quando há o que extrair: em repouso a faixa é idêntica à de antes. */
+.extrai-bar {
+  flex: 1 1 100%; order: 5;
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 2px; padding: 5px 7px 5px 9px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+  background: var(--accent-bg);
+}
+.extrai-bar .eb-ic {
+  flex: none; display: flex; color: var(--pje-2);
+}
+.extrai-bar .eb-t {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-micro); line-height: 1.35; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.extrai-bar .eb-go {
+  flex: none; border: 1px solid var(--pje); background: var(--pje); color: var(--surface);
+  border-radius: var(--r-xs); padding: 3px 11px;
+  font-size: var(--fs-micro); font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: background 0.14s ease;
+}
+.extrai-bar .eb-go:hover { background: var(--pje-2); }
+/* Nada pendente: a linha vira confirmação, não convite. Some o botão e o tom
+   fica neutro — dizer "extrair 0" seria pior que não dizer nada. */
+.extrai-bar.tudo-pronto {
+  border-color: var(--line); background: var(--surface-2);
+}
+.extrai-bar.tudo-pronto .eb-ic,
+.extrai-bar.tudo-pronto .eb-t { color: var(--muted); }
+/* Com peça DIGITALIZADA no meio a natureza muda: deixa de ser oportunidade
+   (grátis) e passa a ser aviso de que a leitura vai sair ruim — e resolver
+   custa. Ver DESIGN.md §2, "aviso suave". */
+.extrai-bar.tem-ocr {
+  border-color: var(--warn-line); background: var(--warn-bg);
+}
+.extrai-bar.tem-ocr .eb-ic { color: var(--warn-ink); }
+.extrai-bar.tem-ocr .eb-t { color: var(--warn-ink); }
+.extrai-bar.tem-ocr .eb-go { border-color: var(--warn-ink); background: var(--warn-ink); }
+.extrai-bar.tem-ocr .eb-go:hover { background: #6f4a0e; }
+
+/* Confirmação visual (nunca confirm() nativo: ele vive fora do Shadow DOM e
+   CONGELA a extensão). Aparece só quando extrair APAGA algo — peça com imagens,
+   onde assinatura, carimbo e foto de laudo deixam de ser vistos pelo modelo. */
+/* position:FIXED pelo mesmo motivo do .selmenu: o .wrap tem tamanho zero. */
+.confirmbox {
+  position: fixed; z-index: 2147483646; width: 292px;
+  background: var(--surface); border: 1px solid var(--line-card);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop); padding: 12px 13px;
+}
+.cb-t { margin: 0 0 10px; font-size: var(--fs-meta); color: var(--text); line-height: 1.45; }
+.cb-acoes { display: flex; gap: 8px; justify-content: flex-end; }
+.cb-no, .cb-yes {
+  border-radius: var(--r-xs); padding: 4px 11px; font-size: var(--fs-micro);
+  font-weight: 600; cursor: pointer;
+}
+.cb-no { border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted-2); }
+.cb-no:hover { background: var(--hover); }
+.cb-yes { border: 1px solid var(--pje-2); background: var(--pje-2); color: var(--surface); }
+.cb-yes:hover { background: var(--pje); }
+
+/* Menu de seleção em faixa (botão direito numa peça). Resolve o caso em que o
+   outro extremo do intervalo está fora da tela — arrastar exigiria rolar com o
+   botão pressionado, e Shift+clique exigiria achar a outra ponta. */
+/* position:FIXED, não absolute: o .wrap é um container de tamanho ZERO (quem
+   tem dimensão é o .panel dentro dele), então posicionar por dentro dele jogaria
+   o menu para fora da tela. Mesma solução do .preview. */
+.selmenu {
+  position: fixed; z-index: 2147483646; min-width: 204px;
+  background: var(--surface); border: 1px solid var(--line-card);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop);
+  padding: 4px; display: flex; flex-direction: column;
+}
+.selmenu button {
+  text-align: left; border: none; background: transparent; cursor: pointer;
+  padding: 6px 10px; border-radius: var(--r-xs);
+  font-size: var(--fs-meta); font-family: inherit; color: var(--text-2);
+}
+.selmenu button:hover { background: var(--hover); color: var(--pje-2); }
+.selmenu button.sep { margin-top: 4px; border-top: 1px solid var(--line-2); padding-top: 9px; }
+
+/* Relatório das peças que não puderam ser baixadas. Fica NO CHAT porque a
+   análise SEGUIU sem elas: o usuário precisa poder ler com calma qual faltou e
+   por quê, e tentar de novo — antes uma única peça com 404 abortava o turno e a
+   pergunta já digitada se perdia. FECHADO por padrão: é diagnóstico, não deve
+   competir com a resposta. */
+.falhas {
+  margin: 4px 0 10px; padding: 8px 11px;
+  border: 1px solid var(--warn-line); border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm); background: var(--warn-bg);
+  font-size: var(--fs-meta); color: var(--text-2);
+}
+.falhas > summary {
+  cursor: pointer; font-weight: 600; color: var(--warn-ink);
+  list-style: none; display: flex; align-items: center; gap: 6px;
+}
+.falhas > summary::before { content: "⚠️"; font-size: var(--fs-micro); }
+.falhas > summary::-webkit-details-marker { display: none; }
+.falhas ul { margin: 8px 0 0; padding-left: 18px; }
+.falhas li { margin: 3px 0; line-height: 1.4; word-break: break-word; }
+.falhas li b { font-weight: 600; color: var(--text); }
+.falhas li span { color: var(--muted); }
+.falhas-dica {
+  margin: 8px 0 0; font-size: var(--fs-micro); color: var(--muted);
+  line-height: 1.45;
+}
 
 .main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 
@@ -596,6 +746,22 @@
   display: block; height: 100%; width: 0;
   background: linear-gradient(90deg, var(--pje-soft), var(--pje));
   border-radius: 2px; transition: width 0.25s ease;
+}
+/* Nota do card de progresso: hoje, o aviso de download lento. Fica embaixo da
+   barra, onde o olho já está durante a espera. */
+/* Etapa "baixando" do card de progresso. Distinta de "loading" de propósito:
+   baixar do PJe leva ~5,6 s por peça (o servidor serializa) e ler o texto leva
+   menos de meio segundo — dizer "extraindo" durante o download faz o usuário
+   culpar a extração por uma espera que é do tribunal. */
+.prep-ic.baixando {
+  border: 2px solid #dfe9ef; border-top-color: var(--muted-2);
+  animation: spin 0.7s linear infinite;
+}
+.prep-nota {
+  margin-top: 8px; padding: 7px 9px;
+  background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-left: 3px solid var(--warn); border-radius: var(--r-xs);
+  font-size: var(--fs-micro); line-height: 1.45; color: var(--warn-ink);
 }
 
 /* ----- Markdown dentro da resposta ----- */
@@ -930,6 +1096,27 @@
   flex: 1; min-width: 0; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Abas Documento / Texto — só existem quando a peça tem texto extraído.
+   O preview mostra O QUE O MODELO VÊ: a aba ativa por padrão é a que
+   corresponde ao que vai no request. */
+.preview-tabs { flex: none; display: flex; gap: 2px; }
+.pv-tab {
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--muted-2); border-radius: var(--r-xs); padding: 2px 8px;
+  font-size: var(--fs-nano); font-weight: 600; font-family: inherit;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.pv-tab:hover { background: var(--hover); color: var(--text-3); }
+.pv-tab.on {
+  background: var(--accent-bg); border-color: var(--line-strong); color: var(--pje-2);
+}
+.preview-abrir-txt {
+  border: 1px solid var(--pje); background: var(--surface); color: var(--pje-2);
+  border-radius: var(--r-xs); padding: 3px 10px;
+  font-size: var(--fs-micro); font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.preview-abrir-txt:hover { background: var(--accent-bg); }
+
 .preview-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .preview-bd embed { width: 100%; height: 100%; border: 0; flex: 1; }
 .preview-txt {

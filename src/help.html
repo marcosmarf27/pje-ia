@@ -207,6 +207,90 @@
         mapa mental — funciona igual.</em></p>
       </div>
 
+      <h1 class="serif" id="rede">Por que a sua conexão importa tanto</h1>
+      <div class="card">
+        <div class="head"><div class="num">📶</div><h2>O gargalo é baixar as peças, não a IA</h2></div>
+        <p>
+          O PJe entrega as peças <strong>uma de cada vez</strong>: para liberar cada documento,
+          a extensão precisa "abri-lo" na sessão do tribunal, e o servidor não aceita dois
+          pedidos simultâneos na mesma tela. Em condições boas isso leva cerca de
+          <strong>5 a 6 segundos por peça</strong> — 40 peças são uns 4 minutos, e a maior
+          parte desse tempo é <em>rede</em>, não inteligência artificial.
+        </p>
+        <p>
+          É por isso que a diferença entre <strong>Wi-Fi e cabo é tão sentida</strong>. No
+          Wi-Fi, cada peça carrega a instabilidade da conexão, e o efeito se multiplica por
+          dezenas de documentos: o que levaria 4 minutos passa a levar 20, e a extensão
+          <em>parece</em> travada quando na verdade está esperando o tribunal responder.
+        </p>
+        <p><strong>O que ajuda, em ordem de impacto:</strong></p>
+        <ul>
+          <li><strong>Conexão por cabo</strong> em vez de Wi-Fi — é de longe o que mais muda.</li>
+          <li><strong>Marque só as peças que interessam.</strong> "Todas" num processo grande é
+          a receita da espera longa; use a busca da lista e o Shift+clique para pegar faixas.</li>
+          <li><strong>Extraia o texto</strong> das peças que você vai reusar: o texto fica
+          guardado por 7 dias e, nas próximas vezes, a extensão nem precisa baixar o PDF de
+          novo.</li>
+          <li>Evite VPN do tribunal quando não for necessária — ela costuma acrescentar uma
+          volta a mais em cada requisição.</li>
+        </ul>
+        <p>
+          Se o download estiver fora do normal, a própria extensão avisa no card de progresso,
+          com o tempo médio por peça que ela está medindo.
+        </p>
+      </div>
+
+      <h1 class="serif" id="mistral">Peças digitalizadas: extrair o texto</h1>
+      <div class="card">
+        <div class="head"><div class="num">1</div><h2>Na maioria das peças, isso já é grátis</h2></div>
+        <p>
+          Passe o mouse sobre uma peça na lista e clique em <strong>Extrair o texto</strong>. Se a
+          peça foi gerada digitalmente — o caso da grande maioria — a extensão lê o texto
+          <strong>dentro do seu próprio navegador</strong>. Não custa nada, nada sai do
+          computador, e não é preciso chave nenhuma.
+        </p>
+        <p>Vale a pena porque a peça em texto:</p>
+        <ul>
+          <li><strong>não conta para o limite de páginas</strong> do modelo — um processo de 300
+          páginas passa a caber até no modelo padrão, que aceita 100;</li>
+          <li>ocupa bem menos do contexto, então cabe mais processo na mesma conversa;</li>
+          <li>é lida com precisão, sem depender de o modelo "enxergar" a página.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">2</div><h2>Para peças digitalizadas, a chave da Mistral</h2></div>
+        <p>
+          Quando a peça é uma <strong>digitalização</strong> (uma imagem do papel), não há texto a
+          ler: aí entra o OCR. Crie uma chave em <strong>console.mistral.ai</strong>, cole no campo
+          <strong>"Chave da API — Mistral"</strong> e salve. O custo é de cerca de
+          <strong>US$ 2 por mil folhas</strong> (ou US$ 4 na qualidade alta, melhor para
+          manuscritos e tabelas), e a extensão sempre mostra a estimativa <em>antes</em> de você
+          confirmar.
+        </p>
+        <p>
+          Sem essa chave, nada muda: peças digitalizadas continuam indo como imagem, do jeito que
+          sempre foram.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">3</div><h2>Quando NÃO vale a pena</h2></div>
+        <p>
+          Extrair o texto <strong>apaga o que é visual</strong>: assinaturas, carimbo de protocolo,
+          selo de autenticidade, RG digitalizado, fotos de laudo pericial. Se a sua pergunta
+          depende disso, deixe a peça como documento — a extensão avisa antes de extrair peças que
+          contêm imagens, e <strong>Voltar ao documento</strong> desfaz a qualquer momento.
+        </p>
+        <p>
+          Sobre custo, a conta muda com o modelo. No <strong>Gemini</strong> e no
+          <strong>GPT-5.6 Luna</strong>, uma página de PDF já é muito barata — ali o OCR pago sai
+          <em>mais</em> caro, e só compensa pela <strong>qualidade</strong> em digitalizações
+          ruins. Nos modelos Claude, no GPT-5.6 Sol e no Terra, ele reduz o custo. O próprio botão
+          diz qual é o caso do modelo que você está usando.
+        </p>
+      </div>
+
       <h1 class="serif" id="modelos">Qual modelo escolher?</h1>
       <div class="card">
         <p>O selo na barra de ferramentas do chat mostra sempre o modelo e o nível de
@@ -339,11 +423,12 @@
 
       <div class="warn-box">
         🔒 Suas chaves ficam só neste navegador (não são enviadas a lugar nenhum além das próprias APIs
-        da Anthropic, do Google e da OpenAI). As peças que você marcar são enviadas ao modelo escolhido para
+        da Anthropic, do Google, da OpenAI e — se você configurar — da Mistral). As peças que você marcar
+        são enviadas ao modelo escolhido para
         análise — processos podem conter dados sigilosos, use com critério.
-        <strong>As minutas geradas ficam guardadas neste computador</strong> (para você reabri-las
-        depois) e são apagadas automaticamente após 7 dias — use <strong>Descartar</strong>, no
-        editor, para removê-las antes. Detalhes na
+        <strong>As minutas geradas e o texto extraído das peças ficam guardados neste computador</strong>
+        (para você reabri-los depois) e são apagados automaticamente após 7 dias — use
+        <strong>Descartar</strong>, no editor, para remover uma minuta antes disso. Detalhes na
         <a class="link" href="https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md" target="_blank" rel="noopener">política de privacidade</a>.
       </div>
 

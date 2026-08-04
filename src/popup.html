@@ -85,6 +85,29 @@
         </div>
       </details>
 
+      <!-- A Mistral não é provedor de chat: ela só extrai o texto de peças
+           DIGITALIZADAS (a leitura de peças com texto nativo é feita no próprio
+           navegador, sem custo e sem chave). Por isso ela não aparece no chip
+           do topo nem na lista de modelos. -->
+      <details class="keybox" id="boxM">
+        <summary>
+          Chave da API — Mistral (peças digitalizadas)
+          <span class="kstate" id="kstateM">não configurada</span>
+        </summary>
+        <div class="keybox-in">
+          <div class="pw-row">
+            <input id="mistralApiKey" type="password" placeholder="..." autocomplete="off" aria-label="Chave da API da Mistral" />
+            <button class="toggle-pw" id="togglePwM" type="button">mostrar</button>
+          </div>
+          <span class="hint">Opcional. Só para peças digitalizadas — <a href="help.html#mistral" target="_blank">passo a passo →</a></span>
+          <label class="field" for="ocrModel" style="margin-top: 8px">Qualidade da extração</label>
+          <select id="ocrModel">
+            <option value="mistral-ocr-latest">Padrão (US$ 2 por 1.000 folhas)</option>
+            <option value="mistral-ocr-4-0">Alta — manuscritos e tabelas (US$ 4 por 1.000)</option>
+          </select>
+        </div>
+      </details>
+
       <label class="field" for="model">Modelo</label>
       <select id="model">
         <optgroup label="Claude (Anthropic)">

@@ -182,6 +182,13 @@ var PjePanel = (function () {
       '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3.5L4 8l4.5 4.5M13 3.5L8.5 8l4.5 4.5"/></svg>',
     ver:
       '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="4.2"/><path d="M8 1.4v2.6M8 12v2.6M1.4 8h2.6M12 8h2.6"/></svg>',
+    // extrair texto: folha com linhas de texto e uma seta saindo — a ação é
+    // "tirar o texto de dentro do documento", não "converter o documento"
+    extrair:
+      '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 1.8H4.2a1 1 0 0 0-1 1v10.4a1 1 0 0 0 1 1h4"/><path d="M9.2 1.8L12 4.6v3"/><path d="M5.4 5.4h4M5.4 8h4M5.4 10.6h2.4"/><path d="M11 11.4h3.4M12.9 9.9l1.5 1.5-1.5 1.5"/></svg>',
+    // marca da peça que JÁ vai como texto: três linhas, discretas
+    emTexto:
+      '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7"/></svg>',
     close:
       '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>',
     reset:
@@ -371,12 +378,25 @@ var PjePanel = (function () {
               <span><i class="l-dot cat-peticao"></i>petições</span>
               <span><i class="l-dot cat-prova"></i>provas</span>
             </div>
-            <div class="doclist"></div>
+            <div class="doclist" title="Arraste para marcar várias peças · Shift+clique marca até aqui · botão direito abre “marcar daqui para baixo/cima”"></div>
             <div class="docs-tip">
               <span class="tip-i" role="note" tabindex="0" title="${TIP_PADRAO_ATTR}" aria-label="${TIP_PADRAO_ATTR}">⚠️</span>
               <span class="tip-txt"></span>
               <button type="button" class="tip-load" title="Rola a linha do tempo do processo automaticamente até o fim para carregar todas as peças na lista">⟳ Carregar todas as peças</button>
-              <button type="button" class="tip-zip" title="Baixa as peças num único arquivo .zip, numeradas na ordem do processo e acompanhadas de um índice com tipo, data e autor da juntada. Exporta as peças MARCADAS; sem nenhuma marcada, exporta todas as da lista.">⬇ Baixar .zip</button>
+              <button type="button" class="tip-zip" title="Baixa os arquivos ORIGINAIS das peças (PDF, HTML) num único .zip, numerados na ordem do processo e com um índice de tipo, data e autor da juntada. Não faz extração de texto. Exporta as peças MARCADAS; sem nenhuma marcada, exporta todas as da lista.">⬇ Documentos (.zip)</button>
+              <!-- Pacote de TEXTO: existe só quando há texto extraído. São
+                   coisas diferentes — um .zip são os autos, o outro é a leitura
+                   deles, e serve para trabalhar fora da extensão. -->
+              <button type="button" class="tip-zipt" hidden title="Baixa as peças em TEXTO num .zip: um arquivo por peça e um autos.md com tudo concatenado. Usa o texto JÁ EXTRAÍDO; peças ainda em documento entram como o arquivo original. Exporta as peças MARCADAS; sem nenhuma marcada, todas as da lista.">⬇ Texto (.zip)</button>
+              <!-- Aviso e ação são UM componente, não um parágrafo solto com um
+                   botão órfão embaixo. "Carregar lista" e "baixar" são
+                   ferramentas da lista; "extrair" responde a uma condição — são
+                   classes diferentes e não podem dividir a mesma fila. -->
+              <div class="extrai-bar" hidden>
+                <span class="eb-ic" aria-hidden="true"></span>
+                <span class="eb-t"></span>
+                <button type="button" class="eb-go">Extrair</button>
+              </div>
             </div>
           </div>
           <div class="main">
@@ -507,8 +527,13 @@ var PjePanel = (function () {
     const docQN = $(".doc-q-n");
     const tipBox = $(".docs-tip");
     const tipTxt = $(".tip-txt");
+    const extraiBar = $(".extrai-bar");
+    const ebTexto = $(".eb-t");
+    const ebGo = $(".eb-go");
+    $(".eb-ic").innerHTML = SVG.extrair; // mesmo glifo do botão da row
     const tipLoad = $(".tip-load");
     const tipZip = $(".tip-zip");
+    const tipZipT = $(".tip-zipt");
     const msgs = $(".msgs");
     const ft = $(".ft");
     const statusEl = $(".status");
@@ -581,6 +606,16 @@ var PjePanel = (function () {
         "na janela do modelo. O medidor ao lado das ferramentas mostra o quanto já foi " +
         "usado; se encher, desmarque peças (libera espaço na hora) ou comece uma " +
         "conversa nova.</p>" +
+        // O gargalo real do produto, e o que mais surpreende quem começa: a
+        // espera não é da IA, é do tribunal entregando peça por peça. Fica no
+        // guia (fechado por padrão) para não engordar o estado vazio, mas com
+        // destaque próprio — é a diferença entre "a extensão é lenta" e "a
+        // minha conexão está ruim".
+        "<p><b>📶 Sua conexão manda no tempo de espera:</b> o PJe entrega as peças " +
+        "<b>uma de cada vez</b> (cerca de 5 s cada). No Wi-Fi instável isso se " +
+        "multiplica por dezenas de documentos e a extensão parece travada, quando na " +
+        "verdade está esperando o tribunal. <b>Cabo de rede faz muita diferença</b> — " +
+        "e marcar só as peças que interessam, mais ainda.</p>" +
         '<p>💡 Para autos muito grandes, conheça o <a href="https://mcp.tecjustica.com/" ' +
         'target="_blank" rel="noopener">TecJustiça MCP</a>, em que o contexto do processo ' +
         "é gerenciado automaticamente pelo código, e a demonstração com o PJe do Ceará em " +
@@ -1167,6 +1202,139 @@ var PjePanel = (function () {
     doclist.addEventListener("change", syncSelection);
 
     // -------------------------------------------------------------------------
+    // SELEÇÃO EM FAIXA — marcar 40 petições em sequência não pode custar 40
+    // cliques.
+    //
+    // Três gestos, todos operando sobre os MESMOS checkboxes (a fonte de verdade
+    // de toda a extensão; chips, contador, popup @ e envio são projeções dela):
+    //
+    //   · arrastar          — marca/desmarca a faixa por onde o ponteiro passa;
+    //   · Shift+clique      — do último item tocado até este (padrão universal:
+    //                         Explorer, Gmail, GitHub — ninguém precisa aprender);
+    //   · botão direito     — menu com "daqui para baixo/cima", que é o que
+    //                         resolve quando o outro extremo está fora da tela.
+    //
+    // Todos respeitam o FILTRO ativo: operam só nas rows visíveis, igual ao
+    // "todas" e ao "principais".
+    // -------------------------------------------------------------------------
+    let ancoraSel = -1; // índice da última row alternada (âncora do Shift)
+    let arrastando = false;
+    let arrastoValor = true; // marcando ou desmarcando
+
+    function rowsVisiveis() {
+      return [...doclist.querySelectorAll(".docrow")].filter((r) => !r.hidden);
+    }
+    function idxDaRow(row) {
+      return rowsVisiveis().indexOf(row);
+    }
+    function aplicarFaixa(de, ate, valor) {
+      const rows = rowsVisiveis();
+      const a = Math.min(de, ate);
+      const b = Math.max(de, ate);
+      for (let i = a; i <= b; i++) {
+        const inp = rows[i] && rows[i].querySelector("input");
+        if (inp) inp.checked = valor;
+      }
+      syncSelection();
+    }
+
+    doclist.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest("button")) return; // .d-ver / .d-extrai têm dono
+      const row = e.target.closest(".docrow");
+      if (!row) return;
+      const i = idxDaRow(row);
+      if (i < 0) return;
+      const inp = row.querySelector("input");
+      if (!inp) return;
+
+      if (e.shiftKey && ancoraSel >= 0) {
+        // Shift+clique: o label alternaria só esta row — preciso do intervalo.
+        e.preventDefault();
+        aplicarFaixa(ancoraSel, i, !inp.checked || ancoraSel !== i);
+        return;
+      }
+      // Início de arrasto: o valor alvo é o OPOSTO do estado atual, e ele se
+      // propaga para todas as rows que o ponteiro cruzar. O clique normal segue
+      // funcionando pelo <label> — não damos preventDefault aqui.
+      arrastando = true;
+      arrastoValor = !inp.checked;
+      ancoraSel = i;
+    });
+
+    doclist.addEventListener("pointerover", (e) => {
+      if (!arrastando) return;
+      const row = e.target.closest(".docrow");
+      if (!row) return;
+      const inp = row.querySelector("input");
+      // A row de origem é alternada pelo próprio <label>; as demais, aqui.
+      if (inp && inp.checked !== arrastoValor && idxDaRow(row) !== ancoraSel) {
+        inp.checked = arrastoValor;
+        syncSelection();
+      }
+    });
+
+    // No documento, não na lista: o ponteiro solta com frequência fora dela.
+    document.addEventListener("pointerup", () => {
+      arrastando = false;
+    });
+    document.addEventListener("pointercancel", () => {
+      arrastando = false;
+    });
+
+    // --- menu "daqui para baixo / daqui para cima" ----------------------------
+    let menuSel = null;
+    function fecharMenuSel() {
+      if (menuSel) menuSel.remove();
+      menuSel = null;
+    }
+    doclist.addEventListener("contextmenu", (e) => {
+      const row = e.target.closest(".docrow");
+      if (!row) return;
+      const i = idxDaRow(row);
+      if (i < 0) return;
+      e.preventDefault();
+      fecharMenuSel();
+      const total = rowsVisiveis().length;
+      const menu = document.createElement("div");
+      menu.className = "selmenu";
+      menu.setAttribute("role", "menu");
+      const opcoes = [
+        ["Marcar daqui para baixo", () => aplicarFaixa(i, total - 1, true)],
+        ["Marcar daqui para cima", () => aplicarFaixa(0, i, true)],
+        ["Desmarcar daqui para baixo", () => aplicarFaixa(i, total - 1, false)],
+        ["Desmarcar daqui para cima", () => aplicarFaixa(0, i, false)],
+        ["Marcar só esta", () => {
+          aplicarFaixa(0, total - 1, false);
+          aplicarFaixa(i, i, true);
+        }],
+      ];
+      opcoes.forEach(function (o, n) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = o[0];
+        if (n === 2) b.className = "sep";
+        b.addEventListener("click", () => {
+          fecharMenuSel();
+          o[1]();
+          ancoraSel = i;
+        });
+        menu.appendChild(b);
+      });
+      wrap.appendChild(menu);
+      menuSel = menu;
+      // Coordenadas de VIEWPORT (o .selmenu é position:fixed): o .wrap tem
+      // tamanho zero e clampar por dentro dele mandaria o menu para o canto.
+      const r = row.getBoundingClientRect();
+      menu.style.left = Math.max(6, Math.min(e.clientX, window.innerWidth - 214)) + "px";
+      menu.style.top = Math.max(6, Math.min(r.bottom + 2, window.innerHeight - 172)) + "px";
+    });
+    // Fecha em qualquer clique fora, Esc e ao re-renderizar a lista.
+    wrap.addEventListener("pointerdown", (e) => {
+      if (menuSel && !e.target.closest(".selmenu")) fecharMenuSel();
+    });
+
+    // -------------------------------------------------------------------------
     // "Carregar todas as peças": a timeline do PJe carrega sob demanda; o
     // botão pede ao content script para rolá-la até o fim pelo usuário. O
     // estado visual (texto da dica + botão travado) é controlado por
@@ -1262,6 +1430,241 @@ var PjePanel = (function () {
     });
 
     // -------------------------------------------------------------------------
+    // Extração de texto das peças.
+    //
+    // A UI fala "extrair o texto", nunca "OCR": OCR é nome de implementação, e
+    // para quem usa o PJe o conceito é tirar o texto de dentro do documento. O
+    // termo técnico vive no help.html.
+    //
+    // O estado por peça mora AQUI num Map e é re-aplicado a cada setDocs — as
+    // rows são recriadas a cada refresh da timeline do PJe, então guardar
+    // estado no DOM o perderia no primeiro refresh.
+    // -------------------------------------------------------------------------
+    let extracaoEstado = {}; // { [id]: {usando, fonte, paginas} }
+    let extrairCb = null;
+    let extrairLoteCb = null;
+    let desfazerExtracaoCb = null;
+    let extraivelCb = null; // (id) -> {podeExtrair, imagens, escaneado} | null
+
+    function aplicarExtracaoNasRows() {
+      for (const row of doclist.querySelectorAll(".docrow")) {
+        const id = row.dataset.id;
+        const st = extracaoEstado[id];
+        const badge = row.querySelector(".d-emtexto");
+        const btn = row.querySelector(".d-extrai");
+        const usando = !!(st && st.usando);
+        row.classList.toggle("em-texto", usando);
+        if (badge) {
+          badge.hidden = !usando;
+          if (usando) {
+            badge.innerHTML = SVG.emTexto;
+            const fonte = st.fonte === "mistral" ? "OCR" : "leitura local";
+            badge.title =
+              "Esta peça vai para a IA como texto (" +
+              fonte +
+              (st.paginas ? ", " + st.paginas + " folhas" : "") +
+              ")";
+          }
+        }
+        if (btn) {
+          const info = extraivelCb ? extraivelCb(id) : null;
+          // O botão só existe onde há o que fazer: peça já em texto ganha
+          // "voltar ao documento"; peça que não pode ser extraída não mostra
+          // nada (não adianta oferecer o que vai falhar).
+          if (usando) {
+            btn.hidden = false;
+            btn.classList.add("desfaz");
+            btn.title = "Voltar a usar o documento original desta peça";
+            btn.setAttribute("aria-label", btn.title);
+          } else if (info && info.podeExtrair) {
+            btn.hidden = false;
+            btn.classList.remove("desfaz");
+            btn.title = info.escaneado
+              ? "Esta peça é digitalizada — extrair o texto dela com OCR"
+              : "Extrair o texto desta peça (leitura local, sem custo)";
+            btn.setAttribute("aria-label", btn.title);
+          } else {
+            btn.hidden = true;
+          }
+        }
+      }
+    }
+
+    doclist.addEventListener("click", (e) => {
+      const btn = e.target.closest(".d-extrai");
+      if (!btn) return;
+      // A row é um <label>: sem isto o clique alternaria o checkbox, que é a
+      // fonte de verdade da seleção (mesmo contrato do .d-ver).
+      e.preventDefault();
+      e.stopPropagation();
+      const row = btn.closest(".docrow");
+      if (!row) return;
+      const id = row.dataset.id;
+      if (btn.classList.contains("desfaz")) {
+        if (desfazerExtracaoCb) desfazerExtracaoCb(id);
+        return;
+      }
+      pedirExtracao([id], row);
+    });
+
+    // Confirmação só quando extrair APAGA algo: peça com imagens embutidas.
+    // Assinatura, carimbo de protocolo, RG digitalizado, foto de laudo — em
+    // texto o modelo deixa de ver tudo isso, e num processo isso costuma ser
+    // exatamente a pergunta. Peça de texto puro extrai direto, sem diálogo.
+    //
+    // Renderizado no Shadow DOM: confirm() nativo vive fora dele e CONGELA a
+    // extensão (mesma razão da exclusão em dois cliques na biblioteca).
+    function pedirExtracao(ids, ancora) {
+      const comImagens = [];
+      let imagens = 0;
+      for (const id of ids) {
+        const info = extraivelCb ? extraivelCb(id) : null;
+        if (info && info.imagens > 0) {
+          comImagens.push(id);
+          imagens += info.imagens;
+        }
+      }
+      if (!comImagens.length) {
+        if (extrairCb && ids.length === 1) extrairCb(ids[0], {});
+        else if (extrairLoteCb) extrairLoteCb(ids, {});
+        return;
+      }
+      confirmarVisual(
+        comImagens.length === 1
+          ? "Esta peça tem " + imagens + " imagem(ns). Em texto, o modelo deixa de ver assinaturas, carimbos e fotos."
+          : comImagens.length + " das " + ids.length + " peças têm imagens. Em texto, o modelo deixa de ver assinaturas, carimbos e fotos.",
+        "Extrair",
+        ancora,
+        () => {
+          if (extrairCb && ids.length === 1) extrairCb(ids[0], {});
+          else if (extrairLoteCb) extrairLoteCb(ids, {});
+        }
+      );
+    }
+
+    let confirmEl = null;
+    function fecharConfirm() {
+      if (confirmEl) confirmEl.remove();
+      confirmEl = null;
+    }
+    function confirmarVisual(texto, rotuloOk, ancora, onOk) {
+      fecharConfirm();
+      const box = document.createElement("div");
+      box.className = "confirmbox";
+      box.setAttribute("role", "dialog");
+      box.innerHTML =
+        '<p class="cb-t"></p>' +
+        '<div class="cb-acoes">' +
+        '<button type="button" class="cb-no">Cancelar</button>' +
+        '<button type="button" class="cb-yes"></button>' +
+        "</div>";
+      box.querySelector(".cb-t").textContent = texto; // conteúdo dos autos: nunca innerHTML
+      box.querySelector(".cb-yes").textContent = rotuloOk;
+      box.querySelector(".cb-no").addEventListener("click", fecharConfirm);
+      box.querySelector(".cb-yes").addEventListener("click", () => {
+        fecharConfirm();
+        onOk();
+      });
+      wrap.appendChild(box);
+      confirmEl = box;
+      if (ancora && ancora.getBoundingClientRect) {
+        // Viewport, não o .wrap (que tem tamanho zero) — ver o CSS do .confirmbox.
+        const r = ancora.getBoundingClientRect();
+        box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 302)) + "px";
+        box.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - 130)) + "px";
+      }
+      box.querySelector(".cb-yes").focus();
+    }
+
+    // Aviso AGREGADO na faixa, e não um ícone por peça: num inquérito com 50
+    // anexos digitalizados, uma marca por linha vira um muro. A .docs-tip já é
+    // o lugar de "algo sobre a lista + o botão que resolve" (é onde vive o
+    // aviso de timeline incompleta). Informa, não barra: o envio funciona
+    // normalmente com peça digitalizada não extraída.
+    // Linha de STATUS da seleção — não um aviso solto.
+    //
+    // Ela responde de uma vez às três perguntas que a versão anterior deixava
+    // no ar: quantas peças estão marcadas, quantas JÁ vão como texto, e quantas
+    // ainda podem ir (com o botão que faz exatamente isso). E — o que mais
+    // importa — **ela não some quando o usuário marca mais peças**: antes o
+    // cálculo só via peças já baixadas, então marcar "todas" escondia a opção,
+    // o oposto do esperado.
+    let extracaoAviso = null;
+    function setExtracaoAviso(info) {
+      extracaoAviso = info;
+      extraiBar.hidden = !info || !info.marcadas;
+      if (extraiBar.hidden) return;
+      const pend = info.pendentes;
+      extraiBar.classList.toggle("tem-ocr", !!info.ocr);
+      extraiBar.classList.toggle("tudo-pronto", !pend);
+
+      // Estado do texto à esquerda: sempre o retrato da seleção.
+      const partes = [info.marcadas + (info.marcadas > 1 ? " marcadas" : " marcada")];
+      if (info.jaTexto) partes.push(info.jaTexto + " em texto");
+      if (pend) {
+        let p = pend + " em documento";
+        if (info.ocr) {
+          // vírgula decimal: o painel é todo em pt-BR e "US$ 0.28" lê como erro
+          // de digitação para quem trabalha com valores em português
+          p +=
+            " · ≈ US$ " +
+            info.custoUsd.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+        }
+        partes.push(p);
+      }
+      ebTexto.textContent = partes.join(" · ");
+
+      ebGo.hidden = !pend;
+      ebGo.textContent = "⌁ Extrair " + pend;
+
+      // O detalhamento vai no title: numa faixa de 420px, na tela ele custaria
+      // a segunda linha que este desenho existe para eliminar.
+      const det = [];
+      if (info.locais) det.push(info.locais + " por leitura local, no seu navegador");
+      if (info.ocr) det.push(info.ocr + " por OCR (peça digitalizada)");
+      if (info.naoMedidas) {
+        det.push(
+          info.naoMedidas +
+            " ainda não baixada(s) — o tipo delas só se sabe depois de baixar, e o custo pode subir"
+        );
+      }
+      // Diz a verdade do MODELO ATIVO. No Gemini e no gpt-5.6-luna o PDF já é
+      // barato e o OCR pago sai MAIS caro; vender economia ali seria mentira.
+      const veredito = info.ocr
+        ? info.economiza
+          ? " Neste modelo, extrair reduz o custo e melhora a leitura."
+          : " Neste modelo o PDF já é barato: extrair vale pela QUALIDADE em peças digitalizadas, não pela economia."
+        : " Peça com texto próprio é lida no seu navegador, sem custo.";
+      const t = pend
+        ? "Extrair o texto de " + pend + " peça(s): " + det.join("; ") + "." + veredito
+        : "Todas as peças marcadas já vão para a IA como texto.";
+      ebGo.title = t;
+      extraiBar.title = t;
+    }
+    ebGo.addEventListener("click", () => {
+      if (!extracaoAviso || !extrairLoteCb) return;
+      const ids = getSelected().filter((id) => {
+        const info = extraivelCb ? extraivelCb(id) : null;
+        return info && info.podeExtrair;
+      });
+      if (ids.length) pedirExtracao(ids, ebGo);
+    });
+
+    // Mesma resolução de escopo do .tip-zip: as MARCADAS; sem nenhuma marcada,
+    // a lista inteira. A seleção por checkbox continua sendo a fonte de verdade.
+    let zipTextoCb = null;
+    tipZipT.addEventListener("click", () => {
+      if (!zipTextoCb) return;
+      const marcadas = getSelectedDocs();
+      const alvo = marcadas.length ? marcadas : allDocs;
+      if (!alvo.length) return;
+      zipTextoCb(alvo, { todas: !marcadas.length });
+    });
+
+    // -------------------------------------------------------------------------
     // Preview de peça no hover (só nos modos expandido/cheia e lateral, onde
     // há espaço). O conteúdo vem SEMPRE do cache do content script (callback
     // síncrono) — o hover NUNCA baixa nada: o download do PJe é serializado
@@ -1277,6 +1680,10 @@ var PjePanel = (function () {
     let previewCb = null; // (id) -> {kind:"pdf"|"text", ...} | null (síncrono)
     let previewDlCb = null; // (id) -> Promise<info> — só no clique em "Baixar"
     let previewId = null; // peça exibida no momento
+    // Aba escolhida À MÃO no popover ("doc"|"texto"); null = automático, que
+    // mostra o que o modelo vai receber. Reseta a cada peça nova.
+    let previewAba = null;
+    let abrirTextoCb = null; // (id) -> abre a página de leitura do texto
     let previewUrl = null; // blob URL vivo (no máximo um)
     let previewTimer = null; // debounce de intenção do hover
     let previewHideTimer = null; // fechamento tolerante (mouse indo ao popover)
@@ -1338,9 +1745,51 @@ var PjePanel = (function () {
         escapeHtml(d ? tituloCurto(d.titulo) : id) + "</span>";
       previewEl.appendChild(hd);
 
+      // Abas Documento / Texto quando a peça tem texto extraído.
+      //
+      // O preview mostra O QUE O MODELO VÊ: se a peça passou a ir como texto,
+      // é o texto que abre por padrão. É isso que torna a conferência
+      // confiável — o usuário decide se aceita a extração olhando exatamente o
+      // que foi para a API, não uma aproximação.
+      const temTexto = !!(info && info.txt);
+      const verTexto = temTexto && (previewAba === "texto" || (previewAba == null && info.txtUsar));
+      if (temTexto) {
+        const tabs = document.createElement("div");
+        tabs.className = "preview-tabs";
+        tabs.innerHTML =
+          '<button type="button" class="pv-tab' + (verTexto ? "" : " on") + '" data-aba="doc">Documento</button>' +
+          '<button type="button" class="pv-tab' + (verTexto ? " on" : "") + '" data-aba="texto">Texto</button>';
+        tabs.addEventListener("click", (e) => {
+          const b = e.target.closest(".pv-tab");
+          if (!b) return;
+          previewAba = b.dataset.aba;
+          renderPreview(row, info);
+        });
+        hd.appendChild(tabs);
+      }
+
       const bd = document.createElement("div");
       bd.className = "preview-bd";
       previewEl.appendChild(bd);
+
+      if (verTexto) {
+        modoCompact();
+        const t = document.createElement("div");
+        t.className = "preview-txt";
+        t.textContent = info.txt; // NUNCA innerHTML — conteúdo dos autos
+        bd.appendChild(t);
+        const ft = document.createElement("div");
+        ft.className = "preview-ft";
+        const fonte = info.txtFonte === "mistral" ? "OCR" : "leitura local";
+        ft.innerHTML =
+          "<span>" + (info.txtPaginas || 0) + " folha(s) · " + fonte + "</span>" +
+          '<button type="button" class="preview-abrir-txt">Abrir texto</button>';
+        ft.querySelector(".preview-abrir-txt").addEventListener("click", () => {
+          if (abrirTextoCb) abrirTextoCb(id);
+        });
+        previewEl.appendChild(ft);
+        return;
+      }
 
       if (!info) {
         // cache-miss: nada de download automático — só sob gesto explícito
@@ -1443,6 +1892,10 @@ var PjePanel = (function () {
 
     function showPreview(row) {
       if (!previewCb || !row.isConnected) return;
+      // peça nova: volta ao automático (mostrar o que o modelo vê). Manter a
+      // aba escolhida na peça anterior faria o popover abrir no "Documento" de
+      // uma peça que está indo como texto, contradizendo o próprio princípio.
+      if (previewId !== row.dataset.id) previewAba = null;
       previewId = row.dataset.id;
       renderPreview(row, previewCb(previewId));
       posicionarPreview(row); // 1º passe: posição estimada, ainda oculto
@@ -1524,6 +1977,10 @@ var PjePanel = (function () {
     // verdade da seleção (peça marcada e filtrada segue marcada).
     // -------------------------------------------------------------------------
     function filtrarDocs() {
+      // O filtro muda QUAIS rows são visíveis, e as faixas operam sobre elas:
+      // a âncora antiga apontaria para outra peça.
+      ancoraSel = -1;
+      fecharMenuSel();
       // rows podem sumir/mudar de lugar sob o popover (exceto durante o
       // download do próprio preview — o refresh da timeline passa por aqui)
       if (!previewDlPendente) hidePreview();
@@ -2789,6 +3246,13 @@ var PjePanel = (function () {
             `<span class="d-nm">${escapeHtml(p.nome)}</span>` +
             (p.id ? `<span class="d-id">${p.id}</span>` : "") +
             "</span>" +
+            // Marca da peça que JÁ vai como texto — irmã de .d-t com flex:none.
+            // DENTRO do .d-t ela roubaria largura do nome e mataria a elipse.
+            // É o ÚNICO estado que vira marca permanente: mudou o que o modelo
+            // recebe, e o usuário precisa ver isso ao revisar a seleção.
+            '<span class="d-emtexto" hidden></span>' +
+            '<button type="button" class="d-extrai" hidden title="Extrair o texto desta peça" aria-label="Extrair o texto desta peça">' +
+            SVG.extrair + "</button>" +
             '<button type="button" class="d-ver" title="Ver esta peça na linha do tempo do processo" aria-label="Localizar esta peça na linha do tempo">' +
             SVG.ver + "</button>";
           if (cur.has(d.id)) row.querySelector("input").checked = true;
@@ -2799,7 +3263,49 @@ var PjePanel = (function () {
         }
         filtrarDocs(); // re-aplica a busca ativa à lista recém-renderizada
         syncSelection();
+        // As rows acabaram de ser recriadas: o glifo de "vai como texto" e o
+        // botão de extrair vivem num Map do painel, não no DOM, justamente
+        // para sobreviverem a este re-render (que o MutationObserver da
+        // timeline do PJe dispara a cada refresh).
+        aplicarExtracaoNasRows();
+        // A lista foi recriada: os índices da seleção em faixa não valem mais.
+        ancoraSel = -1;
+        fecharMenuSel();
         if (mention) updateMention(); // popup aberto: reflete a lista atualizada
+      },
+      // Estado da extração vindo do content script: { [id]: {usando, fonte,
+      // paginas} }. Só as peças que JÁ vão como texto aparecem aqui.
+      setExtracaoEstado(mapa) {
+        extracaoEstado = mapa || {};
+        aplicarExtracaoNasRows();
+        // O pacote de texto só faz sentido quando existe texto: sem isso o
+        // botão seria mais uma coisa na faixa que não resolve nada.
+        tipZipT.hidden = !Object.keys(extracaoEstado).length;
+      },
+      onExportarTexto(cb) {
+        zipTextoCb = cb;
+      },
+      setZipTextoOcupado(on) {
+        tipZipT.disabled = !!on;
+        tipZipT.textContent = on ? "Baixando…" : "⬇ Texto (.zip)";
+      },
+      setExtracaoAviso,
+      // (id) -> {podeExtrair, imagens, escaneado} | null. SÍNCRONO, como o
+      // onPreview: é consultado a cada re-render das rows.
+      onExtraivel(cb) {
+        extraivelCb = cb;
+      },
+      onExtrair(cb) {
+        extrairCb = cb;
+      },
+      onExtrairLote(cb) {
+        extrairLoteCb = cb;
+      },
+      onDesfazerExtracao(cb) {
+        desfazerExtracaoCb = cb;
+      },
+      onAbrirTexto(cb) {
+        abrirTextoCb = cb;
       },
       // attachments: títulos das peças anexadas neste turno (opcional)
       addMessage(role, text, attachments) {
@@ -3023,6 +3529,67 @@ var PjePanel = (function () {
       setStatus(s, busy) {
         statusEl.textContent = s || "";
         statusEl.classList.toggle("busy", !!busy && !!s);
+      },
+      // Nota dentro do card de progresso — hoje usada para avisar que o
+      // download está lento. Aparece DURANTE a espera, que é quando a
+      // informação vale: um aviso estático sobre Wi-Fi seria ignorado por quem
+      // está com rede boa e visto tarde demais por quem não está.
+      setPrepNota(texto) {
+        if (!prepEl) return;
+        let nota = prepEl.querySelector(".prep-nota");
+        if (!texto) {
+          if (nota) nota.remove();
+          return;
+        }
+        if (!nota) {
+          nota = document.createElement("div");
+          nota.className = "prep-nota";
+          prepEl.appendChild(nota);
+        }
+        nota.textContent = texto;
+      },
+      // Relatório das peças que não puderam ser baixadas neste turno.
+      //
+      // Vive NO CHAT, e não no .status (que é transitório) nem na .alertbar (que
+      // é para o que impede de continuar): a análise seguiu com o resto, e o
+      // usuário precisa poder ler com calma qual peça faltou e por quê, para
+      // tentar de novo depois. Antes, uma única peça com 404 abortava o turno
+      // inteiro e a pergunta já digitada se perdia.
+      //
+      // Fica FECHADO por padrão — é informação de diagnóstico, não deve competir
+      // com a resposta.
+      mostrarFalhasPecas(falhas) {
+        if (!falhas || !falhas.length) return null;
+        const el = document.createElement("details");
+        el.className = "falhas";
+        const n = falhas.length;
+        const sum = document.createElement("summary");
+        sum.textContent =
+          n === 1
+            ? "1 peça não pôde ser baixada e ficou de fora desta análise"
+            : n + " peças não puderam ser baixadas e ficaram de fora desta análise";
+        el.appendChild(sum);
+        const ul = document.createElement("ul");
+        for (const f of falhas) {
+          const li = document.createElement("li");
+          const t = document.createElement("b");
+          // conteúdo dos autos: textContent, nunca innerHTML
+          t.textContent = f.titulo || String(f.id);
+          li.appendChild(t);
+          const m = document.createElement("span");
+          m.textContent = " — " + (f.erro || "falha ao baixar");
+          li.appendChild(m);
+          ul.appendChild(li);
+        }
+        el.appendChild(ul);
+        const p = document.createElement("p");
+        p.className = "falhas-dica";
+        p.textContent =
+          "Elas continuam marcadas: no próximo envio a extensão tenta de novo. Se persistir, abra a peça na linha do tempo do PJe uma vez e envie outra vez.";
+        el.appendChild(p);
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
       },
       // Medidor de contexto da conversa: barra + resumo (tokens e páginas
       // acumulados no request vs. limites do modelo). null esconde.

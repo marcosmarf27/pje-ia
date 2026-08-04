@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Extração de texto — TecJustiça PJe</title>
+    <!--
+      Página de trabalho, sem interface: o content script a carrega num iframe
+      oculto (1×1, aria-hidden) só para ter um contexto onde o pdf.js possa
+      abrir um Worker de verdade. Nada aqui é visível ao usuário.
+      Ver o cabeçalho de src/extrator.js para o porquê de não rodar no content
+      script nem no service worker.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="extrator.js"></script>
+  </body>
+</html>

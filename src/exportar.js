@@ -58,7 +58,9 @@
     );
   }
 
-  const EXTENSAO = { pdf: ".pdf", html: ".txt", rtf: ".txt", texto: ".txt" };
+  // `md` é o texto EXTRAÍDO de uma peça (pela leitura local ou por OCR): sai
+  // como .md porque carrega os marcadores de folha e a formatação do OCR.
+  const EXTENSAO = { pdf: ".pdf", html: ".txt", rtf: ".txt", texto: ".txt", md: ".md" };
 
   function nomeArquivo(doc, ordem, fmt) {
     const num = String(ordem).padStart(3, "0");
@@ -182,16 +184,35 @@
   const REGUA = "=".repeat(78);
 
   function montarLeiaMe(info) {
-    const { cnj, gerado, criterio, itens, falhas, ficha, origemLista } = info;
+    const { cnj, gerado, criterio, itens, falhas, ficha, origemLista, modo } = info;
     const temPessoas = !!(ficha && (ficha.poloAtivo || ficha.poloPassivo));
     return []
       .concat(
         [
-          "# Peças do processo " + (cnj || "(número não identificado)"),
+          (modo === "texto" ? "# Texto das peças do processo " : "# Peças do processo ") +
+            (cnj || "(número não identificado)"),
           "",
           "Exportado pela extensão **TecJustiça PJe** em " + gerado + ".",
           "",
         ],
+        // O pacote de texto é a LEITURA dos autos, não os autos: quem abrir
+        // precisa saber disso na primeira linha, antes de usar o conteúdo para
+        // qualquer coisa.
+        modo === "texto"
+          ? [
+              "> ## ⚠️ Este pacote contém TEXTO EXTRAÍDO, não os documentos originais",
+              ">",
+              "> O texto foi extraído dos PDFs pela leitura local do navegador ou por OCR.",
+              "> **Assinaturas, carimbos, selos e imagens NÃO aparecem aqui**, e a extração",
+              "> pode errar em digitalizações de baixa qualidade. Para qualquer uso que",
+              "> dependa da forma do documento, volte ao original no PJe.",
+              ">",
+              "> `autos.md` traz todas as peças concatenadas na ordem cronológica;",
+              "> a pasta `pecas/` traz uma por arquivo. Os marcadores `[fl. N]` indicam",
+              "> a folha de origem dentro de cada peça.",
+              "",
+            ]
+          : [],
         sobSegredo(ficha)
           ? [
               "> ## ⛔ Segredo de justiça",
@@ -386,6 +407,11 @@
       onEtapa,
       sinal,
       agora = new Date(),
+      // "documentos" (padrão) = os arquivos originais, byte a byte como sempre.
+      // "texto" = as peças em forma de texto, mais um autos.md concatenado.
+      // São pacotes conceitualmente distintos: um são os autos, o outro é a
+      // LEITURA deles.
+      modo = "documentos",
     } = opts;
     const Zip = opts.zip || (typeof window !== "undefined" && window.ZipW);
     if (!Zip) throw new Error("escritor de ZIP indisponível");
@@ -396,6 +422,7 @@
 
     const itens = [];
     const falhas = [];
+    const autos = []; // pedaços do autos.md (só no modo "texto")
     let bytesTotais = 0;
 
     for (let i = 0; i < emOrdem.length; i++) {
@@ -455,6 +482,15 @@
         bytes,
         extras: d.extras && Object.keys(d.extras).length ? d.extras : undefined,
       });
+      // Pacote de TEXTO: além do arquivo por peça, um `autos.md` único com
+      // tudo na ordem cronológica. O arquivo por peça preserva a
+      // rastreabilidade no nome (NNN_Titulo_ID); o concatenado é o que se joga
+      // inteiro num chat ou num script, sem ter de montar nada.
+      if (modo === "texto" && !ehPdf) {
+        autos.push(
+          "\n\n# " + d.id + " — " + (semIdInicial(d.titulo) || d.titulo || "") + "\n\n" + c.text
+        );
+      }
       if (onEtapa) onEtapa(d.id, "done");
     }
 
@@ -470,6 +506,7 @@
       origemLista,
       itens,
       falhas,
+      modo,
       gerado: agora.toLocaleString("pt-BR"),
       geradoIso: agora.toISOString(),
     };
@@ -477,6 +514,17 @@
     await zip.add(pasta + "/LEIA-ME.md", montarLeiaMe(info));
     await zip.add(pasta + "/indice.txt", montarIndiceTxt(info));
     await zip.add(pasta + "/indice.json", montarIndiceJson(info));
+    if (modo === "texto" && autos.length) {
+      await zip.add(
+        pasta + "/autos.md",
+        "# " + (cnj || "Processo") + " — texto das peças\n" +
+          "\n> Texto EXTRAÍDO dos PDFs (leitura local ou OCR). Confira sempre no" +
+          " documento original: assinaturas, carimbos e imagens não aparecem aqui," +
+          " e a extração pode errar em digitalizações de baixa qualidade.\n" +
+          "> Peças na ordem cronológica (" + criterio + ").\n" +
+          autos.join("")
+      );
+    }
 
     return {
       blob: zip.fechar(),

@@ -1,6 +1,12 @@
 const apiKeyEl = document.getElementById("apiKey");
 const geminiKeyEl = document.getElementById("geminiApiKey");
 const openaiKeyEl = document.getElementById("openaiApiKey");
+// A Mistral NÃO é provedor de chat: ela só extrai o texto de peças
+// digitalizadas. Por isso fica fora de provedorDoModelo()/campoDoProvedor() e
+// do chip — escolher um modelo nunca deve exigir esta chave, e não tê-la só
+// significa que peça digitalizada continua indo como imagem.
+const mistralKeyEl = document.getElementById("mistralApiKey");
+const ocrModelEl = document.getElementById("ocrModel");
 const modelEl = document.getElementById("model");
 const effortEl = document.getElementById("effort");
 const customEl = document.getElementById("customPrompt");
@@ -11,16 +17,19 @@ const chipText = document.getElementById("chipText");
 const togglePw = document.getElementById("togglePw");
 const togglePwG = document.getElementById("togglePwG");
 const togglePwO = document.getElementById("togglePwO");
+const togglePwM = document.getElementById("togglePwM");
 // Elementos só do layout novo — este script é COMPARTILHADO por popup.html e
 // options.html, então tudo o que uma página tem e a outra não é opcional.
 const kstateA = document.getElementById("kstateA");
 const kstateG = document.getElementById("kstateG");
 const kstateO = document.getElementById("kstateO");
+const kstateM = document.getElementById("kstateM");
 const firstRun = document.getElementById("firstRun");
 const abrirOpcoes = document.getElementById("abrirOpcoes");
 const boxA = document.getElementById("boxA");
 const boxG = document.getElementById("boxG");
 const boxO = document.getElementById("boxO");
+const boxM = document.getElementById("boxM");
 
 // O chip reflete a chave do PROVEDOR do modelo selecionado: escolher um modelo
 // de um provedor sem a chave dele avisa na hora, antes mesmo de salvar. O
@@ -55,6 +64,7 @@ function setChip() {
   marcarChave(kstateA, apiKeyEl.value);
   marcarChave(kstateG, geminiKeyEl.value);
   marcarChave(kstateO, openaiKeyEl && openaiKeyEl.value);
+  marcarChave(kstateM, mistralKeyEl && mistralKeyEl.value);
 }
 function marcarChave(el, valor) {
   if (!el) return;
@@ -80,11 +90,13 @@ function abrirChaveQueFalta() {
 }
 
 chrome.storage.local.get(
-  ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort", "customPrompt"],
+  ["apiKey", "geminiApiKey", "openaiApiKey", "mistralApiKey", "model", "effort", "customPrompt", "ocrModel"],
   (v) => {
     if (v.apiKey) apiKeyEl.value = v.apiKey;
     if (v.geminiApiKey) geminiKeyEl.value = v.geminiApiKey;
     if (openaiKeyEl && v.openaiApiKey) openaiKeyEl.value = v.openaiApiKey;
+    if (mistralKeyEl && v.mistralApiKey) mistralKeyEl.value = v.mistralApiKey;
+    if (ocrModelEl && v.ocrModel) ocrModelEl.value = v.ocrModel;
     if (v.model) modelEl.value = v.model;
     if (effortEl && v.effort) effortEl.value = v.effort;
     if (customEl && v.customPrompt) customEl.value = v.customPrompt;
@@ -109,6 +121,7 @@ function ligarToggle(btn, input) {
 ligarToggle(togglePw, apiKeyEl);
 ligarToggle(togglePwG, geminiKeyEl);
 ligarToggle(togglePwO, openaiKeyEl);
+ligarToggle(togglePwM, mistralKeyEl);
 
 modelEl.addEventListener("change", () => {
   setChip();
@@ -117,6 +130,7 @@ modelEl.addEventListener("change", () => {
 apiKeyEl.addEventListener("input", setChip);
 geminiKeyEl.addEventListener("input", setChip);
 if (openaiKeyEl) openaiKeyEl.addEventListener("input", setChip);
+if (mistralKeyEl) mistralKeyEl.addEventListener("input", setChip);
 
 // "Configuração completa" (só no popup): a página de opções tem as mesmas
 // preferências com as explicações longas e espaço para escrever as instruções
@@ -129,11 +143,45 @@ if (abrirOpcoes) {
   });
 }
 
+// "Apagar todos os textos extraídos" (só na página de opções). Exclusão em dois
+// cliques, como em toda a extensão — confirm() nativo congelaria a página.
+const limparTextos = document.getElementById("limparTextos");
+const limparTextosStatus = document.getElementById("limparTextosStatus");
+if (limparTextos) {
+  let armado = false;
+  limparTextos.addEventListener("click", () => {
+    if (!armado) {
+      armado = true;
+      limparTextos.textContent = "Apagar mesmo?";
+      setTimeout(() => {
+        armado = false;
+        limparTextos.textContent = "Apagar todos os textos extraídos";
+      }, 4000);
+      return;
+    }
+    armado = false;
+    limparTextos.textContent = "Apagar todos os textos extraídos";
+    chrome.storage.local.get(null, (tudo) => {
+      const ks = Object.keys(tudo || {}).filter((k) => k.startsWith("texto:"));
+      if (!ks.length) {
+        limparTextosStatus.textContent = "nada guardado";
+        return;
+      }
+      chrome.storage.local.remove(ks, () => {
+        limparTextosStatus.textContent = ks.length + " apagado(s)";
+        setTimeout(() => (limparTextosStatus.textContent = ""), 3000);
+      });
+    });
+  });
+}
+
 saveBtn.addEventListener("click", () => {
   const apiKey = apiKeyEl.value.trim();
   const geminiApiKey = geminiKeyEl.value.trim();
   const openaiApiKey = openaiKeyEl ? openaiKeyEl.value.trim() : "";
   const cfg = { apiKey, geminiApiKey, openaiApiKey, model: modelEl.value };
+  if (mistralKeyEl) cfg.mistralApiKey = mistralKeyEl.value.trim();
+  if (ocrModelEl) cfg.ocrModel = ocrModelEl.value;
   if (effortEl) cfg.effort = effortEl.value;
   if (customEl) cfg.customPrompt = customEl.value.trim();
   chrome.storage.local.set(cfg, () => {
