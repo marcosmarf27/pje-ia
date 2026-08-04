@@ -283,28 +283,80 @@ var PJE = (function () {
   //    aparece no cru; descomprime os streams /ObjStm (FlateDecode) com a API
   //    nativa do navegador e conta os objetos de página lá dentro.
   const RE_PAGINA = /\/Type\s*\/Page(?![a-zA-Z])/g;
+  // Sinais estruturais colhidos NA MESMA varredura (a string latin1 já existe,
+  // então contá-los é de graça): fontes declaradas, imagens, e os filtros de
+  // compressão típicos de digitalização.
+  const RE_FONTE = /\/Font(?![a-zA-Z])/g;
+  const RE_IMAGEM = /\/Subtype\s*\/Image(?![a-zA-Z])/g;
+  const RE_FILTRO_SCAN = /\/(DCTDecode|JPXDecode|CCITTFaxDecode|JBIG2Decode)(?![a-zA-Z])/g;
+  // Acima disto a página quase certamente é uma imagem: peça com texto nativo
+  // fica em 5–30 KB/página; digitalização a 200 dpi vai de 80 a 400 KB/página.
+  // ÚNICO ponto de calibragem da classificação — mexer aqui muda a decisão toda.
+  const PDF_KB_PAGINA_SCAN = 80;
 
-  async function contarPaginas(blob) {
+  function contarRe(s, re) {
+    const m = s.match(re);
+    return m ? m.length : 0;
+  }
+
+  // Analisa o binário do PDF: número de páginas + os sinais que dizem se a peça
+  // é texto nativo ou digitalização. Devolve sempre um objeto (nunca lança).
+  //
+  // A classificação existe para rotear a extração de texto: PDF nativo tem a
+  // camada de texto lida DE GRAÇA pelo pdf.js local; digitalização precisa de
+  // OCR pago. Errar para o lado "nativo" é barato (o pdf.js devolve pouco texto
+  // e a peça cai no OCR); errar para "escaneado" gastaria dinheiro à toa — por
+  // isso os sinais fortes vêm primeiro e o peso por página é o último recurso.
+  async function analisarPdf(blob) {
     try {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const s = new TextDecoder("latin1").decode(bytes);
-      const m = s.match(RE_PAGINA);
-      if (m && m.length) return m.length;
-      let max = 0;
-      const re = /\/Count\s+(\d+)/g;
-      let mm;
-      while ((mm = re.exec(s))) max = Math.max(max, parseInt(mm[1], 10));
-      if (max) return max;
-      return (await contarPaginasObjStm(bytes, s)) || 1;
+      let pages = contarRe(s, RE_PAGINA);
+      let fontes = contarRe(s, RE_FONTE);
+      let imagens = contarRe(s, RE_IMAGEM);
+      let scans = contarRe(s, RE_FILTRO_SCAN);
+      if (!pages) {
+        let max = 0;
+        const re = /\/Count\s+(\d+)/g;
+        let mm;
+        while ((mm = re.exec(s))) max = Math.max(max, parseInt(mm[1], 10));
+        pages = max;
+      }
+      // Objetos em ObjStm não aparecem no cru — nem as páginas, nem as fontes.
+      // Só inflamos quando a contagem de páginas falhou (é o gatilho original):
+      // inflar 400 streams só para procurar /Font custaria caro em toda peça, e
+      // o peso por página já responde a pergunta nesses casos.
+      if (!pages) {
+        const obj = await varrerObjStm(bytes, s);
+        pages = obj.pages;
+        fontes += obj.fontes;
+        imagens += obj.imagens;
+        scans += obj.scans;
+      }
+      if (!pages) pages = 1;
+      const kbPagina = blob.size / 1024 / pages;
+      // Três sinais, do mais confiável para o mais fraco:
+      //  1. nenhuma fonte declarada e há imagem → pilha de digitalizações;
+      //  2. ~uma imagem de scan por página E página pesada → digitalizado COM
+      //     camada de OCR do scanner (aqui o /Font existe, mas vem do carimbo de
+      //     assinatura eletrônica do PJe, não do conteúdo — por isso /Font
+      //     sozinho NUNCA basta para concluir que a peça é nativa);
+      //  3. só o peso por página — único sinal quando os objetos ficaram em
+      //     ObjStm e não foram inflados.
+      let escaneado;
+      if (!fontes && imagens) escaneado = true;
+      else if (scans >= pages * 0.8 && kbPagina > PDF_KB_PAGINA_SCAN) escaneado = true;
+      else escaneado = kbPagina > PDF_KB_PAGINA_SCAN * 2;
+      return { pages, fontes, imagens, scans, kbPagina, escaneado };
     } catch {
-      return 1;
+      return { pages: 1, fontes: 0, imagens: 0, scans: 0, kbPagina: 0, escaneado: false };
     }
   }
 
   // Latin1 preserva a relação 1:1 entre índice na string e offset no binário —
   // por isso dá para achar "stream"/"endstream" na string e fatiar os bytes.
-  async function contarPaginasObjStm(bytes, s) {
-    let total = 0;
+  async function varrerObjStm(bytes, s) {
+    const out = { pages: 0, fontes: 0, imagens: 0, scans: 0 };
     let lidos = 0;
     const re = /\/Type\s*\/ObjStm/g;
     let m;
@@ -322,13 +374,15 @@ var PJE = (function () {
       lidos++;
       try {
         const txt = new TextDecoder("latin1").decode(await inflar(bytes.subarray(ini, fim)));
-        const mm = txt.match(RE_PAGINA);
-        if (mm) total += mm.length;
+        out.pages += contarRe(txt, RE_PAGINA);
+        out.fontes += contarRe(txt, RE_FONTE);
+        out.imagens += contarRe(txt, RE_IMAGEM);
+        out.scans += contarRe(txt, RE_FILTRO_SCAN);
       } catch {
         /* stream com outro filtro ou corrompido: ignora e segue */
       }
     }
-    return total;
+    return out;
   }
 
   // Descomprime um stream FlateDecode (formato zlib) com DecompressionStream.
@@ -457,14 +511,28 @@ var PJE = (function () {
         console.debug("[PJe IA] peça", id, "PDF de 0 bytes");
         return null;
       }
-      const pages = await contarPaginas(blob);
-      console.debug("[PJe IA] peça", id, "PDF de", blob.size, "bytes,", pages, "página(s)");
+      const an = await analisarPdf(blob);
+      const pages = an.pages;
+      console.debug(
+        "[PJe IA] peça", id, "PDF de", blob.size, "bytes,", pages, "página(s),",
+        an.escaneado ? "digitalizada" : "texto nativo",
+        "(" + Math.round(an.kbPagina) + " KB/pág, " + an.fontes + " fonte(s), " +
+          an.imagens + " imagem(ns))"
+      );
       const b64 = await blobToB64(blob);
       // `fmt` guarda o formato de ORIGEM da peça. `kind` diz como o conteúdo
       // viaja daqui em diante (pdf x texto) e é o que o envio usa; `fmt`
       // preserva a distinção que o `kind` achata — HTML e RTF viram ambos
       // "text" — e é o que a exportação em ZIP registra no índice.
-      return { kind: "pdf", fmt: "pdf", b64, size: blob.size, pages };
+      //
+      // `escaneado` e `imagens` são ADITIVOS: roteiam a extração de texto
+      // (nativo → pdf.js local e grátis; digitalizado → OCR pago) e alimentam o
+      // aviso de que extrair apaga o canal visual. Quem não usa a extração não
+      // enxerga diferença nenhuma neste objeto.
+      return {
+        kind: "pdf", fmt: "pdf", b64, size: blob.size, pages,
+        escaneado: an.escaneado, imagens: an.imagens,
+      };
     }
     // blob.text() decodifica sempre UTF-8; honra o charset do header quando
     // outro (PJe legado pode servir HTML em ISO-8859-1 — acentuação).
@@ -984,5 +1052,6 @@ var PJE = (function () {
     _parsePessoa: parsePessoa,
     _urlsDownload: urlsDownload,
     _totalPaginasGrid: totalPaginasGrid,
+    _analisarPdf: analisarPdf,
   };
 })();

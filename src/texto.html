@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Texto extraído — TecJustiça PJe</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="texto-page.css" />
+  </head>
+  <body>
+    <header class="topo">
+      <img src="../icons/icon48.png" alt="" width="28" height="28" />
+      <div class="tit">
+        <span class="t serif" id="titulo">Texto extraído</span>
+        <span class="s" id="subtitulo">guardado neste computador</span>
+      </div>
+      <div class="acoes" id="acoes" hidden>
+        <div class="busca-wrap">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5" /><path d="M10.6 10.6 14 14" />
+          </svg>
+          <input id="busca" type="search" autocomplete="off" spellcheck="false"
+                 placeholder="Buscar no texto…" aria-label="Buscar no texto" />
+          <span id="achados" class="cnt"></span>
+        </div>
+        <div class="nav-fl">
+          <button id="flAnt" title="Folha anterior" aria-label="Folha anterior">‹</button>
+          <label class="fl-lab">fl.
+            <input id="flNum" type="number" min="1" value="1" aria-label="Ir para a folha" />
+            <span id="flTot">de 0</span>
+          </label>
+          <button id="flProx" title="Próxima folha" aria-label="Próxima folha">›</button>
+        </div>
+        <!-- Comparar: a conferência é a razão de existir desta página. Ler o
+             texto extraído sem o original ao lado obriga a alternar de aba para
+             saber se a extração perdeu algo — e é exatamente por isso que
+             ninguém confere. -->
+        <button id="comparar" hidden>Comparar com o original</button>
+        <button id="copiar">Copiar</button>
+        <button id="baixar">Baixar .md</button>
+      </div>
+    </header>
+
+    <main class="mesa">
+      <section id="telaLista" class="col" hidden>
+        <div id="lista" class="lista"></div>
+      </section>
+      <!-- Coluna do PDF ORIGINAL, à esquerda do texto. Só existe quando a peça
+           foi aberta pelo botão "Comparar" (o binário viaja pela sessão). -->
+      <section id="telaPdf" class="col col-pdf" hidden>
+        <div class="col-hd">
+          <span>Documento original</span>
+          <button id="fecharPdf" title="Fechar a comparação" aria-label="Fechar a comparação">✕</button>
+        </div>
+        <div id="pdfBox" class="pdf-box"></div>
+      </section>
+      <section id="telaTexto" class="col" hidden>
+        <div class="col-hd" id="hdTexto" hidden><span>Texto extraído</span></div>
+        <div id="corpo" class="folhas"></div>
+      </section>
+      <p id="aviso" class="aviso" hidden></p>
+    </main>
+
+    <footer class="rodape">
+      <span id="rodapeTxt"
+        >O texto acima foi extraído do PDF da peça. <b>Confira sempre no documento
+        original</b> antes de usar: a extração pode errar em digitalizações de
+        baixa qualidade, e assinaturas, carimbos e imagens não aparecem aqui.</span
+      >
+    </footer>
+
+    <script src="texto.js"></script>
+    <script src="minuta-md.js"></script>
+    <script src="texto-page.js"></script>
+  </body>
+</html>

@@ -56,6 +56,35 @@
           <button class="toggle-pw" id="togglePwO" type="button">mostrar</button>
         </div>
 
+        <!-- A Mistral não é provedor de chat: ela só extrai o texto de peças
+             DIGITALIZADAS. Peças com texto nativo são lidas no próprio
+             navegador, de graça e sem enviar nada a ninguém. -->
+        <label class="field" for="mistralApiKey">
+          Chave da API — Mistral (texto de peças digitalizadas)
+          <span class="kstate" id="kstateM">não configurada</span>
+          <span class="hint"
+            >Opcional. A extensão lê o texto de peças comuns dentro do seu próprio navegador,
+            sem custo. Esta chave só é usada quando a peça é uma <b>digitalização</b> (imagem),
+            e nesse caso o PDF dela é enviado à Mistral —
+            <a href="help.html#mistral" target="_blank" style="color:var(--pje-2);font-weight:600">passo a passo →</a></span
+          >
+        </label>
+        <div class="pw-row">
+          <input id="mistralApiKey" type="password" placeholder="..." autocomplete="off" />
+          <button class="toggle-pw" id="togglePwM" type="button">mostrar</button>
+        </div>
+
+        <label class="field" for="ocrModel">Qualidade da extração de peças digitalizadas</label>
+        <div class="row2">
+          <select id="ocrModel">
+            <option value="mistral-ocr-latest">Padrão — US$ 2 por 1.000 folhas</option>
+            <option value="mistral-ocr-4-0">Alta — US$ 4 por 1.000 folhas</option>
+          </select>
+          <span class="side-hint"
+            >A opção Alta lê melhor manuscritos, carimbos e tabelas complexas.</span
+          >
+        </div>
+
         <label class="field" for="model">Modelo</label>
         <select id="model">
           <optgroup label="Claude (Anthropic)">
@@ -119,9 +148,21 @@
             </span>
             <span class="arrow" aria-hidden="true">→</span>
           </a>
+          <a class="lib" href="texto.html" target="_blank">
+            <span class="ic" aria-hidden="true">⌁</span>
+            <span class="tx">
+              <b>Textos extraídos</b>
+              <i>O texto que a extensão leu das peças, guardado aqui por 7 dias — leia, copie ou apague.</i>
+            </span>
+            <span class="arrow" aria-hidden="true">→</span>
+          </a>
         </div>
         <p class="libs-nota">
-          As duas ficam <b>apenas neste computador</b> e não sincronizam entre dispositivos.
+          As três ficam <b>apenas neste computador</b> e não sincronizam entre dispositivos.
+        </p>
+        <p class="libs-nota">
+          <button id="limparTextos" class="ghost-mini" type="button">Apagar todos os textos extraídos</button>
+          <span id="limparTextosStatus" class="kstate"></span>
         </p>
         <p class="libs-nota">
           ✨ <a href="changelog.html" target="_blank" style="color: var(--pje-2); font-weight: 600"

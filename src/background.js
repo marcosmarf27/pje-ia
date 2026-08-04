@@ -23,6 +23,10 @@ import {
   uploadFileOpenAI,
   countTokensOpenAI,
 } from "./openai.js";
+// A Mistral não é provedor de chat — só converte peça digitalizada em texto.
+// Por isso fica FORA de providerDe()/chaveDe(): trocar o modelo do chat nunca
+// deve escolher um OCR.
+import { ocrMistral, MISTRAL_MODELS, MISTRAL_MODEL_PADRAO } from "./mistral.js";
 
 // Capacidades por modelo. Governam limites de páginas/contexto, as versões das
 // ferramentas web, a configuração de thinking/effort aceita por cada um e o
@@ -216,8 +220,34 @@ function custoUsdDe(usage, preco) {
     1e6
   );
 }
+// Quanto uma página de peça jurídica pesa já convertida em texto (~2.800 chars
+// ÷ 3,5 chars/token, as mesmas constantes que content.js usa na estimativa).
+const TOKENS_PAGINA_TEXTO = 800;
+// Preço do OCR por página, na tabela mais barata da Mistral. Serve só para o
+// veredito abaixo; o custo real cobrado sai de MISTRAL_MODELS.
+const OCR_USD_PAGINA = 0.002;
+
+// O OCR PAGO compensa financeiramente neste modelo?
+//
+// Derivado do preço, não escrito à mão em cada entrada, porque a resposta muda
+// por MODELO e não por provedor — `gpt-5.6-sol` economiza 40% e `gpt-5.6-luna`
+// fica 5× mais caro, sendo o mesmo provedor. E no Gemini a conta inverte de
+// vez: lá a página de PDF custa 258 tokens de tabela (com o texto nativo de
+// graça), menos do que os ~800 do mesmo conteúdo em texto — extrair AUMENTA o
+// custo. A UI usa isto para dizer a verdade do modelo ativo em vez de vender
+// economia que não existe.
+//
+// A extração LOCAL (pdf.js) é grátis e não passa por aqui: ela sempre vale.
+function ocrEconomiza(caps) {
+  const tokensPdf = caps.tokensPagina || 2000;
+  const preco = (caps.preco && caps.preco.in) || 0;
+  const economiaPorPagina = ((tokensPdf - TOKENS_PAGINA_TEXTO) * preco) / 1e6;
+  return economiaPorPagina > OCR_USD_PAGINA;
+}
+
 function capsDe(model) {
-  return MODEL_CAPS[model] || MODEL_CAPS["claude-haiku-4-5"];
+  const base = MODEL_CAPS[model] || MODEL_CAPS["claude-haiku-4-5"];
+  return Object.assign({}, base, { ocrEconomiza: ocrEconomiza(base) });
 }
 
 // Default: Haiku 4.5 — mais rápido e ~3× mais barato que o Sonnet 5; todas as
@@ -227,14 +257,16 @@ function capsDe(model) {
 function getCfg() {
   return new Promise((resolve) =>
     chrome.storage.local.get(
-      ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort"],
+      ["apiKey", "geminiApiKey", "openaiApiKey", "mistralApiKey", "model", "effort", "ocrModel"],
       (v) =>
         resolve({
           apiKey: v.apiKey,
           geminiApiKey: v.geminiApiKey,
           openaiApiKey: v.openaiApiKey,
+          mistralApiKey: v.mistralApiKey,
           model: v.model || "claude-haiku-4-5",
           effort: v.effort || "high",
+          ocrModel: MISTRAL_MODELS[v.ocrModel] ? v.ocrModel : MISTRAL_MODEL_PADRAO,
         })
     )
   );
@@ -287,11 +319,53 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "caps") {
     // model + effort vão junto: o painel mostra o que está ATIVO (o usuário
-    // não deveria precisar confiar às cegas no que salvou nas opções)
-    getCfg().then(({ model, effort }) =>
-      sendResponse({ model, effort, caps: capsDe(model) })
+    // não deveria precisar confiar às cegas no que salvou nas opções).
+    // `ocrPronto` diz se a chave da Mistral existe — é o que liga o NÍVEL 2 da
+    // extração na UI. Sem ela, a peça digitalizada simplesmente não oferece o
+    // botão (mesmo contrato do PLIB ausente escondendo "Prompts").
+    getCfg().then(({ model, effort, mistralApiKey }) =>
+      sendResponse({
+        model,
+        effort,
+        caps: capsDe(model),
+        ocrPronto: !!mistralApiKey,
+      })
     );
     return true; // resposta assíncrona
+  }
+
+  // OCR de UMA peça digitalizada (nível 2 da extração; o nível 1 é o pdf.js na
+  // página src/extrator.html e não passa pelo worker). Um request por peça: o
+  // content script orquestra a fila, e cada sendMessage reseta o timer de
+  // ociosidade do worker — mais o manterVivo abaixo, para a peça de 300 páginas
+  // que demora mais que os ~30 s do MV3.
+  if (msg.type === "ocr") {
+    (async () => {
+      const parar = manterVivo();
+      try {
+        const cfg = await getCfg();
+        if (!cfg.mistralApiKey) {
+          throw new Error(
+            "configure sua chave da API da Mistral nas opções da extensão para extrair o texto de peças digitalizadas"
+          );
+        }
+        const r = await ocrMistral({
+          apiKey: cfg.mistralApiKey,
+          model: cfg.ocrModel,
+          b64: msg.payload.b64,
+          paginas: msg.payload.paginas,
+        });
+        sendResponse(r);
+      } catch (e) {
+        sendResponse({
+          error: String((e && e.message) || e),
+          retryable: !!(e && e.retryable),
+        });
+      } finally {
+        parar();
+      }
+    })();
+    return true;
   }
 
   if (msg.type === "upload") {
@@ -402,6 +476,33 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // Vai por storage.session (some ao fechar o navegador, não polui o local) e
   // é o worker quem grava: a página é contexto confiável e lê direto, e o
   // content script não precisa de acesso à área session.
+  // PDF original para a comparação lado a lado na página de texto.
+  //
+  // Passa pelo WORKER pela mesma razão do mapa: `chrome.storage.session` só
+  // aceita escrita de contexto CONFIÁVEL, e content script não é um (o padrão é
+  // TRUSTED_CONTEXTS e o projeto não chama setAccessLevel). Do content, o `set`
+  // falharia calado e a comparação abriria sempre sem o documento.
+  //
+  // Chave ÚNICA e sobrescrita: um PDF por vez, sem poda a fazer e sem risco de
+  // encher os 10 MB da sessão com binários.
+  if (msg.type === "guardarPdfCmp") {
+    (async () => {
+      try {
+        await sessSet("cmp:pdf", {
+          chave: msg.payload.chave,
+          b64: msg.payload.b64,
+          ts: Date.now(),
+        });
+        sendResponse({ ok: true });
+      } catch (e) {
+        // Cota estourada é o caso esperado num PDF grande: não é erro fatal —
+        // a página de texto abre sem a coluna do documento e explica por quê.
+        sendResponse({ error: String((e && e.message) || e) });
+      }
+    })();
+    return true;
+  }
+
   if (msg.type === "guardarMapa") {
     (async () => {
       try {

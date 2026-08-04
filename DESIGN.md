@@ -105,9 +105,20 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 | Token | Valor | Uso |
 |---|---|---|
 | `--ok` | `#1f9d6b` | Sucesso, salvo |
+| `--ok-bg` | `#eaf5ee` | Fundo de confirmação suave (marca da peça em texto) |
 | `--warn` | `#dd8b2c` | Alerta, contexto quase cheio |
+| `--warn-bg` | `#fbf1dc` | Fundo de aviso suave |
+| `--warn-line` | `#eeddba` | Borda de aviso suave |
+| `--warn-ink` | `#8a5a12` | Texto sobre aviso suave |
 | `--erro` | `#a5301f` | Erro, exclusão armada |
 | `--erro-hd` | `rgba(220,80,80,0.85)` | Hover do ✕ no cabeçalho |
+
+> **Aviso suave × `.alertbar`.** O trio `--warn-*` veste o que **informa sem
+> impedir de continuar**: o relatório de peças que não baixaram, a nota de
+> download lento, o estado "voltar ao documento". A `.alertbar` é o contrário —
+> ela aparece quando algo **bloqueia** o envio (contexto cheio, troca de
+> provedor) e usa vermelho-tijolo, mais forte de propósito. Não trocar um pelo
+> outro: se tudo alerta com a mesma intensidade, nada alerta.
 
 ---
 
@@ -204,10 +215,116 @@ nome (`--fs-meta`, peso 500, truncado) + **id em `--ff-mono`**, `--fs-nano`, cor
 `--muted-3`. Rodapé com "Mostrando N de M" e o botão ↻ Carregar todas.
 
 A faixa abaixo da lista (`.docs-tip`) hospeda as ações que valem para a **lista
-inteira** — hoje `⟳ Carregar todas as peças` e `⬇ Baixar .zip`. Elas
-compartilham a MESMA regra de estilo (`.tip-load, .tip-zip`) de propósito: são
-pares, e regras separadas divergiriam com o tempo. Ação nova de escopo "lista
-toda" entra aqui, não na `.toolbar` — aquela linha já vive no limite em 484px.
+inteira** — hoje `⟳ Carregar todas as peças`, `⬇ Baixar .zip`, `⌁ Extrair texto`
+e `⬇ Texto (.zip)`. Elas compartilham a MESMA regra de estilo
+(`.tip-load, .tip-zip, .tip-zipt, .tip-txtx`) de propósito: são pares, e regras
+separadas divergiriam com o tempo. Ação nova de escopo "lista toda" entra aqui,
+não na `.toolbar` — aquela linha já vive no limite em 484px.
+
+Os rótulos dizem o CONTEÚDO, não o formato: `⬇ Documentos (.zip)` são os
+arquivos originais e `⬇ Texto (.zip)` é o texto extraído. Com "⬇ Baixar .zip" e
+"⬇ Texto (.zip)" lado a lado ninguém sabia se o primeiro também extraía.
+
+### Linha de status da seleção (`.extrai-bar`)
+
+Ocupa a linha inteira abaixo dos botões (`order: 5`) e é **um componente**, não
+um parágrafo solto com um botão órfão embaixo — foi assim que a faixa chegou a
+quebrar em quatro linhas em 460px. Estrutura: ícone · retrato da seleção ·
+botão de ação.
+
+```
+⌁  8 de 12 ainda em documento · ≈ US$ 0,28                   [⌁ Extrair 8]
+```
+
+**Duas versões no DOM** (`.eb-full`/`.eb-short`), como o medidor de contexto —
+mas pelo critério **inverso** ao dele. No `.expanded`/`.livre-wide` o painel é
+largo, porém a lista de peças vira uma **coluna de ~310px**, e a forma longa
+truncava exatamente no custo (`… · ≈ US…`). Custo cortado é pior que custo
+abreviado: é o número que decide se vale extrair.
+
+```
+expandido:   ⌁  8 em documento · US$ 0,28    [⌁ Extrair 8]
+```
+
+Três estados, e a distinção é semântica, não decorativa:
+
+| Estado | Quando | Veste |
+|---|---|---|
+| convite | só peças com texto próprio a extrair (grátis) | `--accent-bg` + `--line-strong` |
+| aviso (`.tem-ocr`) | há peça digitalizada — vai ser mal lida, e resolver custa | `--warn-bg` + `--warn-line` |
+| pronto (`.tudo-pronto`) | nada pendente; o botão some | `--surface-2` + `--line` |
+
+**Ela nunca some enquanto houver peça marcada.** A primeira versão calculava só
+sobre peças já baixadas, então marcar "todas" fazia a opção de extrair
+desaparecer — o oposto do esperado, e a maior fonte de confusão do recurso. Peça
+não baixada é candidata como qualquer outra; o tipo dela só se conhece depois, e
+isso vai no `title`, não na tela.
+
+O detalhamento (quantas por leitura local, quantas por OCR, quantas ainda não
+medidas, e o veredito de custo do modelo ativo) mora no `title`. Em 420px,
+mostrá-lo custaria a segunda linha que este desenho existe para eliminar.
+
+**Peça indisponível não é trabalho pendente.** A que devolve 404 no PJe, ou é
+digitalizada sem chave de OCR, sai da fila e aparece como `· 1 indisponível`.
+Contá-la como pendente fazia a faixa prometer para sempre algo que nunca ia
+acontecer — cada clique reproduzindo o mesmo erro.
+
+As ações **por peça** seguem outro padrão: `.d-ver` e `.d-extrai` dividem uma
+regra só, pela mesma razão. Duas exceções ao "só no hover", ambas por descoberta:
+o `.d-extrai` fica em `opacity: .4` nas rows **marcadas** (invisível até o hover,
+ninguém o descobria, e a extração parecia existir só em lote), e o `.d-emtexto`
+é **permanente** — é a única confirmação de que a extração daquela peça funcionou.
+
+### Marca da peça em texto (`.d-emtexto`)
+
+Verde `--ok` sobre `--ok-bg`, 18×16px, irmã de `.d-t` com `flex: none` (dentro
+dele roubaria a elipse do nome). É o **único** estado que vira marca permanente
+na lista, porque é o único que muda o que o modelo recebe.
+
+Ela chegou a ser removida — num processo com 43 de 44 peças extraídas, o mesmo
+glifo em toda linha vira o muro que a lista existe para evitar — e **voltou**:
+sem ela, terminar a extração de uma peça não mudava nada na tela. Muro honesto
+vence estado invisível. Não usa `--cat-*` (semântica de espécie) nem azul (cor
+de ação), e o itálico que a acompanhava saiu: repetia o sinal cobrando
+legibilidade de títulos que já são truncados.
+
+O par dela é o **desfazer**, com ícone próprio (`SVG.voltarDoc`) e no hover.
+Reusar o glifo de extrair fazia o botão parecer oferecer a mesma ação de novo —
+e um segundo ícone permanente na mesma linha seria ruído sobre estado resolvido.
+
+### Confirmação com saída segura (`.cb-alt`)
+
+`confirmarVisual` aceita uma **segunda ação**, subordinada à primária. Numa
+decisão em bloco sobre conjunto misto, "sim ou não" é escolha falsa: o que se
+quer quase sempre é *"faça na parte que não perde nada"*. A recomendada sobe
+para linha própria em largura total (`order: -1; flex-basis: 100%`) e a arriscada
+fica ao lado do Cancelar — três botões enfileirados em 292px não caberiam, e a
+opção certa não pode disputar espaço com a que destrói informação.
+
+### Relatório de operação longa no chat (`.extrai-rel`)
+
+Operação que leva minutos e pode custar dinheiro **não termina no `.status`**,
+que é transitório, nem no card de progresso, que some. Vai para o chat como
+`<details>`, irmão do `.falhas`: `--accent-bg` com barra `--ok` à esquerda
+quando deu tudo certo (é confirmação, não aviso), trocando para o trio
+`--warn-*` e abrindo sozinho quando alguma peça falhou. Presta contas **por
+via** — o que foi grátis, o que foi pago e quanto, o que já estava pronto e não
+precisou de nada.
+
+### Card de progresso: `baixando` ≠ `loading`
+
+`.prep-ic.baixando` (spinner cinza) e `.prep-ic.loading` (spinner azul) são
+etapas com custos MUITO diferentes: baixar do PJe leva ~5,6 s por peça, porque o
+servidor serializa; ler o texto localmente leva menos de meio segundo. Rotular a
+espera do tribunal como "extraindo" faz o usuário culpar a extração — foi
+exatamente o que aconteceu no primeiro teste real. Nenhum dos dois avança o
+contador: só `done` e `erro`.
+
+### Aviso dentro do card de progresso (`.prep-nota`)
+Nota em aviso suave abaixo da barra, usada quando o download passa de 12 s por
+peça. Aparece **durante** a espera, que é quando a informação vale: o gargalo
+real do produto é a entrega serializada do PJe, e sem isso a extensão parece
+travada quando na verdade está esperando o tribunal. Ver `#rede` no `help.html`.
 
 ### Estado vazio da conversa
 Eyebrow + título serifado centrado; grade de 3 cartões de passo (número em

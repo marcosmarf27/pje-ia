@@ -30,6 +30,7 @@ Content scripts injetados nesta ordem
 | Arquivo | Global | Papel |
 |---|---|---|
 | `src/pje.js` | `PJE` | Acesso ao PJe: lista peças da timeline (`#divTimeLine`), baixa cada uma pelo endpoint REST autenticado por cookie de sessão. |
+| `src/texto.js` | `TEXTOLIB` | Cache do TEXTO EXTRAÍDO das peças (`chrome.storage.local`, prefixo `texto:`) + o formato comum às duas fontes de extração (marcador `[fl. N]` e o mapa de offsets que devolve a folha nas citações). |
 | `src/prompts.js` | `PLIB` | Biblioteca de prompts do usuário: CRUD sobre `chrome.storage.sync` (um item por prompt, `plib:<id>`) + `aoMudar` para propagação entre abas/dispositivos. |
 | `src/panel.js` | `PjePanel` | Toda a UI (chat, seletor de peças, chips, popups `@` e `/`, card de progresso), isolada em **Shadow DOM**. CSS carregado de `src/panel.css` via `web_accessible_resources`. |
 | `src/content.js` | — | Orquestração: downloads com concorrência 3, cache por peça, montagem dos blocos da API, conversa multi-turno, streaming via `Port`. |
@@ -662,6 +663,224 @@ Code, num script, num arquivo de caso. Regras que não podem quebrar:
   (~1,33× os bytes) e é materializado em Uint8Array ao zipar. Estourar mata a aba
   sem dizer por quê; a mensagem manda exportar em levas marcando parte das peças.
 
+## Extração de texto das peças (pdf.js + Mistral OCR)
+
+Peça em PDF pode ir à IA como **texto** em vez do binário. **Dois níveis**, e o
+roteamento é o coração do recurso:
+
+```
+peça
+ ├─ HTML / RTF ............ já é texto, nada a fazer
+ └─ PDF
+     ├─ tem camada de texto? → pdf.js LOCAL · US$ 0 · nada sai do navegador
+     └─ digitalizada ......... Mistral OCR · US$ 0,002/pág · usuário confirma
+```
+
+**Por que isso existe.** Anthropic e OpenAI cobram a página de PDF como texto **+
+imagem** (~2.300 tok/pág; a comparação oficial da Anthropic é 3 páginas = ~7.000
+tokens com visão contra ~1.000 sem). O Gemini cobra **258 tokens de tabela** por
+página e não cobra o texto nativo — **ali extrair PIORA o custo em ~3×**. Por isso o
+veredito é **por MODELO, nunca por provedor**: `gpt-5.6-sol` economiza 40% e
+`gpt-5.6-luna` fica 5× mais caro, sendo o mesmo provedor. `ocrEconomiza(caps)` em
+`background.js` DERIVA isso do preço (não é campo escrito à mão) e o tooltip do botão
+diz a verdade do modelo ativo — inclusive quando ela é "aqui não compensa".
+
+O ganho maior nem é custo: peça extraída **não conta para `MODEL_CAPS.maxPages`**
+(`paginasDe` a ignora), então processo de 300 páginas passa a caber no Haiku, cujo
+teto é 100.
+
+Regras que não podem quebrar:
+
+- **É tudo ADITIVO.** A entrada do `docsCache` não muda de forma — só ganha `txt`,
+  `txtFolhas`, `txtUsar`, `txtFonte`, `txtChave`. Enquanto `txtUsar` for falso,
+  `montarBlocos`/`subirPecas`/`paginasDe`/preview/exportação enxergam o que sempre
+  enxergaram. Em `montarBlocos` a mudança é **um `if` antes** do ramo PDF; os três
+  ramos existentes não tiveram uma linha alterada, e isso é verificável no diff.
+- **`claude.js`/`gemini.js`/`openai.js` INTOCADOS**: o bloco emitido é o mesmo
+  `{type:"document", source:{type:"text"}}` que peças HTML/RTF já produzem desde
+  sempre, e que os três clientes já traduzem.
+- **A regra peça·id·folha sobrevive por DUAS camadas.** Com texto, a citação da
+  Anthropic vira `char_location`, sem página. (a) `TEXTOLIB.montar` insere
+  `[fl. N]` entre as folhas — resolve Gemini/OpenAI, que já citam textualmente;
+  (b) o mapa de offsets `[{p, ini, fim}]` volta a produzir a folha em
+  `infoCitacao`, por busca binária (`TEXTOLIB.folhaDoOffset`), reusando o id que o
+  `document_title` já carrega. **O mapa consultado é o do texto ENVIADO**
+  (`txtFolhasEnviadas`, gravado por `montarBlocos`): o corte é em **fronteira de
+  folha**, senão a citação viria com a folha errada — pior que sem folha.
+- **`src/extrator.html` é página OCULTA em iframe**, e é o único contexto onde o
+  pdf.js abre um `Worker` de verdade. No content script, 1,64 MB carregariam em toda
+  página `jus.br`; no service worker MV3 não há `new Worker` (rodaria na própria
+  thread) e o PDF só chegaria lá em base64. O ArrayBuffer vai **transferable**, cópia
+  zero. Silêncio do iframe (COEP) é tratado como falha: a peça segue como PDF.
+- **Ordem de leitura não é garantida** pelo `getTextContent()` — ele emite na ordem do
+  content stream. `textoDaPagina` reagrupa por geometria (y decrescente em bandas,
+  x crescente) e insere espaço nas lacunas de posicionamento (sem isso sai
+  "otextoficaassim"). **Não** passar `disableNormalization`: a normalização de
+  ligaduras é o que se quer.
+- **Poda do carimbo do PJe em DOIS critérios** (`podarRepetidas`): literal (pega
+  "Assinado eletronicamente por…") e por padrão numérico **exigindo densidade de
+  dígitos ≥15%** (pega "Num. 141516180 - Pág. 3"). Sem a densidade, "conteúdo da
+  folha 1/2/3…" colapsaria numa chave só e o texto REAL seria apagado.
+- **Classificação nativo × digitalizado é de graça** (`analisarPdf` em `pje.js`, na
+  mesma varredura latin1 de `contarPaginas`): `bytes/página > 80 KB` resolve a
+  maioria; refina com `/DCTDecode`, `/CCITTFaxDecode`, `/Subtype /Image` e `/Font`.
+  **`/Font` sozinho é positivo FRACO** — o carimbo de assinatura do PJe tem `/Font`
+  mesmo num PDF 100% escaneado. Errar para "nativo" é barato (o pdf.js devolve pouco
+  texto e a peça cai no OCR); errar para "escaneado" gastaria dinheiro à toa.
+- **Cache em `chrome.storage.local`** (`TEXTOLIB`, prefixo `texto:`), porque OCR
+  custa e `session` faria repagar. Chave `texto:<proc>:<peca>:<tamanho>` — o tamanho
+  invalida sozinho se a peça for substituída. Poda DUPLA: 7 dias e orçamento de ~6 MB
+  (o `local` tem ~10 e já hospeda `minuta:*` e `modelo:*`; estourar faria o `set`
+  falhar e derrubaria a gravação de uma minuta). **Religar peça já extraída não
+  repaga** — `extrairPeca` devolve do cache antes de chamar qualquer API.
+- **Peça já em `pecasNaConversa` não troca de forma**: o bloco antigo permanece nos
+  turnos passados, que a API remonta inteiros. "Nova conversa" resolve.
+- **Sem permissão nova** além de `host_permissions` para `api.mistral.ai`. Nada de
+  `unlimitedStorage` nem `offscreen` — mudariam o aviso de instalação.
+- **Só PDF entra no fluxo.** HTML e RTF do editor do PJe já SÃO texto: `onExtraivel`
+  devolve `null` neles, `extraiveis` os conta em `jaTexto` e o lote os marca `done`
+  sem erro. Oferecer extração numa peça que já é texto é ruído puro.
+- **A linha de status (`.extrai-bar`) conta a seleção INTEIRA, não o cache.** A
+  primeira versão só olhava peças já baixadas — marcar "todas" fazia a opção de
+  extrair sumir, o oposto do esperado, e foi a maior fonte de confusão no primeiro
+  teste real. Peça não baixada é candidata; o tipo dela só se sabe depois, e isso vai
+  no `title` (`naoMedidas`), não na tela. Ela escreve **duas versões no DOM**
+  (`.eb-full`/`.eb-short`, padrão do medidor `.g-*`) pelo critério **inverso** ao
+  dele: no `.expanded`/`.livre-wide` a lista de peças vira coluna de ~310px e a
+  frase longa truncava exatamente no custo — o número que decide se vale extrair.
+- **Trabalho pendente tem TRÊS estados, não dois** (`extracaoFalhou`, um Map
+  `id → motivo` em content.js): feito, a fazer e **impossível**. Sem o terceiro, a
+  peça que devolve 404 no PJe voltava a `pendentes` a cada recálculo e a faixa
+  prometia "⌁ Extrair 1" para sempre, cada clique repetindo o mesmo erro — foi o
+  defeito mais visível do segundo teste real. O registro governa só o LOTE: o botão
+  da própria peça segue disponível como **retentativa deliberada** (e o `title` diz
+  o motivo da falha anterior). Digitalizada sem chave de OCR conta em
+  `indisponiveis` pela mesma razão — some da soma faria a aritmética da faixa não
+  fechar.
+- **O painel recebe a LISTA de alvos, nunca reconta** (`setExtracaoAviso({ids})`).
+  Quando `content.js` contava e `panel.js` rederivava o alvo do clique por outro
+  caminho, as duas contas divergiam: o botão dizia "Extrair 44" e processava zero.
+  Uma fonte, uma verdade.
+- **O lote presta contas no CHAT** (`panel.mostrarRelatorioExtracao`), não no
+  `.status`. Uma operação que levou minutos e pode ter custado dinheiro não pode
+  terminar sem rastro — o card de progresso some. O relatório separa **por via**
+  (leitura local grátis × OCR pago, com o custo) e diz quantas **já eram texto e
+  não precisaram de nada**: era a pergunta "não sei se ele está lendo só os PDFs".
+  Peça sabidamente texto fica **fora do card de progresso** pelo mesmo motivo —
+  vê-la virar ✓ afirma um trabalho que não houve. Mesmo contrato do
+  `mostrarFalhasPecas`.
+- **Decisão sobre conjunto misto oferece a saída segura como ação PRIMÁRIA**
+  (`confirmarVisual` com o 5º parâmetro `alt`): "Extrair só as N sem imagem" na
+  frente, "Extrair todas" subordinada. Aplicar sim-ou-não em bloco foi o que
+  transformou documentos de identidade em texto ilegível — e o modelo perdeu a
+  imagem, que era todo o conteúdo deles. Peça ainda não baixada **não tem como ser
+  classificada** (o download acontece dentro do lote), então ali o diálogo só avisa
+  e dá a estimativa de espera; a rede de segurança é o desfazer.
+- **`baixando` ≠ `loading` no card de progresso.** Baixar do PJe leva ~5,6 s/peça e
+  ler o texto leva menos de meio segundo. Rotular a espera do tribunal como
+  "extraindo" faz o usuário culpar a extração — e foi o que aconteceu. O lote loga no
+  console quanto foi de cada etapa.
+- **O pdf.js é pré-aquecido** (`aquecerExtrator`, em `requestIdleCallback`) assim que
+  a extração vira possível. São 1,64 MB: criado só no primeiro clique, a PRIMEIRA
+  peça pagava o carregamento inteiro e a leitura parecia lenta sem ser.
+- UX: a palavra é **"extrair o texto"**, nunca "OCR" (nome de implementação; fica no
+  help). Os rótulos dos pacotes dizem o CONTEÚDO — `⬇ Documentos (.zip)` × `⬇ Texto
+  (.zip)` —, porque "Baixar .zip" ao lado de "Texto (.zip)" não deixava claro se o
+  primeiro extraía. Só um estado vira marca permanente na row: a peça que **já vai
+  como texto** (`.d-emtexto`, verde `--ok`/`--ok-bg`). Ela chegou a ser removida
+  (43 de 44 peças com o mesmo glifo vira muro) e **voltou**: sem ela, terminar a
+  extração de UMA peça não mudava nada na tela — não havia como saber se
+  funcionou, e o uso peça a peça, que é o principal, ficava sem confirmação
+  nenhuma. Muro honesto vence estado invisível. O botão de **desfazer tem ícone
+  próprio** (`SVG.voltarDoc`): reusar o glifo de extrair fazia o botão parecer
+  oferecer a mesma ação de novo. O `.d-extrai` fica levemente visível
+  (`opacity: .4`) nas rows **marcadas** — invisível até o hover, ninguém o
+  descobria e a extração parecia existir só em lote.
+- **O preview mostra o que o modelo vê, e é onde se desfaz.** As abas
+  Documento/Texto levam a marca `•` (`.pv-uso`) na versão que **vai para a IA** —
+  sem ela as duas parecem alternativas equivalentes. O botão "Voltar ao documento"
+  vive no rodapé do preview além do ícone da row: é olhando o texto que se
+  descobre que ele não presta (um RG digitalizado vira poucas linhas ilegíveis), e
+  a saída tem de estar na tela onde o problema aparece. "Refazer com OCR" mora no
+  mesmo rodapé, e só quando a leitura foi LOCAL e há chave: ninguém pede OCR antes
+  de ver que o texto grátis não serviu.
+- **UMA via na interface: o OCR do Mistral.** A escolha entre leitura local e OCR
+  chegou a estar espalhada em cinco lugares, e o sintoma foi o usuário perguntando
+  *"eu estou usando o Mistral ou não?"* diante de um botão escrito "Extrair".
+  **Ter de perguntar isso já é o defeito.** Com chave configurada o botão diz
+  `Extrair com OCR · ≈ US$ 0,28` e não há segunda opção; sem chave, o texto
+  explica que a leitura sai pelo navegador e só funciona em peça com texto
+  próprio. O `pdf.js` continua no código como caminho de quem não configurou a
+  chave — ali não há escolha a oferecer, só um jeito de conseguir o texto.
+  **Consequência no custo**: com chave, `extraiveis` soma as páginas de TODAS as
+  pendentes em `paginasOcr`, não só das digitalizadas — senão a faixa anunciaria
+  um preço menor do que o que vai ser cobrado.
+- **A caixa de confirmação MEDE a própria altura** (`confirmarVisual`). Ela usava
+  um `130` fixo para se afastar da borda inferior; com quatro linhas de texto a
+  caixa passava disso e os botões ficavam abaixo da tela — o usuário via a
+  pergunta e não via as respostas. E como o painel vive no rodapé da página, esse
+  era o caso COMUM. Agora mede o `getBoundingClientRect` depois de inserir, abre
+  ACIMA da âncora quando não cabe abaixo, e o CSS tem `max-height: calc(100vh -
+  16px)` como rede de segurança para janelas muito baixas.
+- **O selo de formato (`.d-fmt`: PDF/HTML/RTF) é o que torna a regra visível.**
+  Só PDF aceita extração, e dizer isso em prosa não resolve: o selo responde de
+  relance onde o OCR faz sentido. Aparece só depois do download (o formato vem do
+  content-type + assinatura no binário) e some quando a peça já vai como texto,
+  porque aí quem manda é a marca verde.
+- **Comparação lado a lado** (`src/texto.html?k=…&cmp=1`): PDF original à esquerda,
+  texto extraído à direita, cada coluna com rolagem própria. Texto extraído só é
+  confiável se der para bater contra o original, e conferir alternando de aba é o
+  mesmo que não conferir. O binário viaja **pelo worker** (`{type:"guardarPdfCmp"}`
+  → `chrome.storage.session`, chave única `cmp:pdf` sobrescrita): o content script
+  NÃO pode escrever na sessão — ela só aceita contexto confiável e o projeto não
+  chama `setAccessLevel` —, e do content o `set` falharia calado. Mesma razão pela
+  qual o mapa mental grava por RPC. Teto de 8 MB de base64 (a cota da sessão é
+  ~10 MB); acima disso a página abre só com o texto e explica.
+
+## Tolerância a falha de download (invariante do envio)
+
+Peça que falha ao baixar **não interrompe o turno**. O PJe devolve 404 em peças que
+existem na lista mas não têm download servível (atos ordinatórios de sistema anterior,
+por exemplo), e uma única dessas abortava a análise inteira: o usuário desmarcava,
+reenviava, e caía na seguinte.
+
+`baixarSelecionadas` devolve `{ok, falhas}` em vez de lançar; o envio segue com `ok` e
+**só as peças que realmente entraram** vão para `pecasNaConversa` (as que falharam
+continuam elegíveis na próxima tentativa). `montarBlocos` pula id sem cache por
+construção — um `TypeError` ali derrubaria o turno por causa de uma peça. Minuta e mapa
+seguem a mesma regra. Só quando **nenhuma** peça baixa é que o turno falha.
+
+O relatório vai para o CHAT (`panel.mostrarFalhasPecas`), não para o `.status`
+(transitório) nem para a `.alertbar` (que é para o que impede de continuar): a análise
+seguiu, e o usuário precisa poder ler com calma o que faltou e por quê.
+
+## Seleção em faixa na lista de peças (panel.js)
+
+Marcar 40 petições em sequência não pode custar 40 cliques. Três gestos, todos sobre os
+MESMOS checkboxes (fonte de verdade) e todos respeitando o **filtro ativo** (só rows
+visíveis, como o "todas" e o "principais"):
+
+- **arrastar** — marca/desmarca a faixa por onde o ponteiro passa. Exigiu
+  `user-select: none` na `.docrow`: sem isso o gesto pintava a lista de azul de
+  seleção de TEXTO e não marcava nada. Exceção: `.d-id` continua `user-select: text`
+  (o número da peça se copia para procurar no PJe) — **e a exceção reintroduziu o
+  bug**: o ponteiro cruzando os ids começava a selecionar texto e o arrasto morria.
+  A classe `.arrastando` no `.doclist` (posta no pointerdown, tirada no pointerup)
+  suspende o `user-select` de TODOS os descendentes durante o gesto; parado, o id
+  volta a ser copiável. A row de ORIGEM é marcada no primeiro `pointerover` de
+  outra row (`origemMarcada`): o `<label>` só a alterna quando o gesto vira clique,
+  então arrastar da peça 1 até a 5 marcava 2,3,4,5 e deixava de fora justamente
+  aquela onde o dedo começou.
+- **Shift+clique** — do último item tocado até este. `preventDefault` no
+  `pointerdown`, senão o `<label>` alternaria só a row clicada.
+- **botão direito** — menu com "daqui para baixo/cima", que resolve quando o outro
+  extremo está fora da tela.
+
+`ancoraSel` é zerada em `setDocs` e em `filtrarDocs`: os índices são posicionais e
+deixam de valer quando a lista muda. **`.selmenu` e `.confirmbox` são
+`position: fixed`** — o `.wrap` é um container de tamanho ZERO (quem tem dimensão é o
+`.panel`), então posicionar por dentro dele joga o elemento para fora da tela.
+
 ## Popup de menção `@` (panel.js)
 
 Detecção por regex do token `@busca` antes do caret (`findMentionToken`); busca ignora
@@ -952,7 +1171,28 @@ que não podem quebrar:
 
 ## Desenvolvimento e teste
 
-- Não há bundler. Valide sintaxe com `node --check src/*.js`. Testes de unidade fora do
+- **ARMADILHA DA ZONA MORTA TEMPORAL no `content.js`** (já derrubou o painel
+  inteiro uma vez): o arquivo é um IIFE gigante que REGISTRA callbacks no painel
+  centenas de linhas antes de declarar o estado que eles leem, e chama
+  `refresh()` no meio — que roda `panel.setDocs` → `aplicarExtracaoNasRows` →
+  `onExtraivel` de forma **síncrona**. Todo `const`/`let` do escopo do IIFE
+  declarado DEPOIS de `refresh()` e lido por um desses callbacks lança
+  `Cannot access before initialization` dentro do `setDocs`, que **aborta e leva
+  junto o resto do content.js** — sumiram a seleção em faixa e a extração de uma
+  vez, sem nenhum sintoma que apontasse para a causa. Estado lido por callback
+  vive no TOPO, junto do `const panel`. Duas defesas: `extraivelSeguro` no
+  painel (try/catch em volta do callback do content — a lista de peças não pode
+  morrer por um recurso acessório) e o lint do scratchpad, que lista os
+  candidatos e detecta a classe inteira.
+- Não há bundler. Valide sintaxe com `node --check src/*.js`.
+- **Testar o BOOT do content.js sem PJe** (o único teste que pega erro de ordem
+  de inicialização): HTML com `#divTimeLine` no DOM, stubs de `chrome`, `PJE`
+  (a superfície real é `listarDocumentos`, não `listar`), `TEXTOLIB`, `PLIB`,
+  `MLIB` (**precisa de `CATEGORIAS`**, que o `mount` itera), `ZipW` e
+  `PjeExport`; `eval` do `panel.js` e depois do `content.js`. Conferir por
+  COMPORTAMENTO que os handlers do fim do arquivo subiram — arrastar marca a
+  faixa, Shift+clique estende, botão direito abre o `.selmenu` —, porque um
+  `content.js` abortado no meio ainda monta o painel e lista as peças. Testes de unidade fora do
   navegador no scratchpad da sessão: `renderMd` (escape-first + citações) roda com
   `eval` do `panel.js`; o acumulador SSE de `claude.js` roda com `fetch` fake devolvendo
   um `ReadableStream` de eventos simulados (chat com citação, `pause_turn`);
@@ -1061,6 +1301,8 @@ expandido.
   (`gemini-3.6-flash`, `gemini-3.5-flash-lite` — GA na Interactions API), e a tabela
   `MODEL_CAPS` sincronizada com os docs (limites, versões de tools, thinking/effort).
 - Config no `chrome.storage.local`: `apiKey` (Anthropic), `geminiApiKey` (Google),
+  `mistralApiKey` + `ocrModel` (extração de peças digitalizadas — NÃO é provedor de chat,
+  fica fora de `providerDe`/`chaveDe`),
   `model`, `effort` (baixo/médio/alto — `output_config.effort` na Anthropic, omitido
   nos modelos sem suporte; `generation_config.thinking_level` no Gemini) e
   `customPrompt` (instruções personalizadas do usuário — persona/preferências,

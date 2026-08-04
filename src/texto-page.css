@@ -1,0 +1,215 @@
+/* Página "Texto extraído" — irmã de modelos-page.css e editor.css, mesma
+   direção "Word clean": conteúdo branco sobre canvas cinza neutro, sem textura
+   nem cor decorativa. A cor entra só onde carrega informação (folha, achado da
+   busca, aviso).
+
+   As variáveis de identidade (--pje, --pje-2, --line…) vêm de ui.css. */
+
+:root {
+  --canvas: #eceef1;
+  --canvas-2: #e3e6e9;
+  --linha: #d7dbdf;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas-2);
+  overflow: hidden;
+}
+[hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- cabeçalho */
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  background: linear-gradient(96deg, var(--hd-de) 0%, var(--hd-para) 100%);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(5, 32, 46, 0.25);
+  flex: none;
+  z-index: 3;
+}
+.topo img { border-radius: 7px; flex: none; }
+.topo .tit { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.topo .tit .t {
+  font-size: 16px; line-height: 1.2; color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topo .tit .s { font-size: 11px; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.2px; }
+.topo .acoes { display: flex; gap: 8px; flex: none; align-items: center; }
+
+button {
+  font: inherit; font-size: 13px; border-radius: 7px; padding: 7px 13px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.topo button {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff; font-weight: 600;
+}
+.topo button:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* busca e navegação por folha, no próprio cabeçalho: numa peça de 142 folhas
+   são as duas coisas que se usa o tempo todo */
+.busca-wrap {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 7px; padding: 5px 10px;
+}
+.busca-wrap > svg { color: rgba(255, 255, 255, 0.75); flex: none; }
+.busca-wrap input {
+  border: none; outline: none; background: transparent; color: #fff;
+  font: inherit; font-size: 13px; width: 168px;
+}
+.busca-wrap input::placeholder { color: rgba(255, 255, 255, 0.6); }
+.cnt { font-size: 11px; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
+
+.nav-fl {
+  display: flex; align-items: center; gap: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 7px; padding: 2px 4px;
+}
+.nav-fl button {
+  padding: 2px 8px; font-size: 16px; line-height: 1; border-radius: 5px;
+  background: transparent; border-color: transparent;
+}
+.fl-lab {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: rgba(255, 255, 255, 0.85);
+}
+.fl-lab input {
+  width: 44px; border: none; outline: none; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18); color: #fff;
+  font: inherit; font-size: 12px; text-align: center; padding: 2px 0;
+}
+
+/* -------------------------------------------------------------------- mesa */
+.mesa {
+  flex: 1; min-height: 0; overflow: auto;
+  background: var(--canvas); padding: 24px 18px 40px;
+}
+.col { width: 100%; max-width: 760px; margin: 0 auto; }
+
+/* --------------------------------------------------- comparação lado a lado */
+/* Ler o texto extraído sem o original ao lado é o mesmo que não conferir: a
+   alternância de aba custa o suficiente para ninguém fazer. Em modo comparação
+   a mesa vira duas colunas de altura fixa, cada uma com rolagem própria — a
+   página inteira NÃO rola, senão o PDF sairia da tela ao descer o texto. */
+body.comparando .mesa {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  overflow: hidden; padding: 14px 14px 14px;
+}
+body.comparando .col { max-width: none; margin: 0; min-width: 0; display: flex; flex-direction: column; }
+body.comparando #telaTexto { overflow: auto; }
+.col-hd {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2px 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted, #6b8494);
+}
+.col-hd button {
+  padding: 1px 7px; font-size: 13px; line-height: 1.2;
+  background: transparent; border-color: var(--linha); color: var(--muted, #6b8494);
+}
+.col-hd button:hover { background: #fff; color: var(--text, #123240); }
+.col-pdf { min-height: 0; }
+.pdf-box {
+  flex: 1; min-height: 0;
+  background: #fff; border: 1px solid var(--linha); border-radius: 8px; overflow: hidden;
+}
+/* Toolbar NATIVA do viewer do Chrome (zoom, páginas) — mesma decisão do preview
+   do painel: ela é melhor do que qualquer coisa que se reimplemente aqui. */
+.pdf-box embed { width: 100%; height: 100%; border: 0; display: block; }
+.pdf-miss {
+  padding: 22px 20px; color: var(--muted, #6b8494); font-size: 13.5px; line-height: 1.6;
+}
+.pdf-miss p { margin: 0 0 10px; }
+.pdf-miss b { color: var(--text, #123240); }
+/* Em tela estreita, empilhar seria pior que não comparar (nenhuma das duas
+   caberia). Abaixo de 900px a comparação volta a ser só o texto. */
+@media (max-width: 900px) {
+  body.comparando .mesa { grid-template-columns: 1fr; overflow: auto; }
+  body.comparando .col-pdf { height: 60vh; }
+}
+
+/* ------------------------------------------------------------------ folhas */
+/* Uma "folha" por página do PDF, com o número visível: é assim que o usuário
+   confere a citação "(Contestação, id 123456, fl. 7)" que o modelo escreveu. */
+.folha {
+  background: #fff; border: 1px solid var(--linha); border-radius: 8px;
+  padding: 20px 26px 22px; margin-bottom: 14px;
+}
+.folha h4 {
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 1px solid var(--line-2, #e8eff5);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted, #6b8494);
+}
+.folha-txt {
+  font-family: var(--ff-serif, Georgia, serif);
+  font-size: 15px; line-height: 1.62; color: var(--text, #123240);
+}
+.folha-txt p { margin: 0 0 0.85em; }
+.folha-txt h1, .folha-txt h2, .folha-txt h3 {
+  font-size: 16px; margin: 1.1em 0 0.5em; line-height: 1.3;
+}
+.folha-txt ul, .folha-txt ol { margin: 0 0 0.85em; padding-left: 1.5em; }
+.folha-txt table { border-collapse: collapse; width: 100%; margin: 0 0 0.85em; font-size: 13px; }
+.folha-txt th, .folha-txt td { border: 1px solid var(--linha); padding: 5px 8px; text-align: left; }
+.folha-txt code { font-family: var(--ff-mono, monospace); font-size: 0.9em; }
+.folha-txt .vazia { color: var(--muted, #6b8494); font-style: italic; }
+/* Destaque da busca. Amarelo puro (não o --warn-bg, que é fundo de aviso):
+   aqui a cor precisa saltar dentro de um parágrafo, não vestir um bloco. */
+.folha-txt mark { background: #ffe9a8; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* ------------------------------------------------------------------- lista */
+.lista { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  display: flex; flex-direction: column; gap: 3px;
+  background: #fff; border: 1px solid var(--linha); border-radius: 8px;
+  padding: 12px 15px; text-decoration: none; color: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+.item:hover { border-color: var(--pje, #12729f); background: #fbfdfe; }
+.item b { font-size: 14px; font-weight: 600; color: var(--text, #123240); }
+.item .meta { font-size: 11.5px; color: var(--muted, #6b8494); }
+
+.vazio {
+  background: #fff; border: 1px solid var(--linha); border-radius: 8px;
+  padding: 26px 24px; color: var(--muted, #6b8494); font-size: 14px; line-height: 1.6;
+}
+.vazio p { margin: 0 0 10px; }
+.vazio p:last-child { margin: 0; }
+.vazio b { color: var(--text, #123240); }
+
+.aviso {
+  max-width: 760px; margin: 0 auto;
+  background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-left: 3px solid var(--warn);
+  border-radius: 8px; padding: 14px 16px;
+  font-size: 13.5px; line-height: 1.55; color: var(--text, #123240);
+}
+
+/* ------------------------------------------------------------------ rodapé */
+/* A ressalva de que o texto é DERIVADO e pode errar tem de estar sempre à
+   vista: quem lê aqui está usando isto para trabalhar num processo. */
+.rodape {
+  flex: none; padding: 10px 18px;
+  background: #fff; border-top: 1px solid var(--linha);
+  font-size: 12px; line-height: 1.5; color: var(--muted, #6b8494);
+  text-align: center;
+}
+.rodape b { color: var(--text, #123240); }
+
+@media print {
+  .topo, .rodape { display: none; }
+  body, .mesa { background: #fff; overflow: visible; height: auto; }
+  .folha { border: none; page-break-inside: avoid; padding: 0 0 18px; }
+}

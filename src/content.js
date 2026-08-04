@@ -243,6 +243,39 @@
 
   const panel = PjePanel.mount();
 
+  // --- estado da extração, declarado NO TOPO de propósito --------------------
+  //
+  // O content.js REGISTRA callbacks no painel muito antes de declarar o estado
+  // que eles leem, e chama `refresh()` no meio do arquivo — que roda
+  // `panel.setDocs` → `aplicarExtracaoNasRows` → `onExtraivel` de forma
+  // SÍNCRONA. Qualquer `const`/`let` do escopo do IIFE declarado depois dessa
+  // chamada e lido por um desses callbacks cai na ZONA MORTA TEMPORAL e lança
+  // "Cannot access before initialization" DENTRO do setDocs — que aborta no
+  // meio e derruba o resto do content.js junto, levando embora a seleção em
+  // faixa, a extração e tudo que é registrado depois. Uma linha de posição
+  // errada apagou metade do painel.
+  //
+  // As outras três estavam seguras só por ACIDENTE (o `return` antecipado do
+  // `onExtraivel` no cache vazio as protegia). Subiram junto para a classe
+  // inteira do problema desaparecer — e o lint do scratchpad confere isso.
+  let ocrPronto = false; // chave da Mistral configurada
+  let extraindo = false; // guarda mútua com envio/exportação/timeline
+  let selecaoAtual = []; // projeção dos checkboxes (fonte de verdade segue lá)
+
+  // Peças que JÁ tentaram extrair e não deram — id -> motivo.
+  //
+  // Sem este registro a fila não tem dreno: o PJe devolve 404 em peças que
+  // existem na lista mas não têm download servível (ato ordinatório de sistema
+  // anterior é o caso clássico), `extraiveis` as recolocava em `pendentes` a
+  // cada recálculo, e a faixa prometia "⌁ Extrair 1" para sempre — cada clique
+  // reproduzindo o mesmo erro. Trabalho pendente tem TRÊS estados, não dois:
+  // feito, a fazer e impossível.
+  //
+  // O registro governa só o LOTE (a fila automática). O botão da própria peça
+  // continua disponível como retentativa deliberada: um clique naquela linha é
+  // o usuário dizendo "tente de novo", e um erro pode ter sido transitório.
+  const extracaoFalhou = new Map();
+
   // ---------------------------------------------------------------------------
   // Contexto órfão: quando a extensão é atualizada/recarregada em
   // chrome://extensions, o content script antigo continua vivo na aba, mas
@@ -333,6 +366,9 @@
         if (r && r.caps) {
           modelCaps = r.caps;
           modelInfo = { model: r.model, effort: r.effort };
+          // sem chave da Mistral, o nível 2 da extração (peça digitalizada)
+          // simplesmente não é oferecido — mesmo contrato do PLIB ausente
+          ocrPronto = !!r.ocrPronto;
           aplicarCapsNaUI();
         }
       });
@@ -401,10 +437,18 @@
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area === "local" && (ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.model))
       refreshKey();
-    // effort entra aqui por causa do selo do modelo (mostra o nível ativo)
+    // effort entra aqui por causa do selo do modelo (mostra o nível ativo);
+    // mistralApiKey/ocrModel porque o caps carrega o `ocrPronto` que liga o
+    // nível 2 da extração na UI, ao vivo (sem recarregar a aba do processo)
     if (
       area === "local" &&
-      (ch.model || ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.effort)
+      (ch.model ||
+        ch.apiKey ||
+        ch.geminiApiKey ||
+        ch.openaiApiKey ||
+        ch.mistralApiKey ||
+        ch.ocrModel ||
+        ch.effort)
     )
       refreshCaps();
     if (area === "local" && ch.customPrompt) {
@@ -446,7 +490,7 @@
     if (!PJE.scrollAte(id)) {
       panel.setStatus(
         'A peça "' + metaDe(id).titulo +
-          '" ainda não está na linha do tempo — use "⟳ Carregar todas as peças" (abaixo da lista) e tente de novo.'
+          '" ainda não está na linha do tempo — use "⟳ Carregar tudo" (abaixo da lista) e tente de novo.'
       );
     }
   });
@@ -591,8 +635,10 @@
         onEtapa: (id, estado) => panel.setPrepState(id, estado),
         // Mesmo caminho do envio: o que já está em cache não baixa de novo, e o
         // que baixar aqui fica disponível para a conversa (prefetch de graça).
+        // garantirBinario (não docsCache.has): a peça pode estar em cache SÓ com
+        // o texto extraído, e este pacote leva os arquivos ORIGINAIS.
         obter: async (id) => {
-          if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
+          await garantirBinario(id);
           return docsCache.get(id);
         },
       });
@@ -619,6 +665,262 @@
       panel.setZipOcupado(false);
     }
   });
+
+  // Pacote de TEXTO: as peças em forma de texto, para trabalhar os autos fora
+  // da extensão (num script, no Claude Code, num arquivo de caso). Reusa o
+  // MESMO PjeExport — ele é puro e só conhece `obter(id)`, então basta o obter
+  // devolver texto.
+  //
+  // Um pacote de texto inclui TODAS as peças em forma de texto, não só as que
+  // passaram por extração: peça HTML/RTF do editor do PJe JÁ é texto e não
+  // precisa de extração nenhuma. Um pacote que as ignorasse entregaria autos
+  // furados.
+  panel.onExportarTexto(async (docs, opcoes) => {
+    if (exportando || extraindo) return;
+    if (busy) {
+      panel.setStatus("Aguarde a resposta atual terminar para exportar o texto.");
+      return;
+    }
+    if (carregandoTimeline) {
+      panel.setStatus("Aguarde a leitura da lista de peças terminar para exportar.");
+      return;
+    }
+    if (typeof PjeExport === "undefined" || typeof ZipW === "undefined") {
+      panel.setStatus("Exportação indisponível: recarregue a página do processo.");
+      return;
+    }
+    exportando = true;
+    const sinal = { cancelado: false };
+    const todas = !!(opcoes && opcoes.todas);
+    panel.setZipTextoOcupado(true);
+    panel.startPrep(docs, {
+      titulo: "Reunindo o texto de " + docs.length + " peça(s)…",
+      fim: (total, feitas) =>
+        feitas === total
+          ? "Texto de " + total + " peça(s) exportado"
+          : "Texto exportado — " + feitas + " de " + total + " peça(s)",
+      onCancelar: () => {
+        sinal.cancelado = true;
+      },
+    });
+    try {
+      const r = await PjeExport.montarZip({
+        docs,
+        modo: "texto",
+        cnj: PJE.getNumeroProcesso(),
+        ficha: PJE.lerCabecalhoProcesso(),
+        origemLista: descreverOrigemLista(todas),
+        sinal,
+        onEtapa: (id, estado) => panel.setPrepState(id, estado),
+        obter: async (id) => {
+          await reidratarTextos([id]);
+          let d = docsCache.get(id);
+          // peça já extraída → o texto (e aqui NÃO baixamos o PDF: é justamente
+          // o caso em que ele não é necessário)
+          if (d && d.kind === "pdf" && d.txt) return { kind: "text", fmt: "md", text: d.txt };
+          // sem texto: o pacote leva o arquivo original, para não ter buraco —
+          // e aí o binário é obrigatório
+          d = await garantirBinario(id);
+          return d || null;
+        },
+      });
+      panel.endPrep();
+      baixarBlob(r.nome.replace(/\.zip$/, "-texto.zip"), r.blob);
+      panel.setStatus(
+        "Texto de " + r.resumo.ok + " peça(s) baixado" +
+          (r.resumo.falhas ? ". " + r.resumo.falhas + " peça(s) falharam (ver o indice.txt)." : ".")
+      );
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      panel.endPrep(true);
+      panel.setStatus(
+        msg === "cancelado" ? "Exportação cancelada." : "Não foi possível exportar: " + msg
+      );
+      if (msg !== "cancelado") console.warn("[PJe IA] exportar texto:", e);
+    } finally {
+      exportando = false;
+      panel.setZipTextoOcupado(false);
+    }
+  });
+
+  // --- gatilhos da extração de texto -----------------------------------------
+  // Consulta SÍNCRONA do painel (como o onPreview): pode esta peça virar
+  // texto, e o que se perde ao fazer isso? Roda a cada re-render das rows,
+  // então lê só do cache em memória — nunca baixa nada.
+  panel.onExtraivel((id) => {
+    const d = docsCache.get(id);
+    // Peça AINDA NÃO BAIXADA é candidata como qualquer outra — o tipo dela só
+    // se conhece depois do download, e é a própria extração que descobre.
+    // Devolver null aqui foi o que fez o botão dizer "Extrair 44" e não
+    // extrair nada: a contagem incluía as não baixadas e este filtro as
+    // removia. Os dois têm de enxergar a MESMA coisa.
+    // A peça que falhou sai da FILA automática, mas o botão dela continua: um
+    // clique naquela linha é o usuário dizendo "tente de novo", e o erro pode
+    // ter sido transitório. O motivo vai no rótulo para a tentativa ser
+    // informada, não às cegas.
+    const falhouAntes = extracaoFalhou.get(id) || null;
+    if (!d)
+      return { podeExtrair: true, imagens: 0, escaneado: false, naoMedida: true, falhouAntes };
+    if (d.kind !== "pdf" || d.txtUsar) return null;
+    // digitalizada sem chave de OCR: não há o que oferecer
+    if (d.escaneado && !d.txt && !ocrPronto) return null;
+    return {
+      podeExtrair: true,
+      // já extraída antes: religar é de graça, então nem confirmação faz
+      // sentido — o texto já existe e o usuário já decidiu uma vez
+      imagens: d.txt ? 0 : d.imagens || 0,
+      escaneado: !!d.escaneado,
+      falhouAntes,
+      // Com a chave da Mistral configurada o usuário pode FORÇAR o OCR nesta
+      // peça, em vez de aceitar a decisão automática (local primeiro, OCR só
+      // se o local falhar ou vier pobre). Sem isto o diálogo escolhia por ele
+      // e não havia como pedir o OCR de propósito numa peça específica.
+      ocrDisponivel: ocrPronto,
+      paginas: d.pages || 0,
+    };
+  });
+
+  // Uma peça. O painel já confirmou com o usuário quando a peça tem imagens
+  // (extrair apaga o canal visual: assinatura, carimbo, foto de laudo).
+  panel.onExtrair(async (id, opts) => {
+    const o = opts || {};
+    if (extraindo || busy || exportando || carregandoTimeline) {
+      panel.setStatus("Aguarde a operação atual terminar para extrair o texto.");
+      return;
+    }
+    if (pecasNaConversa.has(id)) {
+      panel.setStatus(
+        "Esta peça já está no contexto desta conversa — use “Nova conversa” para extrair o texto dela."
+      );
+      return;
+    }
+    extraindo = true;
+    // Clique deliberado nesta peça = retentativa: o registro da falha anterior
+    // sai antes de tentar, e só volta se falhar de novo.
+    extracaoFalhou.delete(id);
+    try {
+      // Duas etapas, dois status: baixar do PJe leva ~5,6 s por peça e a leitura
+      // local leva menos de meio segundo. Dizer "extraindo" durante o download
+      // faz o usuário culpar a extração por uma espera que é do tribunal.
+      const d0 = docsCache.get(id);
+      if (!d0 || d0.semBinario) {
+        panel.setStatus("Baixando a peça do PJe…", true);
+        await garantirBinario(id);
+      }
+      const d = docsCache.get(id);
+      // HTML e RTF do editor do PJe já SÃO texto — não há o que extrair.
+      if (d && d.kind !== "pdf") {
+        panel.setStatus("Esta peça já vai como texto — não precisa de extração.");
+        return;
+      }
+      panel.setStatus("Lendo o texto da peça…", true);
+      const r = await extrairPeca(id, o);
+      // A VIA vem primeiro na frase, e nomeada. "Texto extraído: 3 folhas
+      // (OCR)" deixava a pergunta que o usuário fez em aberto — o Mistral foi
+      // usado ou não? Agora a resposta é a primeira coisa que se lê, com o
+      // custo junto quando houve.
+      panel.setStatus(
+        r.fonte === "mistral"
+          ? "Lida por OCR (Mistral): " + r.paginas + " folha(s)" +
+            (r.custoUsd ? " · US$ " + (r.custoUsd < 0.01 ? "0,01" :
+              r.custoUsd.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2})) : "") + "."
+          : r.reaproveitado
+            ? "Texto já extraído antes desta peça — religado, sem novo custo. " +
+              r.paginas + " folha(s)."
+            : "Lida no seu navegador, sem custo: " + r.paginas + " folha(s)."
+      );
+      // texto pobre vindo do pdf.js: a peça é digitalizada com uma camada de
+      // OCR ruim do próprio scanner. Em vez de deixar o usuário descobrir
+      // sozinho, oferecemos o nível 2 sobre a MESMA peça.
+      if (r.pobre && r.fonte === "pdfjs" && ocrPronto) {
+        panel.setStatus(
+          "O texto desta peça saiu pobre — ela parece digitalizada. Extraia de novo com OCR para melhorar."
+        );
+      }
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      extracaoFalhou.set(id, msg);
+      panel.setStatus("Não foi possível extrair: " + msg);
+    } finally {
+      extraindo = false;
+      atualizarEstadoExtracao();
+      ultimaChaveEst = "";
+      if (modelCaps && selecaoAtual.length) mostrarEstimativaLocal(selecaoAtual);
+    }
+  });
+
+  // Lote sobre as peças marcadas.
+  panel.onExtrairLote((ids, opts) => extrairLote(ids, opts));
+
+  // Leitura longa numa aba própria: o popover serve para conferir uma folha,
+  // não 142. window.open no clique (gesto do usuário, não cai no bloqueador) e
+  // navegação de topo, imune à CSP do tribunal — mesmo caminho do mapa e do
+  // editor de minutas.
+  // `comparar` abre a página JÁ em modo comparação, com o PDF original ao lado
+  // do texto. O binário vive só na memória desta aba, então ele viaja por
+  // `chrome.storage.session` sob uma chave ÚNICA e sobrescrita — um por vez,
+  // sem acumular na cota. Acima de 8 MB não vale: a cota da sessão é ~10 MB e
+  // estourar faria o `set` falhar sem dizer por quê; a página abre só com o
+  // texto e explica.
+  const TETO_CMP_B64 = 8 * 1024 * 1024;
+  panel.onAbrirTexto((id, opts) => {
+    const d = docsCache.get(id);
+    if (!d || !d.txtChave) return;
+    const comparar = !!(opts && opts.comparar);
+    const url = () =>
+      chrome.runtime.getURL(
+        "src/texto.html?k=" + encodeURIComponent(d.txtChave) + (comparar ? "&cmp=1" : "")
+      );
+    if (!comparar || d.kind !== "pdf" || !d.b64 || d.b64.length > TETO_CMP_B64) {
+      window.open(url(), "_blank");
+      return;
+    }
+    // Via WORKER, não `chrome.storage.session` daqui: a sessão só aceita
+    // escrita de contexto CONFIÁVEL e content script não é um — o `set` falharia
+    // calado e a comparação abriria sempre sem o documento. Mesmo caminho do
+    // mapa mental.
+    //
+    // A aba abre DEPOIS da gravação: sem isso a página correria para ler uma
+    // chave que ainda não existe. É rápido (sem rede) e o gesto do usuário não
+    // expira nesse intervalo. Falha na gravação NÃO impede de abrir: a página
+    // mostra o texto e explica a ausência do original.
+    rpc({ type: "guardarPdfCmp", payload: { chave: d.txtChave, b64: d.b64 } })
+      .catch(() => {})
+      .then(() => window.open(url(), "_blank"));
+  });
+
+  // Voltar ao documento: um clique, porque o b64 original nunca saiu do cache.
+  // O registro persistente fica (extrair custou tempo ou dinheiro) — só o
+  // `usar` desliga, e re-ligar depois é instantâneo.
+  panel.onDesfazerExtracao(async (id) => {
+    const d = docsCache.get(id);
+    if (!d || !d.txtChave) return;
+    if (pecasNaConversa.has(id)) {
+      panel.setStatus(
+        "Esta peça já está no contexto como texto — use “Nova conversa” para voltar ao documento."
+      );
+      return;
+    }
+    d.txtUsar = false;
+    await new Promise((res) => TEXTOLIB.marcarUso(d.txtChave, false, res));
+    atualizarEstadoExtracao();
+    ultimaChaveEst = "";
+    if (modelCaps && selecaoAtual.length) mostrarEstimativaLocal(selecaoAtual);
+    panel.setStatus("Esta peça voltou a ir como documento.");
+  });
+
+  // Outra aba (a página de leitura src/texto.html) pode ligar/desligar o uso de
+  // um texto. Reidratamos e re-pintamos — sem RPC nova, como o MLIB faz entre a
+  // página de modelos e o painel.
+  if (typeof TEXTOLIB !== "undefined") {
+    TEXTOLIB.aoMudar(() => {
+      reidratarTextos().then(() => {
+        atualizarEstadoExtracao();
+        ultimaChaveEst = "";
+        if (modelCaps && selecaoAtual.length) mostrarEstimativaLocal(selecaoAtual);
+      });
+    });
+  }
 
   // De onde veio a lista que está sendo exportada — vai escrito no LEIA-ME e no
   // índice. "Pode estar incompleta" precisa ser dito COM o motivo; sem ele, a
@@ -661,8 +963,9 @@
   panel.onPreviewBaixar(async (id) => {
     if (busy) throw new Error("aguarde a resposta atual terminar para abrir a peça");
     if (exportando) throw new Error("aguarde a exportação terminar para abrir a peça");
-    if (!docsCache.has(id)) docsCache.set(id, await PJE.baixar(id));
-    return docsCache.get(id);
+    // garantirBinario (não docsCache.has): a peça pode estar em cache só com o
+    // texto extraído, e o preview em PDF precisa dos bytes.
+    return await garantirBinario(id);
   });
 
   let docsIndex = new Map(); // id -> {id, titulo} (para chips e card de progresso)
@@ -737,9 +1040,29 @@
 
   // Baixa as peças com concorrência limitada (3 por vez), com progresso por
   // peça no card de preparo (spinner -> check + barra de progresso).
+  //
+  // Peça que falha NÃO interrompe o turno. O PJe devolve 404 em peças que
+  // existem na lista mas não têm download servível (atos ordinatórios vindos de
+  // sistema anterior, por exemplo), e antes uma única dessas abortava a análise
+  // inteira: o usuário desmarcava, mandava de novo, e caía na seguinte. Agora o
+  // envio segue com o que deu certo e as falhas viram um relatório — quem quiser
+  // investigar tem a lista e o motivo de cada uma.
+  //
+  // Devolve {ok:[ids], falhas:[{id, titulo, erro}]}.
   async function baixarSelecionadas(ids) {
+    // Texto já extraído numa sessão anterior dispensa rebaixar o PDF: em rede
+    // lenta essa era a espera mais cara e mais inútil da extensão.
+    await reidratarTextos(ids);
     panel.startPrep(ids.map(metaDe));
     const queue = ids.slice();
+    const falhas = [];
+    // Ritmo do download. O gargalo real da extensão é este: o PJe serializa a
+    // entrega das peças, então a banda do usuário domina o tempo total. Quando
+    // fica ruim, a extensão PARECE travada — e o usuário não tem como saber que
+    // o problema é a rede dele. Medimos e dizemos.
+    const t0 = Date.now();
+    let baixadas = 0;
+    let avisouLento = false;
     async function worker() {
       while (queue.length) {
         const id = queue.shift();
@@ -747,15 +1070,44 @@
         if (!docsCache.has(id)) {
           try {
             docsCache.set(id, await PJE.baixar(id));
+            baixadas++;
+            // Throughput real (segundos por peça ENTREGUE), não o tempo de uma
+            // peça isolada: é o número que o usuário sente esperando.
+            const media = (Date.now() - t0) / 1000 / baixadas;
+            // A partir da 2ª peça (a 1ª carrega a latência de abrir a sessão) e
+            // com folga sobre os ~5,6 s normais de uma ativação JSF.
+            if (!avisouLento && baixadas >= 2 && media > SEGUNDOS_PECA_LENTO) {
+              avisouLento = true;
+              panel.setPrepNota(
+                "Download lento (~" +
+                  Math.round(media) +
+                  " s por peça). O gargalo costuma ser a rede: uma conexão por cabo " +
+                  "é bem mais estável que o Wi-Fi para baixar os autos."
+              );
+            }
           } catch (e) {
-            // identifica a peça pelo nome na mensagem de erro
-            throw new Error('"' + metaDe(id).titulo + '" — ' + (e && e.message ? e.message : e));
+            falhas.push({
+              id,
+              titulo: metaDe(id).titulo,
+              erro: (e && e.message ? e.message : String(e)).replace(/^falha ao baixar a peça \d+ ?/i, ""),
+            });
+            // `erro` também adianta o contador do card — sem isso a barra de um
+            // envio com falhas nunca chegaria ao fim (mesma regra da exportação)
+            panel.setPrepState(id, "erro");
+            continue;
           }
         }
         panel.setPrepState(id, "done");
       }
     }
     await Promise.all([worker(), worker(), worker()]);
+    const perdidas = new Set(falhas.map((f) => f.id));
+    const ok = ids.filter((id) => !perdidas.has(id));
+    // Peça recém-baixada pode já ter texto extraído numa sessão anterior (o
+    // cache é persistente): reidrata antes de montar os blocos, senão ela iria
+    // como PDF mesmo tendo texto pronto.
+    await reidratarTextos(ok);
+    return { ok, falhas };
   }
 
   // Sobe as peças PDF ainda sem file_id para a Files API (2 por vez). Falha de
@@ -767,8 +1119,13 @@
     const provAtual = (modelCaps && modelCaps.provider) || "anthropic";
     const pend = ids.filter((id) => {
       const d = docsCache.get(id);
+      // peça extraída viaja como texto: subir o PDF dela à Files API seria
+      // pagar upload de um arquivo que não vai entrar no request
       return (
-        d && d.kind === "pdf" && (!d.fileId || (d.fileProvider || "anthropic") !== provAtual)
+        d &&
+        d.kind === "pdf" &&
+        !d.txtUsar &&
+        (!d.fileId || (d.fileProvider || "anthropic") !== provAtual)
       );
     });
     if (!pend.length) return;
@@ -798,12 +1155,616 @@
     await Promise.all([w(), w()]);
   }
 
+  // ---------------------------------------------------------------------------
+  // EXTRAÇÃO DE TEXTO DAS PEÇAS — dois níveis
+  //
+  //   PDF nativo    → pdf.js na página oculta src/extrator.html · US$ 0 ·
+  //                   nada sai do navegador
+  //   PDF escaneado → OCR da Mistral pelo worker · pago por página ·
+  //                   o usuário confirma
+  //
+  // Tudo aqui é ADITIVO: a entrada do docsCache não muda de forma, só ganha
+  // campos (`txt`, `txtFolhas`, `txtUsar`, `txtFonte`). Enquanto `txtUsar` for
+  // falso, montarBlocos/subirPecas/paginasDe/preview/exportação enxergam
+  // exatamente o que enxergavam antes desta versão.
+  // ---------------------------------------------------------------------------
+  // Teto do bloco de peça EXTRAÍDA. Constante própria de propósito: o teto de
+  // 60.000 do ramo HTML/RTF em montarBlocos fica intocado (ver o comentário
+  // lá). 400 mil chars ≈ 114 mil tokens — um inquérito inteiro cabe, e acima
+  // disso a guarda de 90% da janela já barraria o envio de qualquer jeito.
+  const MAX_CHARS_TEXTO = 400000;
+  const EXTRACAO_CONCORRENCIA = 3;
+  // Acima disto o download está fora do normal e vale dizer ao usuário que o
+  // problema é a rede — a ativação JSF de uma peça leva ~5,6 s em condições boas.
+  const SEGUNDOS_PECA_LENTO = 12;
+  // (`ocrPronto`, `extraindo`, `selecaoAtual` e `extracaoFalhou` são declarados
+  // no TOPO do arquivo, junto do `panel` — ver o comentário lá. Aqui embaixo
+  // ficavam na zona morta temporal do primeiro `refresh()`.)
+
+  // --- iframe do extrator (pdf.js) -------------------------------------------
+  // Um único iframe por aba, criado sob demanda. Páginas em
+  // web_accessible_resources não são barradas pela CSP da página que as embute,
+  // mas o Cross-Origin-Embedder-Policy barraria — por isso o timeout: silêncio
+  // do iframe vira falha e a peça segue como PDF (contrato best-effort).
+  let extratorFrame = null;
+  let extratorPronto = null;
+  let extratorSeq = 0;
+  const extratorPend = new Map();
+
+  function garantirExtrator() {
+    if (extratorPronto) return extratorPronto;
+    extratorPronto = new Promise((resolve, reject) => {
+      const fr = document.createElement("iframe");
+      fr.src = chrome.runtime.getURL("src/extrator.html");
+      fr.setAttribute("aria-hidden", "true");
+      fr.setAttribute("tabindex", "-1");
+      fr.style.cssText =
+        "position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none";
+      const falhar = () => {
+        window.removeEventListener("message", aoPronto);
+        try {
+          fr.remove();
+        } catch {
+          /* já removido */
+        }
+        reject(new Error("a leitura local de PDF não pôde ser carregada nesta página"));
+      };
+      const t = setTimeout(falhar, 15000);
+      function aoPronto(ev) {
+        if (ev.source !== fr.contentWindow) return;
+        if (!ev.data || ev.data.__pjeia !== "extrator-pronto") return;
+        clearTimeout(t);
+        window.removeEventListener("message", aoPronto);
+        extratorFrame = fr;
+        resolve(fr);
+      }
+      window.addEventListener("message", aoPronto);
+      fr.addEventListener("error", () => {
+        clearTimeout(t);
+        falhar();
+      });
+      document.documentElement.appendChild(fr);
+    }).catch((e) => {
+      extratorPronto = null; // permite nova tentativa numa próxima peça
+      throw e;
+    });
+    return extratorPronto;
+  }
+
+  window.addEventListener("message", (ev) => {
+    const m = ev.data;
+    if (!m || m.__pjeia !== "extraido") return;
+    if (!extratorFrame || ev.source !== extratorFrame.contentWindow) return;
+    const pend = extratorPend.get(m.req);
+    if (!pend) return;
+    extratorPend.delete(m.req);
+    clearTimeout(pend.t);
+    if (m.erro) pend.reject(new Error(m.erro));
+    else pend.resolve(m);
+  });
+
+  function b64ParaBuffer(b64) {
+    const bin = atob(b64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8.buffer;
+  }
+
+  // Extração local. O ArrayBuffer vai TRANSFERIDO (cópia zero) — um inquérito
+  // de 140 páginas são dezenas de MB, e copiar isso a cada peça travaria a aba.
+  async function extrairLocal(d) {
+    const fr = await garantirExtrator();
+    const req = ++extratorSeq;
+    const buf = b64ParaBuffer(d.b64);
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        extratorPend.delete(req);
+        reject(new Error("a leitura local demorou demais"));
+      }, 180000);
+      extratorPend.set(req, { resolve, reject, t });
+      try {
+        fr.contentWindow.postMessage({ __pjeia: "extrair", req, buf }, "*", [buf]);
+      } catch (e) {
+        clearTimeout(t);
+        extratorPend.delete(req);
+        reject(e);
+      }
+    });
+  }
+
+  // Extração pelo OCR pago.
+  async function extrairOcr(d, id) {
+    const r = await rpc({
+      type: "ocr",
+      payload: { b64: d.b64, paginas: d.pages || 1 },
+    });
+    return { folhas: r.folhas, custoUsd: r.custoUsd || 0, modelo: r.modelo };
+  }
+
+  // Interface ÚNICA da extração. Decide a fonte, grava no cache persistente e
+  // devolve {fonte, paginas, chars, custoUsd} — ou lança com mensagem amigável.
+  //
+  // `forcarOcr` existe porque o nível 1 pode devolver texto pobre (digitalização
+  // com camada de OCR ruim do próprio scanner): aí a UI oferece o nível 2 sobre
+  // a MESMA peça, sem o usuário ter de descobrir sozinho o que aconteceu.
+  async function extrairPeca(id, opts) {
+    const o = opts || {};
+    const d = docsCache.get(id);
+    if (!d) throw new Error("peça ainda não carregada");
+    if (d.kind !== "pdf") throw new Error("esta peça já é texto");
+
+    // Já extraída antes (o cache é persistente e pode vir de outra sessão):
+    // religar é instantâneo e de graça. Sem esta guarda, "voltar ao documento"
+    // seguido de "extrair" pagaria o OCR uma segunda vez pela MESMA peça.
+    if (d.txt && d.txtChave && !o.forcarOcr) {
+      d.txtUsar = true;
+      await new Promise((res) => TEXTOLIB.marcarUso(d.txtChave, true, res));
+      return {
+        fonte: d.txtFonte,
+        paginas: d.txtPaginas || 0,
+        chars: d.txt.length,
+        custoUsd: 0,
+        reaproveitado: true,
+      };
+    }
+
+    // Daqui para baixo precisamos dos BYTES (o pdf.js e o OCR leem o binário).
+    // Peça reidratada de sessão anterior pode estar em cache só com o texto.
+    const bin = d.semBinario ? await garantirBinario(id) : d;
+
+    let folhas = null;
+    let fonte = null;
+    let custoUsd = 0;
+    let pobre = false;
+
+    // Nível 1: só faz sentido no PDF que tem camada de texto. Em digitalização
+    // pura o pdf.js devolveria zero e teríamos gasto tempo à toa.
+    if (!o.forcarOcr && !bin.escaneado) {
+      try {
+        const r = await extrairLocal(bin);
+        folhas = r.folhas;
+        fonte = "pdfjs";
+        pobre = !!r.pobre;
+      } catch (e) {
+        console.debug("[PJe IA] extração local da peça", id, "falhou:", e && e.message);
+      }
+    }
+
+    // Nível 2: peça digitalizada, ou o nível 1 falhou/devolveu texto pobre.
+    if (!folhas || pobre) {
+      if (!ocrPronto) {
+        if (folhas && !o.forcarOcr) {
+          // texto pobre mas é o que temos; melhor que nada, e o usuário vê
+          console.debug("[PJe IA] peça", id, "com texto pobre e sem chave de OCR");
+        } else {
+          throw new Error(
+            "esta peça é digitalizada — configure a chave da Mistral nas opções para extrair o texto dela"
+          );
+        }
+      } else if (!folhas || o.forcarOcr || o.aceitaOcr) {
+        const r = await extrairOcr(bin, id);
+        folhas = r.folhas;
+        fonte = "mistral";
+        custoUsd = r.custoUsd;
+      }
+    }
+    if (!folhas || !folhas.length) throw new Error("não foi possível extrair o texto desta peça");
+
+    const m = TEXTOLIB.montar(folhas);
+    if (!m.md.trim()) throw new Error("a extração não encontrou texto nesta peça");
+
+    const reg = {
+      chave: TEXTOLIB.chaveDe(PJE.getIdProcesso() || "proc", id, bin.size || 0),
+      proc: PJE.getIdProcesso() || "proc",
+      peca: id,
+      titulo: metaDe(id).titulo,
+      md: m.md,
+      folhas: m.folhas,
+      paginas: m.paginas,
+      fonte,
+      custoUsd,
+      usar: true,
+      em: Date.now(),
+    };
+    await new Promise((res) => TEXTOLIB.salvar(reg, res));
+    aplicarTextoNoCache(id, reg);
+    if (custoUsd) registrarCustoOcr(custoUsd);
+    return { fonte, paginas: m.paginas, chars: m.chars, custoUsd, pobre };
+  }
+
+  // Garante que a peça tem o BINÁRIO em memória.
+  //
+  // Peça reidratada de sessão anterior entra no cache só com o texto
+  // (`semBinario`) — de propósito, para não rebaixar o PDF à toa. Mas qualquer
+  // caminho que precise dos bytes (fallback base64, preview em PDF, exportação
+  // de documentos, uma nova extração) tem de baixá-la antes, e `docsCache.has()`
+  // sozinho responde "sim" para uma entrada que não tem `b64`.
+  async function garantirBinario(id) {
+    const d = docsCache.get(id);
+    if (d && !d.semBinario) return d;
+    const novo = await PJE.baixar(id);
+    // preserva o que já foi extraído (o registro persistente é a fonte)
+    if (d) {
+      novo.txt = d.txt;
+      novo.txtFolhas = d.txtFolhas;
+      novo.txtPaginas = d.txtPaginas;
+      novo.txtFonte = d.txtFonte;
+      novo.txtChave = d.txtChave;
+      novo.txtUsar = d.txtUsar;
+    }
+    docsCache.set(id, novo);
+    return novo;
+  }
+
+  // Espelha o registro persistente nos campos do docsCache — o caminho quente
+  // (montarBlocos, estimativa, preview) lê daqui, sem ir ao storage.
+  function aplicarTextoNoCache(id, reg) {
+    const d = docsCache.get(id);
+    if (!d || !reg) return;
+    d.txt = reg.md;
+    d.txtFolhas = reg.folhas;
+    d.txtPaginas = reg.paginas;
+    d.txtFonte = reg.fonte;
+    d.txtChave = reg.chave;
+    d.txtUsar = !!reg.usar;
+  }
+
+  // Reidrata o cache em memória a partir do que já foi extraído neste processo.
+  //
+  // O ponto crítico é o caso em que a peça AINDA NÃO foi baixada nesta sessão:
+  // o texto já está no disco, e obrigar a rebaixar o PDF só para "conferir o
+  // tamanho" seria pagar o pior custo da extensão (o download do PJe é
+  // serializado — ~5,6 s por peça em rede boa, muito mais em rede ruim) por uma
+  // verificação que não muda nada. Peça juntada aos autos não muda de conteúdo;
+  // e se mudar, a chave inclui o tamanho e a divergência é detectada assim que a
+  // peça for baixada por qualquer outro motivo.
+  //
+  // Então: com o binário em mãos, confere o tamanho; sem ele, entra uma entrada
+  // SÓ TEXTO (`semBinario`), que já basta para o envio, o medidor e a exportação.
+  function reidratarTextos(ids) {
+    return new Promise((resolve) => {
+      TEXTOLIB.doProcesso(PJE.getIdProcesso() || "proc", (map) => {
+        const alvo = ids || Object.keys(map);
+        for (const id of alvo) {
+          const reg = map[id];
+          if (!reg) continue;
+          const d = docsCache.get(id);
+          if (d) {
+            // o tamanho na chave invalida sozinho o texto de uma peça que tenha
+            // sido substituída nos autos
+            if (reg.chave === TEXTOLIB.chaveDe(reg.proc, id, d.size || 0)) {
+              aplicarTextoNoCache(id, reg);
+            }
+            continue;
+          }
+          if (!reg.usar) continue; // texto existe mas está desligado: nada a fazer
+          docsCache.set(id, { kind: "pdf", fmt: "pdf", semBinario: true, pages: reg.paginas || 0 });
+          aplicarTextoNoCache(id, reg);
+        }
+        resolve();
+      });
+    });
+  }
+
+  // Custo de OCR entra no MESMO acumulador dos tokens: o usuário vê um número
+  // só no rodapé, que é o que ele gastou.
+  function registrarCustoOcr(usd) {
+    custoConversaUsd += usd;
+    panel.setCusto({ conversaUsd: custoConversaUsd, ocrUsd: usd });
+  }
+
+  // Retrato da SELEÇÃO para a linha de status: quantas peças estão marcadas,
+  // quantas já vão como texto e quantas ainda podem ir.
+  //
+  // O ponto crítico é a peça AINDA NÃO BAIXADA. A versão anterior só olhava o
+  // que estava em cache, então marcar "todas" fazia a opção de extrair
+  // DESAPARECER — o oposto do esperado, e a origem da confusão. Uma peça não
+  // baixada é candidata como qualquer outra: o tipo dela (nativa ou
+  // digitalizada) só é conhecido depois do download, e é a própria extração que
+  // descobre isso. O que não dá é fingir que ela não existe.
+  function extraiveis(ids) {
+    const out = {
+      marcadas: ids.length,
+      jaTexto: 0, // já vão como texto (extraídas, ou HTML/RTF que já nascem assim)
+      pendentes: [], // PDF sem texto — o que o botão vai processar
+      locais: 0, // dessas, quantas sabemos que são nativas (grátis)
+      ocr: 0, // quantas sabemos que são digitalizadas (pagas)
+      naoMedidas: 0, // ainda não baixadas: o tipo só se sabe depois
+      indisponiveis: 0, // já tentaram e falharam — fora da fila (ver extracaoFalhou)
+      paginasOcr: 0,
+    };
+    for (const id of ids) {
+      const d = docsCache.get(id);
+      if (d && d.txtUsar && d.txt) {
+        out.jaTexto++;
+        continue;
+      }
+      if (d && d.kind === "text") {
+        out.jaTexto++; // peça do editor do PJe: já é texto, nada a fazer
+        continue;
+      }
+      // Fora da fila: insistir sozinho produziria o mesmo erro para sempre.
+      if (extracaoFalhou.has(id)) {
+        out.indisponiveis++;
+        continue;
+      }
+      if (!d) {
+        out.pendentes.push(id);
+        out.naoMedidas++;
+        continue;
+      }
+      if (d.kind !== "pdf") continue;
+      if (d.escaneado) {
+        // Sem chave de OCR não há o que fazer com uma digitalização — mas ela
+        // conta como INDISPONÍVEL, não some da soma: "1 de 54 ainda em
+        // documento" quando 54 = jaTexto + pendentes + nada seria aritmética
+        // que não fecha, e é o usuário quem paga para entender por quê.
+        if (!ocrPronto) {
+          out.indisponiveis++;
+          continue;
+        }
+        out.pendentes.push(id);
+        out.ocr++;
+        out.paginasOcr += d.pages || 1;
+      } else {
+        out.pendentes.push(id);
+        out.locais++;
+        // Com chave configurada, TODA peça pendente vai por OCR — a leitura
+        // local deixou de ser uma opção da interface. O custo precisa refletir
+        // isso, senão a faixa mostra só o preço das digitalizadas e o usuário
+        // paga um valor maior do que o anunciado.
+        if (ocrPronto) out.paginasOcr += d.pages || 1;
+      }
+    }
+    return out;
+  }
+
+  // Peça JÁ anexada ao histórico não pode trocar de forma no meio da conversa:
+  // o bloco antigo (PDF) permanece nos turnos passados, que a API remonta
+  // inteiros a cada request. Ficaria a mesma peça em duas formas no mesmo
+  // contexto — e as citações do turno anterior deixariam de casar. É a mesma
+  // razão pela qual trocar de provedor no meio é bloqueado.
+  function bloqueadaNaConversa(ids) {
+    return ids.filter((id) => pecasNaConversa.has(id));
+  }
+
+  // Extração em lote das peças informadas. Reusa o card de progresso cancelável
+  // da exportação — inclusive a regra de que o estado `erro` também adianta o
+  // contador, senão a barra de um lote com falhas nunca chegaria ao fim.
+  async function extrairLote(ids, opts) {
+    const o = opts || {};
+    if (extraindo) return;
+    if (busy) {
+      panel.setStatus("Aguarde a resposta atual terminar para extrair o texto.");
+      return;
+    }
+    if (exportando) {
+      panel.setStatus("Aguarde a exportação terminar para extrair o texto.");
+      return;
+    }
+    if (carregandoTimeline) {
+      panel.setStatus("Aguarde a leitura da lista de peças terminar para extrair o texto.");
+      return;
+    }
+    const jaNoContexto = bloqueadaNaConversa(ids);
+    let alvo = ids.filter((id) => !jaNoContexto.includes(id));
+
+    // Peça que a extensão JÁ SABE ser texto fica FORA do card de progresso.
+    // Ver o título dela sob "Extraindo o texto de 54 peças…" e depois virar ✓
+    // afirma que ela foi processada — quando não havia o que processar. Era daí
+    // que vinha "não fica claro se ele está lendo só os PDFs": o card listava
+    // todas, sem distinguir. O card mostra TRABALHO; o relatório final é que
+    // presta contas do conjunto inteiro.
+    const jaEramTexto = [];
+    alvo = alvo.filter((id) => {
+      const d = docsCache.get(id);
+      if (d && (d.kind === "text" || (d.txtUsar && d.txt))) {
+        jaEramTexto.push(id);
+        return false;
+      }
+      return true;
+    });
+
+    if (!alvo.length) {
+      panel.setStatus(
+        jaNoContexto.length
+          ? "Estas peças já estão no contexto desta conversa — use “Nova conversa” para extrair o texto delas."
+          : jaEramTexto.length
+            ? "Todas as peças marcadas já vão para a IA como texto."
+            : "Nenhuma peça para extrair."
+      );
+      return;
+    }
+    extraindo = true;
+    const sinal = { cancelado: false };
+    const itens = alvo.map((id) => ({ id, titulo: metaDe(id).titulo }));
+    panel.startPrep(itens, {
+      titulo: "Extraindo o texto de " + alvo.length + " peça(s)…",
+      fim: (total, feitas) =>
+        feitas === total
+          ? "Texto extraído de " + total + " peça(s)"
+          : "Texto extraído — " + feitas + " de " + total + " peça(s)",
+      onCancelar: () => {
+        sinal.cancelado = true;
+      },
+    });
+    const fila = alvo.slice();
+    let okN = 0;
+    let locaisN = 0; // lidas no navegador, sem custo
+    let ocrN = 0; // digitalizadas, lidas por OCR (pago)
+    let jaTextoN = jaEramTexto.length;
+    const falhas = [];
+    let custo = 0;
+    let tDown = 0;
+    let tExtrai = 0;
+    async function w() {
+      while (fila.length) {
+        if (sinal.cancelado) return;
+        const id = fila.shift();
+        try {
+          // DUAS etapas com custos MUITO diferentes: baixar do PJe leva ~5,6 s
+          // por peça (o servidor serializa) e a leitura local leva menos de meio
+          // segundo. Dizer "extraindo" enquanto se baixa faz o usuário culpar a
+          // extração por uma espera que é do tribunal.
+          if (!docsCache.has(id) || docsCache.get(id).semBinario) {
+            panel.setPrepState(id, "baixando");
+            const t = Date.now();
+            await garantirBinario(id);
+            tDown += Date.now() - t;
+          }
+          const d = docsCache.get(id);
+          // HTML e RTF do editor do PJe JÁ SÃO TEXTO — extrair não faz sentido
+          // e não é erro. Só PDF passa daqui.
+          if (!d || d.kind !== "pdf") {
+            jaTextoN++;
+            panel.setPrepState(id, "done");
+            continue;
+          }
+          panel.setPrepState(id, "loading");
+          const t2 = Date.now();
+          const r = await extrairPeca(id, o);
+          tExtrai += Date.now() - t2;
+          custo += r.custoUsd || 0;
+          okN++;
+          if (r.fonte === "mistral") ocrN++;
+          else locaisN++;
+          extracaoFalhou.delete(id);
+          panel.setPrepState(id, "done");
+        } catch (e) {
+          const msg = (e && e.message) || String(e);
+          // Registrado para sair da FILA: sem isto a faixa prometeria extrair
+          // esta peça para sempre, e cada clique repetiria o mesmo erro.
+          extracaoFalhou.set(id, msg);
+          falhas.push({ id, titulo: metaDe(id).titulo, erro: msg });
+          panel.setPrepState(id, "erro");
+          console.debug("[PJe IA] extração da peça", id, "falhou:", msg);
+        }
+      }
+    }
+    try {
+      const w1 = [];
+      for (let i = 0; i < EXTRACAO_CONCORRENCIA; i++) w1.push(w());
+      await Promise.all(w1);
+      // Diagnóstico no console: separa o que é espera do PJe do que é a leitura
+      // em si. Sem isto, "demorou" não tem como virar uma causa.
+      console.debug(
+        "[PJe IA] extração de", alvo.length, "peça(s):",
+        Math.round(tDown / 1000) + "s baixando,",
+        Math.round(tExtrai / 1000) + "s lendo"
+      );
+      // Conferido também DEPOIS do laço: cancelar durante a última peça
+      // escaparia da guarda do topo (mesma regra da exportação).
+      panel.endPrep(sinal.cancelado);
+      // Prestação de contas no CHAT, não no `.status`.
+      //
+      // O `.status` é transitório e some — e uma operação que levou minutos e
+      // pode ter custado dinheiro não pode terminar sem deixar rastro do que
+      // fez. Era esta a queixa "não fica claro quais foram as peças, nem se
+      // está lendo só os PDFs": o card de progresso sumia e restava um número.
+      // Mesmo contrato do relatório de falhas de download.
+      panel.mostrarRelatorioExtracao({
+        locais: locaisN,
+        ocr: ocrN,
+        jaTexto: jaTextoN,
+        falhas,
+        bloqueadas: jaNoContexto.length,
+        custoUsd: custo,
+        segDown: Math.round(tDown / 1000),
+        segLer: Math.round(tExtrai / 1000),
+        cancelado: sinal.cancelado,
+      });
+      if (sinal.cancelado) panel.setStatus("Extração cancelada.");
+    } finally {
+      extraindo = false;
+      atualizarEstadoExtracao();
+      // a forma das peças mudou: a última medição precisa não vale mais
+      ultimaChaveEst = "";
+      if (modelCaps && selecaoAtual.length) mostrarEstimativaLocal(selecaoAtual);
+    }
+    return { okN, erroN: falhas.length, custo };
+  }
+
+  // Estado da extração para o painel: o glifo por peça (só as que JÁ vão como
+  // texto — é o único estado que mudou o que o modelo recebe) e o aviso
+  // agregado sobre as peças MARCADAS.
+  //
+  // Agregar em vez de marcar peça a peça é deliberado: num inquérito com 50
+  // anexos digitalizados, um ícone por linha vira um muro. A faixa .docs-tip já
+  // é o lugar de "algo sobre a lista + o botão que resolve".
+  function atualizarEstadoExtracao() {
+    const estado = {};
+    for (const [id, d] of docsCache) {
+      if (!d) continue;
+      // O FORMATO entra para toda peça já baixada, extraída ou não: é ele que
+      // responde "onde o OCR faz sentido?" sem o usuário precisar tentar. Só
+      // PDF aceita extração — HTML e RTF do editor do PJe já SÃO texto.
+      // `fmt` guarda "html"/"rtf" no ramo de texto (ver lerCorpo em pje.js).
+      const formato =
+        d.kind === "pdf" ? "PDF" : d.fmt ? String(d.fmt).toUpperCase() : d.kind === "text" ? "TXT" : null;
+      if (!formato && !d.txt) continue;
+      estado[id] = {
+        formato,
+        usando: !!(d.txt && d.txtUsar),
+        fonte: d.txtFonte,
+        paginas: d.txtPaginas || 0,
+      };
+    }
+    panel.setExtracaoEstado(estado);
+    const e = extraiveis(selecaoAtual);
+    panel.setExtracaoAviso(
+      e.marcadas
+        ? {
+            marcadas: e.marcadas,
+            jaTexto: e.jaTexto,
+            // A LISTA, não só o número. O painel não pode rederivar o alvo do
+            // clique por outro caminho: quando ele recontava sozinho, o botão
+            // dizia "Extrair 44" e processava zero — as duas contas divergiam.
+            // Uma fonte, uma verdade.
+            ids: e.pendentes,
+            pendentes: e.pendentes.length,
+            locais: e.locais,
+            ocr: e.ocr,
+            naoMedidas: e.naoMedidas,
+            indisponiveis: e.indisponiveis,
+            // O custo só existe no nível 2 (OCR). O nível 1 (pdf.js) é grátis.
+            // Só contamos o que JÁ foi medido — peça não baixada ainda não tem
+            // tipo conhecido, e chutar o custo dela seria pior que omitir.
+            custoUsd: e.paginasOcr * 0.002,
+            // Diz a verdade do MODELO ATIVO: em gpt-5.6-luna e nos Gemini o OCR
+            // pago custa mais do que economiza; vender economia ali é mentira.
+            economiza: !!(modelCaps && modelCaps.ocrEconomiza),
+          }
+        : null
+    );
+    // Pré-aquece o pdf.js assim que a extração vira uma possibilidade real. Ele
+    // são 1,64 MB: criado só no primeiro clique, a PRIMEIRA peça pagava esse
+    // carregamento inteiro e a leitura parecia lenta sem ser.
+    if (e.pendentes.length) aquecerExtrator();
+  }
+
+  // Carrega o iframe do pdf.js em segundo plano, uma vez por aba. Falha aqui é
+  // silenciosa de propósito: se não der, a extração tenta de novo na hora.
+  let aquecido = false;
+  function aquecerExtrator() {
+    if (aquecido) return;
+    aquecido = true;
+    const ir = () =>
+      garantirExtrator().catch((e) =>
+        console.debug("[PJe IA] leitura local indisponível:", e && e.message)
+      );
+    if (typeof requestIdleCallback === "function") requestIdleCallback(ir, { timeout: 3000 });
+    else setTimeout(ir, 400);
+  }
+
   // Soma as páginas de PDF das peças informadas (sem lançar erro).
+  // Peça EXTRAÍDA não conta: ela viaja como texto, e o limite de páginas do
+  // modelo (MODEL_CAPS.maxPages) vale para PDF. É isto que faz um processo de
+  // 300 páginas caber no Haiku, cujo teto é 100.
   function paginasDe(ids) {
     let total = 0;
     for (const id of ids) {
       const d = docsCache.get(id);
-      if (d && d.kind === "pdf") total += d.pages || 1;
+      if (d && d.kind === "pdf" && !d.txtUsar) total += d.pages || 1;
     }
     return total;
   }
@@ -908,7 +1869,37 @@
     const provAtual = (modelCaps && modelCaps.provider) || "anthropic";
     for (const id of ids) {
       const d = docsCache.get(id);
-      if (d.kind === "pdf") {
+      // Peça sem conteúdo no cache (download falhou) é PULADA, nunca uma
+      // exceção: os chamadores já filtram, mas um TypeError aqui derrubaria o
+      // turno inteiro por causa de uma peça — exatamente o que a tolerância a
+      // falha de download existe para evitar. `semBinario` sem texto em uso cai
+      // no mesmo caso: não há nem bytes nem texto para enviar.
+      if (!d) continue;
+      if (d.semBinario && !(d.txtUsar && d.txt)) continue;
+      if (d.kind === "pdf" && d.txtUsar && d.txt) {
+        // Peça EXTRAÍDA: vai como documento de TEXTO — exatamente o mesmo
+        // formato de bloco que as peças HTML/RTF já usam desde sempre, e que os
+        // três clientes (claude.js, gemini.js, openai.js) já traduzem. Nenhum
+        // deles precisou mudar por causa da extração.
+        //
+        // O corte é em FRONTEIRA DE FOLHA e o mapa enviado é o do texto
+        // truncado: se o mapa apontasse para folhas que não foram no request, a
+        // citação voltaria com a folha errada — pior que sem folha nenhuma.
+        const c = TEXTOLIB.cortar(d.txt, d.txtFolhas, MAX_CHARS_TEXTO);
+        d.txtFolhasEnviadas = c.folhas;
+        if (c.cortou) {
+          console.debug(
+            "[PJe IA] peça", id, "truncada no envio:", c.folhasCortadas, "folha(s) fora"
+          );
+        }
+        blocks.push({
+          type: "document",
+          source: { type: "text", media_type: "text/plain", data: c.md },
+          title: metaDe(id).titulo,
+          citations: { enabled: true },
+          __pecaId: id,
+        });
+      } else if (d.kind === "pdf") {
         if (d.fileId && (d.fileProvider || "anthropic") === provAtual) {
           // caminho normal: referência por file_id (Files API) — payload mínimo
           blocks.push({
@@ -1161,8 +2152,32 @@
         id,
       };
     }
-    // char_location: sem página. O trecho citado é a única âncora disponível.
+    // char_location: a API não devolve página. Mas quando a peça foi EXTRAÍDA,
+    // nós sabemos onde cada folha começa e termina no texto que enviamos — e o
+    // offset do caractere volta a virar número de folha. É isto que mantém a
+    // regra peça·id·folha de pé com a peça em texto: sem isto, extrair custaria
+    // a rastreabilidade, que é justamente o que o usuário usa para reencontrar
+    // a peça na timeline.
+    //
+    // O mapa consultado é o do texto EFETIVAMENTE ENVIADO (txtFolhasEnviadas,
+    // gravado por montarBlocos), não o do texto completo.
     const trecho = String(c.cited_text || "").replace(/\s+/g, " ").trim();
+    const d = id ? docsCache.get(id) : null;
+    const folhas = d && (d.txtFolhasEnviadas || d.txtFolhas);
+    if (folhas && folhas.length && c.start_char_index != null) {
+      const pi = TEXTOLIB.folhaDoOffset(folhas, c.start_char_index);
+      const pf = TEXTOLIB.folhaDoOffset(
+        folhas,
+        Math.max(c.start_char_index, (c.end_char_index || c.start_char_index) - 1)
+      );
+      if (pi != null) {
+        return {
+          label: doc + (pf > pi ? ", fls. " + pi + "–" + pf : ", fl. " + pi),
+          id,
+          trecho: trecho.slice(0, 300) || undefined,
+        };
+      }
+    }
     return { label: doc, id, trecho: trecho.slice(0, 300) || undefined };
   }
   function tituloLimpo(t) {
@@ -1216,6 +2231,11 @@
       }
     }
     await Promise.all([w(), w(), w()]);
+    // texto já extraído em sessão anterior volta ao cache em memória: a
+    // estimativa deste refinamento passa a contar a peça como texto, que é o
+    // que ela vai ser no envio
+    await reidratarTextos(ids);
+    atualizarEstadoExtracao();
   }
 
   // ---------------------------------------------------------------------------
@@ -1247,10 +2267,16 @@
     for (const id of ids) {
       const d = docsCache.get(id);
       if (!d) continue; // ainda não baixada: entra quando o download chegar
-      t +=
-        d.kind === "pdf"
-          ? (d.pages || 1) * tokensPagina
-          : Math.ceil(Math.min(d.text.length, 60000) / CHARS_POR_TOKEN);
+      if (d.kind === "pdf" && d.txtUsar && d.txt) {
+        // extraída: conta como texto, não por página — é justamente o que o
+        // usuário quer ver cair no medidor ao extrair
+        t += Math.ceil(Math.min(d.txt.length, MAX_CHARS_TEXTO) / CHARS_POR_TOKEN);
+      } else {
+        t +=
+          d.kind === "pdf"
+            ? (d.pages || 1) * tokensPagina
+            : Math.ceil(Math.min(d.text.length, 60000) / CHARS_POR_TOKEN);
+      }
     }
     for (const turn of conversation) {
       if (typeof turn.content === "string") {
@@ -1307,6 +2333,11 @@
 
   panel.onSelectionChange((ids) => {
     clearTimeout(estTimer);
+    // Espelho da seleção para quem precisa dela fora deste handler (o aviso
+    // agregado de extração, a re-estimativa depois de um lote). Os checkboxes
+    // continuam sendo a ÚNICA fonte de verdade — isto é projeção, como os chips.
+    selecaoAtual = ids.slice();
+    atualizarEstadoExtracao();
     // Durante um turno o ENVIO é dono do medidor: refreshs da timeline do PJe
     // disparam syncSelection sem mudança real e sobrescreveriam a medição
     // oficial com uma estimativa local defasada.
@@ -1451,18 +2482,34 @@
     let assistantEl = null;
     let acc = "";
     let truncated = false;
+    // Peças que de fato entraram neste turno (o download pode falhar em
+    // algumas) e o relatório do que ficou de fora.
+    let anexadas = novas;
+    let falhasDownload = [];
 
     try {
       await garantirCaps(); // limites do modelo antes de qualquer validação
       let userContent;
       let paginas = 0;
       if (attach) {
-        await baixarSelecionadas(novas);
+        const r = await baixarSelecionadas(novas);
+        anexadas = r.ok;
+        falhasDownload = r.falhas;
+        // Todas falharam: aí não há análise possível. Uma OU OUTRA falhando não
+        // pode derrubar o turno — o usuário perde a pergunta que já digitou e
+        // tem de adivinhar qual peça remover.
+        if (!anexadas.length) {
+          throw new Error(
+            falhasDownload.length === 1
+              ? 'não foi possível baixar "' + falhasDownload[0].titulo + '" — ' + falhasDownload[0].erro
+              : "nenhuma das " + falhasDownload.length + " peças novas pôde ser baixada"
+          );
+        }
         // a guarda conta o que VAI no request: só as peças ativas (marcadas)
         paginas = guardaPaginas(selectedIds);
-        await subirPecas(novas);
+        await subirPecas(anexadas);
         stripOldCacheControl();
-        userContent = [...montarBlocos(novas), { type: "text", text }];
+        userContent = [...montarBlocos(anexadas), { type: "text", text }];
       } else {
         paginas = guardaPaginas(selectedIds);
         userContent = text;
@@ -1484,6 +2531,11 @@
       panel.setStatus("Estimando o tamanho do contexto…", true);
       const est = await estimarContexto(msgsEnvio, opts);
       if (attach) panel.endPrep(); // confirma "peças anexadas" após validar limites
+      // Relatório do que ficou de fora. Fica NO CHAT (não no .status, que é
+      // transitório): o usuário precisa poder ler com calma, ver o motivo de
+      // cada peça e tentar de novo depois — sem que a análise que ele pediu
+      // tenha sido perdida no caminho.
+      if (falhasDownload.length) panel.mostrarFalhasPecas(falhasDownload);
       let infoCtx = "";
       if (est) {
         infoCtx = " (~" + Math.round(est.tokens / 1000) + " mil tokens, " + est.pct + "% do contexto)";
@@ -1504,7 +2556,9 @@
       }
 
       conversation.push({ role: "user", content: userContent });
-      for (const id of novas) pecasNaConversa.add(id);
+      // só as que REALMENTE entraram: peça que falhou no download precisa
+      // continuar elegível na próxima tentativa
+      for (const id of anexadas) pecasNaConversa.add(id);
       if (!conversaProvider) {
         conversaProvider = (modelCaps && modelCaps.provider) || "anthropic";
       }
@@ -1673,7 +2727,7 @@
         // resposta vazia: não grava turno (evitaria content vazio no próximo request)
         panel.removeMessage(assistantEl);
         conversation.pop(); // remove o turno do usuário correspondente
-        for (const id of novas) pecasNaConversa.delete(id); // peças saem junto
+        for (const id of anexadas) pecasNaConversa.delete(id); // peças saem junto
         // conversa esvaziou: o rótulo de provedor cai junto (senão um turno
         // futuro em OUTRO provedor herdaria o rótulo velho e a guarda de
         // troca deixaria passar um histórico misto)
@@ -1696,7 +2750,7 @@
       if (conversation.length && conversation[conversation.length - 1].role === "user") {
         conversation.pop();
       }
-      for (const id of novas) pecasNaConversa.delete(id); // peças do turno desfeito
+      for (const id of anexadas) pecasNaConversa.delete(id); // peças do turno desfeito
       // conversa esvaziou: o rótulo de provedor cai junto (ver ramo acima)
       if (!conversation.length) conversaProvider = null;
     } finally {
@@ -1819,11 +2873,15 @@
     let ckptMinuta = ""; // texto na UI no início do request físico corrente
 
     try {
-      await baixarSelecionadas(selectedIds);
-      guardaPaginas(selectedIds);
-      await subirPecas(selectedIds);
-      const blocos = montarBlocos(selectedIds);
+      // Peça que falha no download não derruba a minuta: seguimos com o que
+      // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
+      const dl = await baixarSelecionadas(selectedIds);
+      if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      guardaPaginas(dl.ok);
+      await subirPecas(dl.ok);
+      const blocos = montarBlocos(dl.ok);
       panel.endPrep();
+      if (dl.falhas.length) panel.mostrarFalhasPecas(dl.falhas);
 
       panel.setStatus("Redigindo a minuta a partir das peças marcadas…", true);
       assistantEl = panel.addMessage("assistant", "");
@@ -2073,11 +3131,15 @@
     let ckptMapa = ""; // texto na UI no início do request físico corrente
 
     try {
-      await baixarSelecionadas(selectedIds);
-      guardaPaginas(selectedIds);
-      await subirPecas(selectedIds);
-      const blocos = montarBlocos(selectedIds);
+      // Peça que falha no download não derruba o mapa: seguimos com o que
+      // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
+      const dl = await baixarSelecionadas(selectedIds);
+      if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      guardaPaginas(dl.ok);
+      await subirPecas(dl.ok);
+      const blocos = montarBlocos(dl.ok);
       panel.endPrep();
+      if (dl.falhas.length) panel.mostrarFalhasPecas(dl.falhas);
 
       panel.setStatus("Montando o mapa mental a partir das peças marcadas…", true);
       assistantEl = panel.addMessage("assistant", "");
