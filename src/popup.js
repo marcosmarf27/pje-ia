@@ -226,6 +226,83 @@ chrome.storage.local.get(
   }
 );
 
+// ── Login com Google (SÓ identidade/perfil; não bloqueia nada) ──────────────
+// Os IDs existem no popup E nas opções (mesmo popup.js), mas guardo com `if`
+// por disciplina, como o resto dos elementos compartilhados. O fluxo OAuth roda
+// no worker (background.js: "googleLogin") — aqui só disparo, releio o storage e
+// pinto. Ver src/auth.js.
+const gauthOut = document.getElementById("gauthOut");
+const gauthIn = document.getElementById("gauthIn");
+const gLoginBtn = document.getElementById("gLogin");
+const gLogoutBtn = document.getElementById("gLogout");
+const gAvatar = document.getElementById("gAvatar");
+const gName = document.getElementById("gName");
+const gMail = document.getElementById("gMail");
+const gauthMsg = document.getElementById("gauthMsg");
+
+function pintarGoogle(user) {
+  if (!gauthOut || !gauthIn) return;
+  const logado = !!(user && user.email);
+  gauthOut.hidden = logado;
+  gauthIn.hidden = !logado;
+  if (!logado) return;
+  if (gName) gName.textContent = user.name || user.email;
+  if (gMail) gMail.textContent = user.email || "";
+  if (gAvatar) {
+    if (user.picture) {
+      gAvatar.src = user.picture;
+      gAvatar.hidden = false;
+      // Avatar remoto pode falhar (rede/CSP); some sem deixar imagem quebrada.
+      gAvatar.onerror = () => {
+        gAvatar.hidden = true;
+      };
+    } else {
+      gAvatar.hidden = true;
+    }
+  }
+}
+
+if (gLoginBtn) {
+  gLoginBtn.addEventListener("click", () => {
+    if (gauthMsg) gauthMsg.textContent = "";
+    gLoginBtn.disabled = true;
+    const rotulo = gLoginBtn.querySelector("span:last-child");
+    const textoAntes = rotulo ? rotulo.textContent : "";
+    if (rotulo) rotulo.textContent = "Abrindo…";
+    chrome.runtime.sendMessage({ type: "googleLogin" }, (r) => {
+      void chrome.runtime.lastError;
+      gLoginBtn.disabled = false;
+      if (rotulo) rotulo.textContent = textoAntes;
+      if (r && r.ok) {
+        pintarGoogle(r.user);
+      } else if (gauthMsg) {
+        gauthMsg.textContent = (r && r.erro) || "não foi possível entrar.";
+      }
+    });
+  });
+}
+
+if (gLogoutBtn) {
+  gLogoutBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "googleLogout" }, (r) => {
+      void chrome.runtime.lastError;
+      void r;
+      pintarGoogle(null);
+    });
+  });
+}
+
+chrome.storage.local.get("googleUser", (v) => pintarGoogle(v && v.googleUser));
+
+// Mantém as duas telas em sincronia (login no popup reflete nas opções e
+// vice-versa) sem colidir com os outros onChanged: filtra a chave googleUser.
+if (chrome.storage.onChanged && chrome.storage.onChanged.addListener) {
+  chrome.storage.onChanged.addListener((mudancas, area) => {
+    if (area !== "local" || !mudancas.googleUser) return;
+    pintarGoogle(mudancas.googleUser.newValue);
+  });
+}
+
 function ligarToggle(btn, input) {
   if (!btn || !input) return;
   btn.addEventListener("click", () => {

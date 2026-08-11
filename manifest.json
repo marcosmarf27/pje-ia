@@ -3,7 +3,7 @@
   "name": "TecJustiça PJe — Análise de Processos",
   "version": "0.33.0",
   "description": "Chat com IA (Claude, Gemini ou GPT) sobre os autos do PJe de qualquer tribunal: selecione peças e converse. Por TecJustiça.",
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": ["storage", "clipboardWrite", "identity"],
   "host_permissions": [
     "https://*.jus.br/*",
     "https://api.anthropic.com/*",

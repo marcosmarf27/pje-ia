@@ -36,6 +36,7 @@ import {
   podarCasos,
   podarAgressivo,
 } from "./casodb.js";
+import { loginGoogle, logoutGoogle } from "./auth.js";
 
 // Capacidades por modelo. Governam limites de páginas/contexto, as versões das
 // ferramentas web, a configuração de thinking/effort aceita por cada um e o
@@ -335,6 +336,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "openOptions") {
     chrome.runtime.openOptionsPage();
     return;
+  }
+
+  // Login com Google — SÓ perfil (nome/e-mail/avatar), nada é bloqueado. O
+  // fluxo (launchWebAuthFlow) roda AQUI, no worker, e não no popup: abrir a
+  // janela de conta do Google tira o foco e FECHA o popup, o que abandonaria a
+  // promessa se ela vivesse lá. O worker sobrevive à chamada e responde ao
+  // popup/opções, que então relê o storage. Ver src/auth.js.
+  if (msg.type === "googleLogin") {
+    loginGoogle()
+      .then((user) => sendResponse({ ok: true, user }))
+      .catch((e) => sendResponse({ ok: false, erro: String((e && e.message) || e) }));
+    return true; // resposta assíncrona
+  }
+  if (msg.type === "googleLogout") {
+    logoutGoogle()
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: true }));
+    return true; // resposta assíncrona
   }
 
   // Valida a chave SEM custo: cada provedor tem um endpoint de LISTAGEM DE

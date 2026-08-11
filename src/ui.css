@@ -173,6 +173,52 @@ body {
 .status-chip.warn { background: var(--warn-bg); color: var(--warn); }
 .status-chip.warn .dot { background: var(--warn); }
 
+/* Login com Google — cartão de identidade/perfil (não bloqueia nada). */
+.gauth { margin-bottom: 14px; }
+.gbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  background: #fff;
+  color: #3c4043;
+  border: 1px solid var(--line-input);
+  border-radius: var(--r-ctrl);
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.gbtn:hover { background: var(--surface-2); border-color: var(--line-strong); box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12); }
+.gbtn:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
+.gbtn-ic { display: inline-flex; line-height: 0; }
+.gauth-msg { display: block; margin-top: 7px; font-size: var(--fs-meta); color: var(--erro); }
+.gauth-in {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  background: var(--surface-card);
+  border: 1px solid var(--line-card);
+  border-radius: var(--r-box);
+}
+.gauth-av { width: 34px; height: 34px; border-radius: 50%; flex: none; object-fit: cover; background: var(--line-2); }
+.gauth-id { min-width: 0; flex: 1; }
+.gauth-name { font-size: var(--fs-ui); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gauth-mail { font-size: var(--fs-micro); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gauth-sair {
+  flex: none;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--line-input);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  cursor: pointer;
+}
+.gauth-sair:hover { background: var(--surface-2); border-color: var(--line-strong); }
+
 label.field { display: block; margin: 14px 0 6px; font-weight: 600; font-size: var(--fs-ui); }
 label.field .hint { display: block; font-weight: 400; font-size: var(--fs-meta); color: var(--muted); margin-top: 2px; }
 
