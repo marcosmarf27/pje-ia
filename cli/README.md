@@ -99,6 +99,27 @@ O comando só declara sucesso quando (a) existe cookie do Keycloak — o
 depois**. Sem essas três, ele anunciaria um login pela metade e a falha só
 apareceria no comando seguinte, sem ligação aparente com o login.
 
+**MEDIDO EM 20/08/2026, Ubuntu 24.04 sob WSLg:** login concluído e 207 peças
+baixadas em seguida. Ou seja, **funciona no WSL** — basta haver um Chrome do
+**Linux** instalado; o WSLg (padrão no Windows 11) fornece o servidor gráfico.
+Esta documentação já afirmou o contrário, a partir de uma suposição sobre WSL2
+sem interface, nunca executada.
+
+**E `Storage.getCookies` pendurou nesse ambiente** — não deu erro, simplesmente
+não respondeu, enquanto `Target.getTargets` respondia na mesma conexão; o mesmo
+Chrome no Windows responde na hora. Por isso a leitura tem **duas rotas**: se a
+primeira não responde em 6 s, o CLI anexa a uma aba e usa
+`Network.getAllCookies`, que apesar do nome devolve o pote do navegador inteiro.
+Outro domínio do protocolo, outro alvo, outro modo de falha — a mesma regra que
+o `pje-http.mjs` aplica às rotas do PJe.
+
+**E, acima de tudo: nenhuma chamada isolada encerra a espera.** A versão
+anterior deixava `colherCookies` sem `try` dentro de um `finally` que só fechava
+o CDP — e `finally` não engole exceção. Um comando que anuncia esperar dez
+minutos morria aos 12 segundos, antes de o usuário digitar o CPF. Hoje a falha
+de uma volta só faz a seguinte tentar de novo, que é literalmente o que o laço
+existe para fazer.
+
 ### Onde ficam os arquivos
 
 Em `%LOCALAPPDATA%\tecjustica-pje\` (Windows) ou `~/.tecjustica-pje/` (Unix)

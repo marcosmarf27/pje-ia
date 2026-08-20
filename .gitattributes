@@ -1,26 +1,19 @@
-# Fim de linha, e por que isto nao e detalhe.
+# ESTREITO DE PROPOSITO: so o que precisa de garantia, e nada mais.
 #
-# O repositorio e trabalhado no Windows com `core.autocrlf=true`, entao o
-# checkout converte para CRLF. Num `.sh` isso e FATAL fora do Windows: o shell
-# le o `\r` como parte do interpretador e responde `bad interpreter: /bin/sh^M`.
-#
-# O modo de falha e ASSIMETRICO, que e o pior tipo: quem instala por
-# `curl ... | sh` nao percebe (o GitHub serve o blob como armazenado, em LF);
-# quem CLONA no Windows e roda do WSL leva o erro. Isto e, quebra so para quem
-# desenvolve — e a mensagem nao aponta para o fim de linha.
+# Uma versao anterior declarava tambem `*.js text`, `*.css text`, `*.html text`.
+# Hoje isso e no-op (com core.autocrlf esses arquivos ja vao ao repositorio em
+# LF), mas passa a governar como o git normaliza TODA a extensao — superficie
+# nova exatamente onde a regra do projeto e nao mexer. Um `git add` futuro sob
+# outra configuracao poderia reescrever src/ inteiro num diff gigante. O ganho
+# era organizacao; o risco, a extensao. Fica de fora.
+
+# O UNICO caso com falha real, e ela e ASSIMETRICA:
+# com `core.autocrlf` e sem esta linha, quem CLONA no Windows recebe o
+# `instalar.sh` em CRLF e leva `bad interpreter: /bin/sh^M` ao roda-lo no WSL.
+# Quem instala por `curl ... | sh` nao ve nada (o GitHub serve o blob como
+# armazenado, em LF). Isto e: quebra so para quem desenvolve, e a mensagem nao
+# aponta para o fim de linha.
 *.sh text eol=lf
-
-# PowerShell: CRLF. Nao e simetria — o `instalar.ps1` documenta que here-strings
-# quebram com LF, e ainda que ele proprio as evite, um `.ps1` futuro nao evitara.
-*.ps1 text eol=crlf
-
-# Fontes e docs: LF no repositorio, o checkout decide o resto.
-*.js   text
-*.mjs  text
-*.json text
-*.md   text
-*.css  text
-*.html text
 
 # Binarios: nunca normalizar (um `\n` trocado corrompe o arquivo em silencio).
 *.png  binary

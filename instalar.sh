@@ -24,12 +24,23 @@
 #
 #   1. `pje login --sessao-atual` FUNCIONA aqui. Ele lê a área de transferência
 #      do WINDOWS pelo `powershell.exe`, que é alcançável de dentro do WSL — e é
-#      lá que está o navegador de onde saiu o "Copy as cURL". Este é o caminho
-#      recomendado no WSL, e não um plano B.
+#      lá que está o navegador de onde saiu o "Copy as cURL". Continua sendo o
+#      caminho recomendado, por não criar uma SEGUNDA sessão do PJe — e não por
+#      o outro estar indisponível.
 #
-#   2. `pje login` SEM opção não funciona: ele pilota um Chrome, e dentro do WSL
-#      não há navegador gráfico (a busca cobre `/usr/bin/google-chrome` e
-#      similares, nunca o `.exe` do lado Windows).
+#   2. `pje login` SEM opção TAMBÉM funciona — se houver um Chrome do LINUX
+#      instalado. MEDIDO EM 20/08/2026, Ubuntu 24.04 sob WSLg: login concluído
+#      e 207 peças baixadas. O WSLg (padrão no Windows 11) dá o servidor
+#      gráfico, e o `/usr/bin/google-chrome` é encontrado normalmente.
+#
+#      Esta nota já afirmou o CONTRÁRIO ("no WSL não há navegador gráfico"), a
+#      partir de uma suposição sobre WSL2 pelado, nunca executada. Ficou aqui
+#      como lembrete: afirmação sobre ambiente não testado é pior que silêncio,
+#      porque manda o leitor por um caminho pior sem ele saber que há outro.
+#
+#      O que NÃO funciona é apontar para o `.exe` do lado Windows: a busca cobre
+#      `/usr/bin/google-chrome` e similares, e um Chrome do Windows abriria a
+#      porta de depuração noutro espaço de rede.
 #
 # E o que mais confunde: a sessão do Windows e a do WSL são ARQUIVOS DIFERENTES.
 # No Windows ela vai para `%LOCALAPPDATA%\tecjustica-pje`; no WSL, para
@@ -134,7 +145,7 @@ Pronto.
 
   1. pje login --sessao-atual
      (com o PJe aberto e logado no seu navegador; ele guia o passo manual.
-      No WSL este e o caminho: ele le a area de transferencia do Windows)
+      No WSL ele le a area de transferencia do Windows)
 
      Se voce NAO estiver logado no PJe e tiver navegador grafico:
        pje login https://pje.SEUTRIBUNAL.jus.br/pje1grau
