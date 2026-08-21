@@ -13,7 +13,7 @@
 // coletados de processos de verdade.
 //
 // POR QUE O MOVIMENTO, E NÃO O TÍTULO DA PEÇA
-// Medido no processo 0200984-48.2025.8.06.0303 (103 eventos, 113 peças):
+// Medido no processo P1 (103 eventos, 113 peças):
 //   por TÍTULO  (/carta precatória/) → 6 peças, 3 delas FALSAS
 //   por MOVIMENTO (EXPEDIÇÃO DE …)  → 3 peças, todas certas
 // As três falsas eram a precatória DEVOLVIDA, juntada de volta sob o movimento
@@ -47,7 +47,7 @@
 
   // PEÇA DE ORIGEM da ação, em ordem de preferência. Não classificamos o rito
   // em "criminal × cível" para escolher UMA regra: o processo real
-  // 3000436-28.2026.8.06.0203 é uma QUEIXA-CRIME cuja peça inicial se chama
+  // processo P2 é uma QUEIXA-CRIME cuja peça inicial se chama
   // "Petição Inicial" — uma classificação binária mandaria procurar "Denúncia"
   // e não acharia nada. Tenta-se a lista inteira, e o rito só REORDENA os
   // candidatos. Assim o acerto não depende de a ficha do processo existir.
@@ -65,8 +65,8 @@
   //     que o sufixo não satisfaz. E o veto NÃO pode conter "pag. inicial": a
   //     própria denúncia se chama "Denúncia (Outras) (Denúncia | Pág. Inicial
   //     SAJ 1)" e seria descartada por ele.
-  // (b) `\bqueixa\b` solto: no 3000436-28.2026 existe "Petição (queixa carlos
-  //     eduardo para protocolar )" — um rascunho — que venceria a verdadeira
+  // (b) `\bqueixa\b` solto: no processo P2 existe "Petição (queixa fulano de
+  //     tal para protocolar )" — um rascunho — que venceria a verdadeira
   //     "Petição Inicial". Só `queixa-crime` fechado.
   //
   // O veto que sobra cobre peças que FALAM da inicial sem serem a inicial: o

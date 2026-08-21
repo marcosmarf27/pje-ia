@@ -6,7 +6,8 @@
 > qualquer caminho pela interface.
 >
 > **Estado.** Sondado em sessão real no **TJCE 1º grau, PJe 2.9.7.0, em
-> 13/08/2026**, com o processo 3000436-28.2026.8.06.0203. As rotas marcadas
+> 13/08/2026**, com o processo P2 (os números CNJ das medições são omitidos:
+> repositório público — ver a legenda em `CLAUDE.md`). As rotas marcadas
 > **CONFIRMADA** responderam ali; **nada** aqui foi verificado em outro tribunal
 > ou outra versão.
 >
@@ -130,7 +131,7 @@ possível determinar com segurança"*. Estava correto — **publicação, decurs
 prazo e trânsito são MOVIMENTOS**, e movimento quase nunca vira peça com texto.
 O modelo recebia os PDFs e nada mais.
 
-Medido no 3000167-23.2025.8.06.0203 (17/08/2026, sessão real): 25 movimentos,
+Medido no processo P3 (17/08/2026, sessão real): 25 movimentos,
 ~77 ms, uma requisição. O que a rota dá e o DOM não dava:
 
 | | `lerEventos()` (DOM) | `movimentacoes` (REST) |
@@ -283,7 +284,7 @@ autorização por documento (`codIni`, `md5`). Perfil de URL auto-autorizada, o
 que levantou a hipótese de que dispensaria a **ativação JSF** (`ativarPeca`,
 ~5,6 s por peça e serializada) — que é o gargalo real da extensão.
 
-**Medido em 13/08/2026, no 3000436-28.2026.8.06.0203 — a hipótese caiu:**
+**Medido em 13/08/2026, no processo P2 — a hipótese caiu:**
 
 | Peça | rota de hoje (completa) | `linkDownload` |
 |---|---|---|

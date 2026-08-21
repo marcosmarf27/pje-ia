@@ -149,9 +149,9 @@ var PJE = (function () {
   // A leitura é BEST-EFFORT em todos os níveis (qualquer falha vira null e a
   // exportação segue sem a ficha): é um enfeite valioso, nunca um requisito.
 
-  // "JOSE SIDOU DA SILVA - CPF: 170.373.523-49 (AUTOR)"
-  // "JOSUE CALEBE ... - OAB CE53045 - CPF: 073.706.313-03 (ADVOGADO)"
-  // "BANCO ITAU CONSIGNADO S.A. - CNPJ: 33.885.724/0001-19 (REU)"
+  // "FULANO DE TAL DA SILVA - CPF: 000.000.000-00 (AUTOR)"
+  // "BELTRANO SOUZA ... - OAB CE00000 - CPF: 111.111.111-11 (ADVOGADO)"
+  // "BANCO ITAU CONSIGNADO S.A. - CNPJ: 00.000.000/0001-00 (REU)"
   //
   // O papel vem entre parênteses NO FIM, e é o que distingue autor de réu e
   // parte de advogado. Puro e exportado para teste — o formato é do PJe, não
@@ -249,14 +249,14 @@ var PJE = (function () {
   //
   // Ler o movimento importa porque ele é o vocabulário CNJ — controlado e muito
   // mais discriminante que o título, que no PJe costuma ser o nome do arquivo.
-  // Medido em processo real (0200984-48.2025, 103 eventos): buscar carta
+  // Medido em processo real (processo P1, 103 eventos): buscar carta
   // precatória pelo TÍTULO devolve 6 peças, das quais 3 são a precatória
   // devolvida, juntada sob o movimento "DOCUMENTO"; buscar pelo MOVIMENTO
   // ("EXPEDIÇÃO DE CARTA PRECATÓRIA") devolve exatamente as 3 expedidas.
   //
   // ARMADILHA: movimento e peça nem sempre estão no MESMO evento. No PJe nativo
   // aparece o par "evento com movimento e sem peça" seguido de "evento com peça
-  // e sem movimento" (4 ocorrências no 3000436-28.2026). Por isso o movimento
+  // e sem movimento" (4 ocorrências no processo P2). Por isso o movimento
   // órfão é HERDADO pelo evento seguinte quando este não tem movimento próprio
   // — sem essa herança, uma precatória nesse formato sumiria em silêncio.
   const MES_PT = { jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5, jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11 };
@@ -1439,7 +1439,7 @@ var PJE = (function () {
   // aba do usuário morrer com "Sua página expirou"; por aqui esse custo
   // simplesmente não existe.
   //
-  // Medido no 3000436-28.2026.8.06.0203: 35 documentos pela API contra 33 na
+  // Medido no processo P2: 35 documentos pela API contra 33 na
   // timeline carregada — SUPERCONJUNTO (nenhum id da timeline faltou), com dois
   // a mais que ela não mostrava, e em ordem cronológica CRESCENTE, que até aqui
   // era só premissa nossa na exportação.
@@ -1559,7 +1559,7 @@ var PJE = (function () {
    * ou `null` quando a rota não responde (o chamador cai para o DOM).
    *
    * É a fonte que faltava para toda pergunta de PRAZO. Medido no
-   * 3000167-23.2025.8.06.0203 (17/08/2026): 25 movimentos, ~77 ms, e o que vem é
+   * processo P3 (17/08/2026): 25 movimentos, ~77 ms, e o que vem é
    * melhor que a timeline em três eixos —
    *   • `dataAtualizacao` é epoch em ms, então há **hora**; o `.media.data` do DOM
    *     só dá o dia, e dois atos do mesmo dia ficavam indistinguíveis;

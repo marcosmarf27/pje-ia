@@ -1084,7 +1084,7 @@ o que não sabe que existe. **Sete dos treze passos são sobre marcar peças**, 
      **ZERO tela JSF**, contra ~10 da grid num processo de 138 peças. Como é a
      leitura da grid que esgota o orçamento de telas e faz a aba morrer com "Sua
      página expirou", esta rota tira o risco do caminho normal.
-     Medido no 3000436-28.2026.8.06.0203: 35 documentos contra 33 na timeline —
+     Medido no processo P2: 35 documentos contra 33 na timeline —
      **superconjunto** (nenhum id da timeline faltou) e em ordem cronológica
      CRESCENTE, que até aqui era só premissa da exportação.
      - **GUARDA ANTI-REGRESSÃO**: lista MENOR que a timeline já no DOM é
@@ -1435,7 +1435,7 @@ pedido ao modelo.
   `.media.data` IRMÃO que vale até o próximo. `PJE.lerEventos()` lê isso;
   `listarDocumentos` passa a anexar `mov`/`dataMov` a cada doc (best-effort — num
   tribunal com outra estrutura os campos somem e tudo segue como antes).
-  Medido no 0200984-48.2025.8.06.0303 (103 eventos, 113 peças):
+  Medido no processo P1 (103 eventos, 113 peças):
 
   | critério | cartas achadas | precisão |
   |---|---|---|
@@ -1459,7 +1459,7 @@ pedido ao modelo.
   tudo": no fluxo em que o clique é obrigatório, ele deixa de existir.
 - **Não se classifica o rito para escolher UMA regra de origem.** `ORIGENS` é uma
   lista de candidatos (denúncia → queixa-crime → petição inicial) tentada
-  INTEIRA; o rito só reordena. O processo real 3000436-28.2026.8.06.0203 é uma
+  INTEIRA; o rito só reordena. O processo real processo P2 é uma
   **queixa-crime cuja peça inicial se chama "Petição Inicial"** — uma
   classificação binária mandaria procurar "Denúncia" e não acharia nada. Assim o
   acerto não depende de a ficha do processo existir.
@@ -1469,7 +1469,7 @@ pedido ao modelo.
     `| Pág. Inicial SAJ 177`. A regra casaria a lista inteira. Só
     `\bpeticao inicial\b` — e o veto **não pode** conter `pag. inicial`, porque a
     própria denúncia se chama `Denúncia (Outras) (Denúncia | Pág. Inicial SAJ 1)`.
-  - `\bqueixa\b` solto: existe a peça `Petição (queixa carlos eduardo para
+  - `\bqueixa\b` solto: existe a peça `Petição (queixa fulano de tal para
     protocolar )` — um rascunho — que venceria a verdadeira inicial. Só
     `queixa-crime` fechado.
 - **`RE_DECISAO` precisa cobrir `interlocutoria`**: em processo migrado do SAJ a
@@ -1486,7 +1486,7 @@ pedido ao modelo.
   a decisão e a expedição.
 - **Movimento e peça nem sempre no MESMO evento**: no PJe nativo aparece o par
   "evento com movimento e sem peça" seguido de "evento com peça e sem movimento"
-  (4 ocorrências no 3000436-28.2026). `lerEventos` faz o movimento órfão ser
+  (4 ocorrências no processo P2). `lerEventos` faz o movimento órfão ser
   HERDADO pelo evento seguinte; sem isso, uma carta nesse formato sumiria calada.
 - **O pacote leva o PDF OFICIAL, não o texto da peça** (`PJE.baixarPdfOficial` +
   `obterParaMalote` em content.js). O que entra num anexo de malote é o
@@ -1779,7 +1779,7 @@ página inteira empurra a mais antiga para fora.
 
 **Quem gasta view em volume é a leitura da grid**: `listarPelaGrid` faz um POST
 de página inteira POR PÁGINA (armadilha 4 de `docs/pje-tela-documentos.md`).
-Medido no 0202410-91.2026.8.06.0293: **138 peças ≈ 9 páginas ≈ 10 a 12 telas
+Medido no processo P4: **138 peças ≈ 9 páginas ≈ 10 a 12 telas
 novas**, contra um teto por sessão da ordem de 15. **Quem descobre o estrago é o
 `link.click()` da ativação**, o primeiro postback seguinte — daí o erro aparecer
 no Enviar, e não no ⟳ que o causou.
@@ -2080,7 +2080,7 @@ inventário, que ganhou a data de cada peça não marcada.
   usa o **vocabulário CNJ** (`codEvento`/`dsEvento`) e traz o `textoFinalExterno`
   — que é o campo que FECHA a conta do prazo: *"Decorrido prazo de EUDES … em
   16/07/2026 23:59"*. Custa ~77 ms e **zero tela JSF**. Medido em sessão real no
-  3000167-23.2025.8.06.0203; detalhes em `docs/pje-api-rest.md`.
+  processo P3; detalhes em `docs/pje-api-rest.md`.
 - **`lerEventos()` (DOM) continua como FALLBACK**, para o tribunal em que a rota
   não exista. O cabeçalho do bloco DIZ qual fonte produziu a lista, e o aviso de
   parcialidade **só sai no fallback** — repeti-lo com a fonte oficial faria o
@@ -3282,6 +3282,16 @@ lateral (dot + peso da fonte), nos chips e no popup `@`; a legenda só é exibid
 expandido.
 
 ## Convenções
+
+- **Processos de referência (`processo P1`…`P4`).** As medições citadas neste
+  arquivo e no código foram feitas em processos REAIS do TJCE, mas os números
+  CNJ **não são publicados**: este repositório é público, e um número de
+  processo identifica as partes — no caso de matéria criminal, uma pessoa
+  investigada, ré ou presa. Os rótulos preservam a distinção entre as medições
+  sem expor ninguém. `P1` é o de cartas precatórias (103 eventos, 113 peças);
+  `P2` é uma queixa-crime migrada do SAJ; `P3` é o das movimentações via REST;
+  `P4` é o de 138 peças que derrubava a view JSF. Dados pessoais em exemplos de
+  código (nomes, CPF, OAB) são **fictícios** por regra.
 
 - Comentários e strings de UI em português do Brasil (com acentuação correta).
 - **Visual: `DESIGN.md` manda.** O parágrafo abaixo é histórico e os valores nele
