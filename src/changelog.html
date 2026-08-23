@@ -103,7 +103,56 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.47.0</span> Qual modelo serve para quê — dito onde você escolhe</h2>
+        <h2><span class="v novo">v0.48.0</span> A minuta passa a ser redigida pelo modelo certo — e a seguir os seus modelos</h2>
+        <p>
+          Quem cadastrava peças-modelo e via a minuta sair ignorando a estrutura delas
+          tinha razão, e a causa não era o assistente "não querer": havia uma
+          <strong>instrução interna mandando ignorá-las</strong>. As regras que a minuta
+          herdava do chat diziam para se basear <em>somente</em> nos documentos anexados —
+          e uma peça-modelo, que é de outro processo, não é um documento anexado. As
+          instruções da minuta foram reescritas para separar as duas coisas: o
+          <strong>conteúdo</strong> sai só das peças deste processo, a <strong>forma</strong>
+          vem dos seus modelos.
+        </p>
+        <p>
+          Pelo mesmo motivo, <strong>o que você escreve no campo passou a ter peso</strong>.
+          O seu pedido ia solto no meio de milhares de palavras de regras fixas, e ainda
+          antes da lista de peças e da linha do tempo — quase no começo de tudo, quando o
+          que decide é o fim. Agora ele vai destacado e <strong>por último</strong>, dito
+          como o que prevalece sobre as regras de forma. Pedir "sem tabelas" ou "fundamentação
+          curta" volta a funcionar. A sua tese continua sendo a última palavra, como manda a
+          Resolução CNJ 615.
+        </p>
+        <p>
+          E a minuta passou a ser redigida pelo <strong>modelo mais adequado a escrever do seu
+          provedor</strong>, sem você trocar nada: quem usa o GPT-5.6 Luna minuta no
+          <strong>Terra</strong>; quem usa o Claude Haiku, no <strong>Sonnet 5</strong>; quem
+          usa o Gemini Flash-Lite, no <strong>3.7 Flash</strong>. O chat continua no modelo que
+          você escolheu — a troca vale só para a minuta, que é o único caso em que o texto sai
+          da extensão e vai assinado ao processo. Quem já usa um modelo bom de redação não tem
+          troca nenhuma.
+        </p>
+        <p>
+          <strong>Isso custa mais</strong> — redigir é dominado pelo que sai, e a diferença
+          chega a dez vezes —, então a faixa do modo minuta <strong>diz qual modelo vai
+          redigir antes de você gerar</strong>, e o custo no rodapé já sai calculado por ele.
+          Se preferir outro, há um campo <strong>"Modelo para minutas"</strong> nas opções, com
+          "Automático" como padrão.
+        </p>
+        <p>
+          Um detalhe que valia por muitos: quem escolhia <strong>Claude</strong> na tela de
+          configuração caía no Haiku, e com ele a biblioteca de peças-modelo ficava
+          desabilitada por causa do tamanho da janela — a minuta saía <strong>sem modelo
+          nenhum e sem avisar</strong>. Como agora ela roda no Sonnet 5, a biblioteca voltou a
+          funcionar. E quando algum modelo seu fica de fora — categoria não escolhida, modelos
+          grandes demais para caberem, ou espécie do ato diferente da categoria —, a faixa
+          passa a <strong>dizer qual foi o motivo</strong> em vez de sair calada.
+        </p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Antes disso</p>
+        <h2><span class="v">v0.47.0</span> Qual modelo serve para quê — dito onde você escolhe</h2>
         <p>
           Os modelos não são intercambiáveis, e a diferença não é "melhor ou pior": o mais
           barato para <strong>ler</strong> os autos costuma ser o mais fraco para
@@ -143,7 +192,6 @@
       </div>
 
       <div class="card">
-        <p class="eyebrow">Antes disso</p>
         <h2><span class="v">v0.46.2</span> A consulta das datas deixa de desistir por um soluço de rede</h2>
         <p>
           Revisão das cinco versões da linha do tempo, linha por linha. Nenhum recurso novo:
@@ -1651,6 +1699,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.48.0</span></td><td>23/08/2026</td><td><span class="dot-marco"></span><strong>A minuta passa a seguir as suas peças-modelo e as suas instruções.</strong> As regras que ela herdava do chat mandavam se basear <em>somente</em> nos documentos anexados — e peça-modelo, sendo de outro processo, não é um documento anexado: havia uma instrução interna mandando ignorá-las. Agora o <strong>conteúdo</strong> sai só das peças deste processo e a <strong>forma</strong> vem dos seus modelos. O que você escreve no campo saiu do meio das regras fixas e vai <strong>por último e destacado</strong>, prevalecendo sobre as regras de forma (a tese continua sendo a última palavra). A minuta passou a ser redigida pelo modelo mais adequado a escrever do <strong>mesmo provedor</strong> — Luna→Terra, Haiku→Sonnet 5, Flash-Lite→3.7 Flash —, sem trocar o modelo do chat; custa mais, e a faixa da minuta diz qual vai redigir <strong>antes</strong> de gerar. Quem escolhia Claude caía no Haiku e a biblioteca de peças-modelo ficava desabilitada: a minuta saía sem modelo nenhum, calada. Novo campo <strong>"Modelo para minutas"</strong> nas opções</td></tr>
             <tr><td><span class="v">0.47.0</span></td><td>19/08/2026</td><td>A tela de configuração passa a dizer <strong>para que serve cada modelo</strong> — analisar os autos, redigir expedientes ou os dois —, e quem liga o modo minuta com um modelo de análise recebe a sugestão de qual usar, de preferência do mesmo provedor (sem exigir outra chave); é sugestão, nunca impedimento. A tabela do guia ganhou a coluna para os dez modelos. Além disso, atualizações com novidade de verdade passam a acender um selo <strong>"novo"</strong> no ícone da extensão, com uma linha no painel levando a estas notas — antes as melhorias chegavam em silêncio. E o pedido de avaliação na Chrome Web Store entrou nas telas de apoio</td></tr>
             <tr><td><span class="v">0.46.2</span></td><td>17/08/2026</td><td>Revisão das cinco versões da linha do tempo, sem recurso novo. A consulta oficial das datas <strong>desistia pelo resto da sessão</strong> na primeira espera estourada — e a versão anterior passou a fazê-la assim que o processo abre, o momento mais congestionado da aba, de modo que um soluço de rede ali degradava a sessão inteira para a leitura da tela (incompleta e sem hora), anunciando isso como se fosse limitação do tribunal; agora são precisas duas seguidas, e uma resposta boa zera a contagem. A lista das datas passou a fechar ao clicar na página do tribunal, e quando é encurtada diz <strong>entre que datas</strong>. Por dentro: cada pergunta deixou de varrer a linha do tempo da tela sem precisar, e o assistente passou a saber também no chat que data de publicação ou trânsito não tem peça nem folha</td></tr>
             <tr><td><span class="v">0.46.1</span></td><td>17/08/2026</td><td>A lista das datas ajustada aos modos do painel, depois de conferi-la em <strong>todos eles</strong>. No modo <strong>lateral</strong> a caixa vazava para fora do painel, sobre a página do tribunal, e encostava na borda da janela; agora as bordas do painel são o limite, na largura e na altura. E quando o processo <strong>não tem movimento nenhum</strong>, clicar no selo não fazia nada — o cursor prometia um clique que não acontecia; agora abre a caixa explicando por que não há datas e que a ausência de um ato não significa que ele não aconteceu</td></tr>
