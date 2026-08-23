@@ -157,6 +157,23 @@
             <a href="help.html#modelos" target="_blank">Tabela completa com preços →</a>
           </span>
 
+          <label class="field" for="modeloMinuta">Modelo para minutas</label>
+          <!-- Os <option> são CLONADOS do #model por popup.js
+               (montarModeloMinuta): a lista de modelos existe uma vez só no
+               HTML, senão seria mais um lugar para divergir. -->
+          <select id="modeloMinuta"></select>
+          <span class="hint">
+            Analisar autos é dominado pela ENTRADA e redigir, pela SAÍDA — por
+            isso o modelo mais barato de ler o processo costuma ser o mais fraco
+            de escrever o expediente. No <b>automático</b> a minuta é redigida
+            pelo melhor de redigir do mesmo provedor (o chat continua no modelo
+            que você escolheu acima), e isso custa mais por minuta.
+            A lista traz só os modelos do <b>mesmo provedor</b> do modelo acima:
+            as peças do processo já foram enviadas para ele, e misturar provedores
+            faria a minuta falhar. Trocar o modelo do chat troca esta lista junto.
+            A barra do modo minuta sempre nomeia o modelo que vai de fato redigir.
+          </span>
+
           <div class="pc-head pc-head-sp">
             <label class="field" id="effortLab">Nível de raciocínio</label>
             <span class="side-hint" id="effortHint">Alto (recomendado)</span>

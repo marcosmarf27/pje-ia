@@ -198,6 +198,19 @@
            foram medidos em uso real — o resto é inferência do tier. -->
       <span class="perfil-hint" id="perfilHint" hidden></span>
 
+      <label class="field" for="modeloMinuta">Modelo para minutas</label>
+      <!-- Os <option> são CLONADOS do #model por popup.js (montarModeloMinuta):
+           a lista de modelos existe uma vez só no HTML, senão seria mais um
+           lugar para divergir. O primeiro item é o automático e NOMEIA o modelo
+           resolvido — "Automático" sozinho não responde a pergunta que o
+           próprio campo levanta. -->
+      <select id="modeloMinuta"></select>
+      <span class="hint">
+        Redigir é dominado pela saída, e o modelo mais barato de ler os autos
+        costuma escrever pior. No automático a minuta usa o melhor de redigir do
+        mesmo provedor — custa mais por minuta.
+      </span>
+
       <div class="pc-head pc-head-sp">
         <label class="field" id="effortLab">Nível de raciocínio</label>
         <span class="side-hint" id="effortHint">Alto (recomendado)</span>

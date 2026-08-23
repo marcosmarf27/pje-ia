@@ -559,9 +559,43 @@
         <p style="margin-top:10px"><em>E para <b>redigir</b> — minuta, despacho, ofício:
         o <b>Gemini 3.7 Flash</b> é o que tem rendido melhor. Quem já usa a OpenAI e não
         quer uma segunda chave tem no <b>GPT-5.6 Terra</b> o irmão do Luna voltado a texto.
-        Vale trocar só para gerar o expediente e voltar ao Luna para a leitura do próximo
-        processo: a chave de cada provedor fica salva, e a troca é um clique nas
-        opções.</em></p>
+        Desde a v0.48 você não precisa trocar de modelo para isso: veja
+        <a class="link" href="#modelo-minuta">A minuta usa um modelo diferente do chat</a>.</em></p>
+      </div>
+
+      <h1 class="serif" id="modelo-minuta">A minuta usa um modelo diferente do chat</h1>
+      <div class="card">
+        <p>Desde a versão 0.48, você não precisa mais trocar de modelo para gerar um
+        expediente: <strong>a minuta é redigida sozinha pelo modelo de redação do mesmo
+        provedor</strong>, e o chat continua no que você escolheu. Isso vale para todas as
+        espécies do modo minutar — sentença, decisão, acórdão, despacho, ofício, mandado
+        e ata.</p>
+        <table>
+          <tr><th>Se o seu modelo é…</th><th>a minuta sai no…</th><th>por quê</th></tr>
+          <tr><td>GPT-5.6 Luna</td><td><strong>GPT-5.6 Terra</strong></td><td>mesma conta e mesma chave; o irmão do Luna voltado a texto</td></tr>
+          <tr><td>Claude Haiku 4.5</td><td><strong>Claude Sonnet 5</strong></td><td>o Haiku só aceita 100 páginas; o Sonnet aceita 600 e escreve melhor</td></tr>
+          <tr><td>Gemini 3.5 Flash-Lite</td><td><strong>Gemini 3.7 Flash</strong></td><td>o indicado do provedor para texto</td></tr>
+        </table>
+        <p style="margin-top:10px">Quem já usa um modelo que redige bem — Terra, Sol,
+        Sonnet 5, Opus, Fable, Gemini 3.7 ou 3.6 Flash — <strong>não tem troca nenhuma</strong>:
+        a minuta sai no modelo de sempre.</p>
+        <p><b>Custa mais, e a barra do modo minuta diz isso antes de você gerar</b>, nomeando
+        o modelo que vai redigir. Redigir é dominado pela SAÍDA, e a diferença de preço entre
+        o Luna e o Terra é de cerca de dez vezes: numa minuta com autos volumosos, é a
+        diferença entre alguns centavos e alguns dólares. O rodapé do chat mostra o custo real
+        daquela resposta, já calculado pela tabela do modelo que redigiu.</p>
+        <p><b>Para fixar outro modelo</b>, use <strong>Modelo para minutas</strong> nas opções
+        da extensão. O padrão é <em>Automático</em>, que é o comportamento descrito acima; você
+        pode escolher qualquer modelo do <strong>mesmo provedor</strong> do seu modelo de chat —
+        inclusive o próprio, se preferir que nada mude. A lista mostra só esse provedor (as
+        peças do processo já foram enviadas para ele, e misturar provedores faria a minuta
+        falhar), e trocar o modelo do chat troca a lista junto.</p>
+        <p><b>A troca só vale para a minuta.</b> O chat, o mapa mental e o “Escolher com IA”
+        continuam no modelo que você configurou — a minuta é o único caso em que o resultado
+        sai da extensão e vai assinado ao processo.</p>
+        <p><b>O registro é do modelo certo.</b> A faixa de origem do editor — a que atende aos
+        arts. 19, §6º e 21, §2º da Resolução CNJ 615 — grava o modelo que <em>de fato</em>
+        redigiu, não o que estava configurado no chat.</p>
       </div>
 
       <h1 class="serif">Como usar bem o chat (fluxo recomendado)</h1>

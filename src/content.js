@@ -52,10 +52,34 @@
   // requisito do produto nos dois provedores: o id é o número que abre o título
   // de cada peça e é por ele que o usuário reencontra a peça na timeline do PJe
   // (mesma convenção do SUFIXO_MAPA e do SUFIXO_MINUTA).
-  const PROMPT_INICIO = [
+  //
+  // PARTIDO em três porque a MINUTA precisa de uma variante (ver systemMinuta):
+  // a frase da FONTE, escrita para o chat, dizia ao modelo para se basear
+  // "SOMENTE nos documentos anexados (peças selecionadas pelo usuário)" — e as
+  // peças-modelo da biblioteca NÃO são peça selecionada. Havia, portanto, uma
+  // regra no system mandando ignorá-las, contra a moldura <modelos_de_referencia>
+  // que pedia o contrário: era o candidato mais forte para "a minuta não seguiu
+  // os meus modelos". Na minuta ela vira uma frase que separa os dois eixos —
+  // conteúdo dos autos, forma dos modelos.
+  //
+  // O `PROMPT_INICIO` do chat é reconstruído na ordem original logo abaixo, e
+  // como `join(" ")` sobre arrays concatenados é associativo, ele sai byte a
+  // byte o de antes (o teste de regressão do chat trava isso).
+  const PROMPT_PAPEL = [
     "Você é um assistente jurídico que analisa autos de processos do PJe.",
     "Responda sempre em português do Brasil.",
+  ];
+  const PROMPT_FONTE_CHAT = [
     "Baseie-se SOMENTE nos documentos anexados (peças selecionadas pelo usuário).",
+  ];
+  const PROMPT_FONTE_MINUTA = [
+    "O CONTEÚDO do ato — fatos, nomes, datas, valores, pedidos, fundamentos — sai",
+    "EXCLUSIVAMENTE das peças anexadas deste processo e da linha do tempo dele.",
+    "Se a mensagem trouxer peças-modelo, elas são de OUTROS processos e servem",
+    "apenas de referência de FORMA (estrutura, seções, fraseado, tom): siga a",
+    "forma delas e não aproveite nenhum fato delas.",
+  ];
+  const PROMPT_RASTREIO = [
     "Toda afirmação sobre os autos precisa ser rastreável até a peça de origem.",
     "Cada peça anexada tem um id — o número que abre o seu título (em",
     "'123456 - Contestação', o id é 123456) — e é por ele que o usuário reencontra",
@@ -70,7 +94,8 @@
     "Ao narrar fatos ou atos processuais, siga a ordem CRONOLÓGICA e informe a",
     "data de cada um quando ela constar da peça.",
   ];
-  const PROMPT_FIM = [
+  const PROMPT_INICIO = PROMPT_PAPEL.concat(PROMPT_FONTE_CHAT, PROMPT_RASTREIO);
+  const PROMPT_FIM_COMUM = [
     "Seja objetivo e técnico. Comece pela resposta: nada de preâmbulo do tipo 'Vou",
     "analisar as peças' ou 'Com base nos documentos fornecidos'.",
     "Se a informação não estiver nos documentos selecionados,",
@@ -119,10 +144,17 @@
     "anexos protocolados junto dela. Nesse caso, diga claramente que a peça é só um",
     "encaminhamento e oriente o usuário a marcar também os anexos correspondentes",
     "(ex.: as peças 'Documento de Comprovação' logo abaixo dela na lista).",
+  ];
+  // Formatação de RESPOSTA DE CHAT, e só dela: "para uma pergunta pontual,
+  // responda em uma ou duas frases corridas, sem estruturar" briga de frente com
+  // a ESTRUTURA que o SUFIXO_MINUTA exige (um # com o nome do ato, ## nas
+  // seções). Fica fora do system da minuta.
+  const PROMPT_FORMATO_CHAT = [
     "Use markdown — títulos curtos, listas e tabelas (ex.: linha do tempo dos atos,",
     "partes, pedidos) — quando a resposta tiver mais de um eixo; para uma pergunta",
     "pontual, responda em uma ou duas frases corridas, sem estruturar.",
   ];
+  const PROMPT_FIM = PROMPT_FIM_COMUM.concat(PROMPT_FORMATO_CHAT);
   // Ordem de prioridade das fontes na busca web. Vive em trecho PRÓPRIO porque os
   // DOIS system prompts precisam dele: até aqui a instrução de busca existia só no
   // caminho de citação textual (Gemini/OpenAI) e o caminho Anthropic não tinha
@@ -202,21 +234,23 @@
     "Estes documentos não têm id de peça: ao citar, use o NOME do arquivo no lugar",
     "do id, com a folha quando conseguir identificá-la — ex.: '(contrato.pdf, fl. 3)'.",
   ];
+  // Os dois trechos de citação viram constantes próprias porque o systemMinuta
+  // escolhe entre eles pelas caps da MINUTA, que podem diferir das do chat.
+  const PROMPT_CIT_NATIVA = [
+    "As citações precisas de trechos são geradas automaticamente pelo sistema e já",
+    "mostram peça, id e folha ao usuário — apoie cada afirmação relevante no trecho",
+    "correspondente e NÃO repita id nem folha no corpo do texto.",
+    "Peças digitalizadas sem camada de texto podem não permitir citação automática;",
+    "só nesse caso escreva a referência no próprio texto (ex.: 'na Contestação, id",
+    "123456') e avise o usuário de que aquela peça não é citável.",
+  ];
   const SYSTEM_PROMPT = PROMPT_INICIO.concat(
-    [
-      "As citações precisas de trechos são geradas automaticamente pelo sistema e já",
-      "mostram peça, id e folha ao usuário — apoie cada afirmação relevante no trecho",
-      "correspondente e NÃO repita id nem folha no corpo do texto.",
-      "Peças digitalizadas sem camada de texto podem não permitir citação automática;",
-      "só nesse caso escreva a referência no próprio texto (ex.: 'na Contestação, id",
-      "123456') e avise o usuário de que aquela peça não é citável.",
-    ],
+    PROMPT_CIT_NATIVA,
     PROMPT_BUSCA,
     PROMPT_FIM,
     PROMPT_DESTAQUES
   ).join(" ");
-  const SYSTEM_PROMPT_CIT_TEXTUAL = PROMPT_INICIO.concat(
-    [
+  const PROMPT_CIT_TEXTUAL = [
       "Ao afirmar fatos relevantes, cite a peça, o id E a página no PRÓPRIO texto,",
       "no formato '(Contestação, id 123456, fl. 12)' — indique sempre a página do",
       "PDF de origem quando conseguir identificá-la; sem folha identificável, use",
@@ -233,9 +267,11 @@
       // faltava era a DISPENSA explícita do formato de documento.
       "Fato que vier da LINHA DO TEMPO do processo (distribuição, publicação,",
       "intimação, decurso de prazo, trânsito em julgado, conclusão) não tem peça nem",
-      "folha: cite-o como '(movimentação de DD/MM/AAAA)' e NUNCA o pendure numa peça",
-      "para satisfazer o formato acima.",
-    ],
+    "folha: cite-o como '(movimentação de DD/MM/AAAA)' e NUNCA o pendure numa peça",
+    "para satisfazer o formato acima.",
+  ];
+  const SYSTEM_PROMPT_CIT_TEXTUAL = PROMPT_INICIO.concat(
+    PROMPT_CIT_TEXTUAL,
     PROMPT_BUSCA,
     PROMPT_FIM,
     PROMPT_DESTAQUES
@@ -357,6 +393,59 @@
       // acabou de estabelecer; antes do customPrompt, que segue por último.
       (soAnexos ? " " + PROMPT_SO_ANEXOS.join(" ") : "");
     if (!customPrompt) return base;
+    return (
+      base +
+      " Instruções adicionais definidas pelo usuário desta extensão (perfil e " +
+      "preferências dele — siga-as no que não conflitar com as regras acima): " +
+      customPrompt
+    );
+  }
+
+  // O system da MINUTA. Até aqui ela usava o system do CHAT — ~5,4 mil chars de
+  // regras de análise —, e três deles trabalhavam contra o resultado:
+  //
+  //   (1) a frase da FONTE mandava se basear só nas peças SELECIONADAS, o que
+  //       exclui as peças-modelo (ver PROMPT_FONTE_MINUTA);
+  //   (2) o PROMPT_FORMATO_CHAT pedia "uma ou duas frases corridas, sem
+  //       estruturar" numa tarefa cuja estrutura é obrigatória;
+  //   (3) o PROMPT_DESTAQUES mandava usar "> [!ALERTA]" e o SUFIXO_MINUTA gasta
+  //       a última frase PROIBINDO — dois comandos contraditórios no mesmo
+  //       payload. O comentário do PROMPT_DESTAQUES sempre AFIRMOU que ele não
+  //       ia na minuta; ia, porque a minuta chama systemPromptAtual(). Agora a
+  //       afirmação é verdade, e a frase do sufixo vira cinto-e-suspensório.
+  //
+  // `comBusca` é PARÂMETRO, e não uma leitura de `panel.isSearchOn()` aqui
+  // dentro: esta função é chamada DUAS vezes por turno (pré-voo e stream) e as
+  // duas precisam da MESMA string — um toggle alternado no meio faria o
+  // count_tokens medir um request diferente do que sai.
+  //
+  // `soAnexos` não entra: minutar exige peça marcada (guarda dura no painel e
+  // em minutarAgora), então o modo só-anexos nunca se aplica aqui.
+  function systemMinuta(comBusca) {
+    const base =
+      PROMPT_PAPEL.concat(
+        PROMPT_FONTE_MINUTA,
+        PROMPT_RASTREIO,
+        // SEMPRE a citação TEXTUAL, qualquer que seja o provedor — e isto não é
+        // um descuido de não olhar `citacoesNativas`. Duas razões, e as duas
+        // valem mesmo nos modelos que citam por página:
+        //   (1) a citação nativa NÃO EXISTE no produto final. A minuta vira
+        //       markdown, abre no editor e sai em .docx para o PJe; os
+        //       `page_location` da API ficam na bolha do chat, que aqui nem
+        //       existe (a resposta vira um card). A referência TEM de estar no
+        //       texto ou não existe para quem assina.
+        //   (2) o `PROMPT_CIT_NATIVA` manda literalmente "NÃO repita id nem
+        //       folha no corpo do texto", enquanto o `SUFIXO_MINUTA` exige
+        //       "(Título da peça, id 123456, fl. 7)" em toda afirmação. Num
+        //       modelo Anthropic isso eram dois comandos opostos sobre a coisa
+        //       mais importante do ato — a rastreabilidade peça·id·folha.
+        PROMPT_CIT_TEXTUAL,
+        comBusca ? PROMPT_BUSCA : [],
+        PROMPT_FIM_COMUM
+      ).join(" ") + contextoDoProcesso(false);
+    if (!customPrompt) return base;
+    // Mesmo rótulo de subordinação do chat: a persona do usuário orienta o
+    // estilo, mas não desliga a não-invenção nem a origem obrigatória.
     return (
       base +
       " Instruções adicionais definidas pelo usuário desta extensão (perfil e " +
@@ -487,9 +576,13 @@
   // fontes depende SÓ da instrução do PROMPT_BUSCA (garantia mole). Nos outros
   // dois a allowlist é aplicada no servidor (garantia dura); o PROMPT_BUSCA vai
   // junto assim mesmo, porque é ele que expressa a ORDEM entre os três degraus.
-  function toolsBusca() {
-    if (!modelCaps) return [];
-    if (modelCaps.provider === "gemini") return [{ type: "google_search" }];
+  // `caps` é parâmetro (default: o modelo do chat) porque as VERSÕES das tools
+  // variam entre irmãos do MESMO provedor — na Anthropic o Sonnet 5 usa as
+  // `_20260209` e o Haiku as básicas —, e a minuta pode rodar noutro modelo.
+  function toolsBusca(caps) {
+    const c = caps || modelCaps;
+    if (!c) return [];
+    if (c.provider === "gemini") return [{ type: "google_search" }];
     // OpenAI: web_search embutida da Responses API (o tipo antigo
     // "web_search_preview" é legado e não aceita os controles novos). Aqui a
     // restrição de domínios EXISTE — vai em `filters.allowed_domains` (teto de
@@ -497,18 +590,18 @@
     // tem o recurso. Sem ela a busca de jurisprudência varreria a web inteira
     // e devolveria blog no lugar de fonte oficial: num uso jurídico isso não é
     // detalhe, e deixaria o GPT pior que o Claude sem motivo técnico.
-    if (modelCaps.provider === "openai") {
+    if (c.provider === "openai") {
       return [{ type: "web_search", filters: { allowed_domains: DOMINIOS_JURIDICOS } }];
     }
     return [
       {
-        type: modelCaps.webSearch,
+        type: c.webSearch,
         name: "web_search",
         max_uses: 5,
         allowed_domains: DOMINIOS_JURIDICOS,
       },
       {
-        type: modelCaps.webFetch,
+        type: c.webFetch,
         name: "web_fetch",
         max_uses: 3,
         allowed_domains: DOMINIOS_JURIDICOS,
@@ -1056,6 +1149,30 @@
   // + id do modelo e nível de raciocínio ativos (mostrados no selo do rodapé).
   let modelCaps = null;
   let modelInfo = null; // {model, effort} da última resposta de caps
+  // Capacidades do modelo que REDIGE a minuta — quase sempre um irmão de
+  // redação do mesmo provedor (ver modeloDaMinuta no worker). São caps
+  // PRÓPRIAS porque diferem das do chat onde importa: Haiku (200 mil tokens,
+  // 100 páginas) contra Sonnet 5 (1 milhão, 600). Quem decide por elas está
+  // listado em aplicarCapsNaUI e em minutarAgora.
+  let capsMinuta = null;
+  let minutaInfo = null; // {model, trocado} da última resposta de caps
+
+  // Ponto ÚNICO de aplicação da resposta de `caps`: refreshCaps e garantirCaps
+  // faziam o mesmo bloco duas vezes, e agora que ele preenche DOIS conjuntos de
+  // caps a duplicata divergiria no primeiro que alguém esquecesse.
+  function aplicarRespostaCaps(r) {
+    if (!r || !r.caps) return false;
+    modelCaps = r.caps;
+    modelInfo = { model: r.model, effort: r.effort };
+    // Sem o campo `minuta` (worker de uma versão anterior ainda vivo): a minuta
+    // degrada para o modelo do chat, que é o comportamento de sempre.
+    capsMinuta = (r.minuta && r.minuta.caps) || r.caps;
+    minutaInfo = r.minuta
+      ? { model: r.minuta.model, trocado: !!r.minuta.trocado, fixado: !!r.minuta.fixado }
+      : { model: r.model, trocado: false, fixado: false };
+    aplicarCapsNaUI();
+    return true;
+  }
 
   // Reflete na UI o que o modelo atual suporta: selo do modelo ativo, nota de
   // citações textuais (Gemini) e a guarda de troca de provedor no meio da
@@ -1070,17 +1187,24 @@
       }
     );
     panel.setModoCitacoes(modelCaps.citacoesNativas === false ? "textual" : "nativa");
-    // Perfil de uso do modelo (analise | redacao | ambos): o painel orienta
-    // quem liga o modo minuta com um modelo bom de LEITURA e fraco de
-    // REDAÇÃO. Vem por CAPS, nunca por nome de modelo — a sugestão de troca
-    // é calculada no worker, que é onde a tabela de modelos mora.
-    panel.setPerfilModelo(
-      modelCaps.perfil || null,
-      (modelInfo && modelInfo.sugestao) || null
+    // Qual modelo vai REDIGIR a minuta. Antes isto era uma SUGESTÃO ("experimente
+    // trocar nas opções"); hoje a troca acontece de fato, então a barra ANUNCIA
+    // o que vai rodar. Vem por caps/worker, nunca por nome de modelo aqui.
+    panel.setModeloMinuta(
+      minutaInfo && {
+        model: minutaInfo.model,
+        modelChat: modelInfo && modelInfo.model,
+        trocado: minutaInfo.trocado,
+        fixado: minutaInfo.fixado,
+      }
     );
     // A biblioteca de modelos assume 1M tokens (a minuta manda os autos + vários
-    // modelos): habilitada só nesses; nos menores (Haiku) a feature some.
-    panel.setModelosHabilitado((modelCaps.contextTokens || 0) >= 1000000);
+    // modelos). O gate olha as caps da MINUTA, não as do chat: quem escolhe
+    // "Anthropic" no popup cai no Haiku (200k), e o gate desligava o botão 📚 e
+    // fazia modelosMinutaSelecionados() devolver [] EM SILÊNCIO no envio — a
+    // minuta saía sem peça-modelo nenhuma. Como ela agora roda no Sonnet 5 (1M),
+    // medir pelo chat seria negar a feature por um limite que não se aplica.
+    panel.setModelosHabilitado(((capsMinuta || modelCaps).contextTokens || 0) >= 1000000);
     const prov = modelCaps.provider || "anthropic";
     if (conversation.length && conversaProvider && prov !== conversaProvider) {
       panel.setAlerta(ALERTA_TROCA_PROVEDOR);
@@ -1102,11 +1226,7 @@
         // disco são invalidados quando o usuário muda de conta — sem um caminho
         // novo só para isso.
         if (r && "chaveHash" in r) chaveHashAtual = r.chaveHash || null;
-        if (r && r.caps) {
-          modelCaps = r.caps;
-          modelInfo = { model: r.model, effort: r.effort, sugestao: r.sugestao || null };
-          aplicarCapsNaUI();
-        }
+        aplicarRespostaCaps(r);
       });
     } catch {
       avisarContextoPerdido();
@@ -1123,11 +1243,7 @@
       try {
         chrome.runtime.sendMessage({ type: "caps" }, (r) => {
           void chrome.runtime.lastError;
-          if (r && r.caps) {
-            modelCaps = r.caps;
-            modelInfo = { model: r.model, effort: r.effort, sugestao: r.sugestao || null };
-            aplicarCapsNaUI();
-          }
+          aplicarRespostaCaps(r);
           resolve(); // sem caps segue mesmo assim: count_tokens e a API guardam
         });
       } catch {
@@ -1173,10 +1289,17 @@
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area === "local" && (ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.model))
       refreshKey();
-    // effort entra aqui por causa do selo do modelo (mostra o nível ativo)
+    // effort entra aqui por causa do selo do modelo (mostra o nível ativo);
+    // modeloMinuta, por causa do anúncio na barra de minuta e do gate da
+    // biblioteca de peças-modelo — os dois saem das caps da minuta.
     if (
       area === "local" &&
-      (ch.model || ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.effort)
+      (ch.model ||
+        ch.apiKey ||
+        ch.geminiApiKey ||
+        ch.openaiApiKey ||
+        ch.effort ||
+        ch.modeloMinuta)
     )
       refreshCaps();
     if (area === "local" && ch.customPrompt) {
@@ -2522,17 +2645,20 @@
   // Bloqueia envios acima do limite de páginas de PDF por request do modelo
   // (600 nos modelos de 1M de contexto; 100 no Haiku). Conta SÓ as peças
   // ativas (selecionadas) — peça desmarcada sai do request e não conta mais.
-  function guardaPaginas(ids) {
-    if (!modelCaps) return 0;
+  // `caps` default = as do chat; a minuta passa as dela, senão o teto do Haiku
+  // (100 páginas) barraria uma minuta que vai rodar no Sonnet 5 (600).
+  function guardaPaginas(ids, caps) {
+    const c = caps || modelCaps;
+    if (!c) return 0;
     const total = paginasDe(ids);
-    if (total > modelCaps.maxPages) {
+    if (total > c.maxPages) {
       const dica =
-        modelCaps.maxPages <= 100
+        c.maxPages <= 100
           ? " Dica: o Haiku aceita só 100 páginas — nas opções da extensão, troque para o Sonnet 5 (até 600 páginas)."
           : "";
       throw new Error(
         "as peças selecionadas somam ~" + total + " páginas — acima do limite de " +
-          modelCaps.maxPages + " páginas por análise deste modelo. Desmarque algumas peças e analise por partes." +
+          c.maxPages + " páginas por análise deste modelo. Desmarque algumas peças e analise por partes." +
           dica
       );
     }
@@ -2548,11 +2674,16 @@
     let r = null;
     try {
       const payload = {
-        system: systemPromptAtual(),
+        // O system do TURNO, não o do chat: a minuta tem system próprio
+        // (systemMinuta) e o pré-voo precisa medir o request que vai de fato —
+        // eram ~5,4 mil chars de diferença medindo outra coisa.
+        system: (opts && opts.system) || systemPromptAtual(),
         messages,
         betas: (opts && opts.betas) || BETAS_CHAT,
       };
       if (opts && opts.tools) payload.tools = opts.tools;
+      // Idem para o MODELO: sem ele o worker mede na janela do modelo do chat.
+      if (opts && opts.model) payload.model = opts.model;
       r = await rpc({ type: "countTokens", payload });
     } catch (e) {
       // estimativa é opcional, mas a falha precisa ser diagnosticável (F12)
@@ -3654,12 +3785,15 @@
   // Ferramentas/betas do turno atual: busca web quando o toggle está ligado —
   // e, uma vez usada na conversa, nos turnos seguintes também (histórico com
   // blocos de ferramenta exige as tools declaradas, inclusive no count_tokens).
-  function optsDoTurno() {
+  // `caps` default = as do chat; a minuta passa as dela (as tools e o beta de
+  // web_fetch acompanham o modelo que vai de fato rodar).
+  function optsDoTurno(caps) {
+    const c = caps || modelCaps;
     const opts = {};
-    if ((panel.isSearchOn() || buscaNaConversa) && modelCaps) {
-      opts.tools = toolsBusca();
+    if ((panel.isSearchOn() || buscaNaConversa) && c) {
+      opts.tools = toolsBusca(c);
       opts.betas = BETAS_CHAT.concat(
-        modelCaps.webFetch === "web_fetch_20250910" ? ["web-fetch-2025-09-10"] : []
+        c.webFetch === "web_fetch_20250910" ? ["web-fetch-2025-09-10"] : []
       );
     }
     return opts;
@@ -5103,6 +5237,43 @@
     );
   }
 
+  // A INSTRUÇÃO do usuário, com moldura própria e no FIM da mensagem.
+  //
+  // Antes ela era concatenada crua na frente do SUFIXO_MINUTA — sem tag, sem
+  // separador — e perdia nas duas dimensões que decidem o que um modelo obedece:
+  //
+  //   FRONTEIRA: a tese tem <orientacao_decisoria>, os modelos têm
+  //     <modelos_de_referencia>, e o pedido do usuário era o ÚNICO texto livre
+  //     sem moldura, indistinguível das regras do produto. Uma instrução de ~80
+  //     chars vinha seguida de ~3.000 chars de imperativo categórico; um pedido
+  //     que contrariasse o sufixo ("sem tabelas", "texto corrido") perdia.
+  //   RECÊNCIA: depois dela ainda vinham a lista de ids, as datas de juntada e
+  //     até ~15 mil chars de linha do tempo. A última coisa lida NÃO era o
+  //     pedido.
+  //
+  // Ela sobe para o fim, mas fica ANTES de `blocoOrientacao`: a tese continua
+  // sendo a última coisa que o modelo lê, porque é obrigação normativa (a
+  // decisão de quem assina, Res. CNJ 615) e a instrução é regra de forma.
+  //
+  // Com a instrução PADRÃO a moldura é neutra, sem a cláusula de prevalência: o
+  // painel injeta esse texto sozinho no campo vazio, e dar-lhe peso de "o
+  // usuário pediu isto" seria fabricar uma ordem que ninguém deu.
+  function blocoInstrucao(instrucao) {
+    const txt = String(instrucao || "").trim();
+    if (!txt) return "";
+    const limpo = txt.replace(/<\/?instrucao_do_usuario\b[^>]*>/gi, "");
+    const cabeca =
+      txt === INSTRUCAO_MINUTA_PADRAO
+        ? "Instrução para esta minuta:"
+        : "É isto que quem vai assinar pediu para esta minuta. Onde ela for mais " +
+          "específica que as regras de forma acima, ela PREVALECE — salvo as regras " +
+          "de não inventar dado e de indicar a origem de cada afirmação, que valem " +
+          "sempre.";
+    return (
+      "\n\n<instrucao_do_usuario>\n" + cabeca + "\n" + limpo + "\n</instrucao_do_usuario>"
+    );
+  }
+
   // A regra que diz ao modelo o que fazer com o bloco acima. Fica FORA do
   // `SUFIXO_MINUTA` de propósito: aquele é a regra de FORMA, vale para toda
   // minuta e é a maior superfície de regressão do fluxo — esta é condicional.
@@ -5171,18 +5342,23 @@
       : "O bloco <modelo> abaixo é uma peça-modelo que o usuário cadastrou para você " +
         "imitar a FORMA: a estrutura das seções, a ordem, o fraseado e o tom forense. " +
         "Ela é de OUTRO processo.\n";
+    // A REGRA ABSOLUTA vem DEPOIS dos modelos, não antes. Ela é a frase mais
+    // categórica do bloco, e abrindo-o dominava a leitura inteira: o modelo
+    // entrava nos <modelo> já convencido de que não devia aproveitar nada deles
+    // — que é exatamente o "ignorou o meu modelo" relatado. A ordem que funciona
+    // é: o que fazer (intro) → os modelos → o limite.
     return {
       type: "text",
       text:
         "<modelos_de_referencia>\n" +
         intro +
-        "REGRA ABSOLUTA: não copie NENHUM fato dos modelos — nomes de partes, números, " +
+        partes.join("\n") +
+        "\nREGRA ABSOLUTA: não copie NENHUM fato dos modelos — nomes de partes, números, " +
         "datas, valores, endereços, dispositivos legais, fundamentos ou trechos " +
         "específicos do caso. Aproveite só a forma e a linguagem. Todo o conteúdo da " +
         "minuta sai EXCLUSIVAMENTE das peças deste processo, anexadas em seguida. Se um " +
         "modelo trouxer um dado que não conste dessas peças, use [COMPLETAR: …] no lugar. " +
-        "Os modelos são a forma; os autos são o conteúdo.\n" +
-        partes.join("\n") +
+        "Os modelos são a forma; os autos são o conteúdo." +
         "\n</modelos_de_referencia>",
     };
   }
@@ -5264,11 +5440,21 @@
       // das peças, e este caminho monta os blocos do zero (não passa por
       // `comInventario`). Best-effort — falhar não impede o turno.
       await garantirMovimentacoes();
+      // As caps ANTES de qualquer decisão. A minuta não chamava garantirCaps —
+      // dependia de o refreshCaps do boot já ter respondido —, e isso era
+      // inofensivo enquanto a UI não afirmava nada. Deixou de ser: a barra agora
+      // ANUNCIA o modelo que vai redigir, e numa janela de corrida ela diria
+      // "GPT-5.6 Terra" enquanto o turno sairia no Luna (sem `payload.model` o
+      // worker cai no modelo do chat), sem nada na tela dizendo. Resolve
+      // imediato quando as caps já chegaram, que é o caminho normal.
+      await garantirCaps();
       // Peça que falha no download não derruba a minuta: seguimos com o que
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
       const dl = await baixarSelecionadas(selectedIds);
       if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
-      guardaPaginas(dl.ok);
+      // Teto de páginas do modelo que vai REDIGIR: o do chat barraria em 100
+      // páginas (Haiku) uma minuta que vai rodar no Sonnet 5, que aceita 600.
+      guardaPaginas(dl.ok, capsMinuta);
       await subirPecas(dl.ok);
       const blocos = montarBlocos(dl.ok);
       panel.endPrep();
@@ -5285,10 +5471,18 @@
       // A moldura do modelo (se houver) é o PRIMEIRO bloco: fica antes das
       // peças, no prefixo cacheado, e o reforço na instrução volta a amarrar
       // "forma do modelo, fatos das peças".
+      // O reforço é o ÚNICO fio que liga a moldura — lá no topo do prefixo
+      // cacheado — à tarefa, centenas de milhares de tokens adiante. Nomear a
+      // quantidade torna verificável que eles chegaram: "os 3 modelos" é uma
+      // afirmação que o modelo pode conferir contra o que leu.
       const reforcoModelo = molduraBloco
-        ? " Baseie a FORMA (estrutura, seções, linguagem) nos modelos de referência" +
-          " fornecidos no início — escolhendo o mais adequado e aproveitando o linguajar" +
-          " dos demais —, mas com os FATOS exclusivamente das peças deste processo."
+        ? " Baseie a FORMA (estrutura, seções, linguagem) " +
+          (modelos.length > 1
+            ? "nos " + modelos.length + " modelos de referência"
+            : "no modelo de referência") +
+          " no início desta mensagem — escolhendo o mais adequado e aproveitando o" +
+          " linguajar dos demais —, mas com os FATOS exclusivamente das peças deste" +
+          " processo."
         : "";
       const messages = prepararEnvio(
         [
@@ -5310,9 +5504,13 @@
                 // — o pior erro possível aqui, porque a citação sai com a
                 // mesma cara de uma legítima e só se descobre conferindo os
                 // autos.
+                //
+                // A INSTRUÇÃO do usuário saiu daqui da frente e vai no FIM, com
+                // moldura própria (ver blocoInstrucao). O `trimStart` é porque o
+                // SUFIXO_MINUTA começa com um espaço, herdado de quando vinha
+                // depois dela.
                 text:
-                  instrucao +
-                  SUFIXO_MINUTA +
+                  SUFIXO_MINUTA.trimStart() +
                   regraDaOrientacao(ato) +
                   reforcoModelo +
                   " Peças anexadas, use exatamente estes ids: " +
@@ -5324,6 +5522,8 @@
                   // sem essas datas sai incompleto ou inventado.
                   datasDasPecas(dl.ok) +
                   linhaDoTempoProcessual() +
+                  blocoInstrucao(instrucao) +
+                  // A tese continua por ÚLTIMO: é a decisão de quem assina.
                   blocoOrientacao(ato),
               },
             ],
@@ -5336,7 +5536,14 @@
       // aceso — "Jurisprudência ligada + Gerar minuta" produzia uma minuta sem
       // busca nenhuma, e nada na tela dizia isso. O mesmo `opts` vai ao pré-voo,
       // senão a conta de tokens não é a do request que sai.
-      const optsMinuta = optsDoTurno();
+      const optsMinuta = optsDoTurno(capsMinuta);
+      // O MODELO da minuta (irmão de redação do mesmo provedor) e o SYSTEM
+      // próprio dela viajam no mesmo `opts`, que `stream` mescla por cima do
+      // payload padrão — o mesmo mecanismo que a triagem já usa para o system.
+      // Vão TAMBÉM ao `estimarContexto` logo abaixo: o pré-voo tem de medir o
+      // request que sai, e são ~5,4 mil chars de system e uma janela diferentes.
+      if (minutaInfo && minutaInfo.model) optsMinuta.model = minutaInfo.model;
+      optsMinuta.system = systemMinuta(!!optsMinuta.tools);
 
       // Pré-voo: a minuta não tinha nenhum — autos grandes somados a até 12
       // peças-modelo voltavam como erro cru da API em vez da mensagem que diz
@@ -5389,7 +5596,11 @@
 
       const url = await guardarMinuta(md, tituloDaMinuta(md), {
         ato,
-        modelo: (modelInfo && modelInfo.model) || "",
+        // O modelo que REDIGIU, não o configurado no chat: é este campo que o
+        // editor imprime como "Texto produzido com auxílio de IA (…)", o
+        // registro dos arts. 19, §6º e 21, §2º da Res. CNJ 615. Com o do chat
+        // ele passaria a mentir no instante em que a minuta trocou de modelo.
+        modelo: (minutaInfo && minutaInfo.model) || (modelInfo && modelInfo.model) || "",
         modelosCategoria: catModelos || "",
         modelosQtd: modelos && modelos.length ? modelos.length : 0,
       });

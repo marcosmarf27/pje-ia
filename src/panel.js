@@ -947,6 +947,7 @@ var PjePanel = (function () {
                   <span class="mm-lab">Seguir modelos:</span>
                   <select class="minuta-modelo-sel" aria-label="Categoria de peças-modelo que a minuta deve seguir" title="Escolha uma categoria: o assistente recebe as suas peças-modelo daquela espécie e segue a estrutura e o estilo da mais adequada ao caso — os fatos continuam vindo só das peças do processo."></select>
                   <span class="mm-vazio" hidden>nenhuma cadastrada — a minuta sai no estilo padrão</span>
+                  <span class="mm-nota" hidden></span>
                   <button class="mm-add" hidden title="Cadastre uma sentença, decisão, despacho ou ofício seu: nas próximas minutas o assistente segue a estrutura e o estilo dela.">${SVG.novo}<span class="lbl">Cadastrar</span></button>
                 </div>
                 <div class="perfil-nota" hidden></div>
@@ -1916,19 +1917,24 @@ var PjePanel = (function () {
     let minutaCb = null;
     let minutaMode = false;
 
-    // ---- Perfil do modelo × modo minuta -------------------------------------
+    // ---- Qual modelo redige a minuta ----------------------------------------
     // O modelo mais barato para LER os autos costuma ser o mais fraco para
     // ESCREVER o expediente — não é defeito, é a estrutura de preço: analisar
     // é dominado pelo input (centenas de páginas entram, poucos milhares de
-    // tokens saem) e redigir é dominado pelo output. Quem liga o modo minuta
-    // com um modelo de perfil `analise` merece saber disso ANTES de gerar.
+    // tokens saem) e redigir é dominado pelo output.
+    //
+    // Antes isto era uma SUGESTÃO ("experimente trocar nas opções") e a minuta
+    // saía no modelo do chat de todo jeito. Hoje ela roda mesmo num irmão de
+    // redação do MESMO provedor, então a nota deixou de sugerir e passou a
+    // ANUNCIAR — inclusive o custo, que sobe junto. Mudar o modo verbal criou um
+    // requisito técnico do outro lado: `minutarAgora` precisa aguardar as caps
+    // antes de gerar, senão esta frase afirma um modelo e o turno usa outro.
     //
     // INFORMA, NUNCA BLOQUEIA (tokens `--warn-*`, como a `.sel-nota`; jamais a
-    // `.alertbar`): barrar seria a extensão julgando o trabalho de quem assina,
-    // o oposto do que a Res. CNJ 615 estabelece sobre a autoridade final.
+    // `.alertbar`): a escolha do modelo segue sendo de quem assina — Res. CNJ
+    // 615 —, e o campo "Modelo para minutas" das opções permite fixar outro.
     const perfilNota = $(".perfil-nota");
-    let perfilModelo = null; // "analise" | "redacao" | "ambos" | null
-    let sugestaoModelo = null; // {model, mesmoProvedor} | null
+    let minutaModeloInfo = null; // {model, modelChat, trocado, fixado} | null
     let modeloAtualId = null; // preenchido por setModelo, para nomear o ativo
 
     function nomeModelo(id) {
@@ -1937,29 +1943,33 @@ var PjePanel = (function () {
 
     function atualizarPerfilNota() {
       if (!perfilNota) return;
-      if (!minutaMode || perfilModelo !== "analise") {
+      // Sem troca não há o que anunciar; sem info (caps ainda não chegaram) a
+      // nota não afirma nada — melhor calada que adivinhando.
+      if (!minutaMode || !minutaModeloInfo || !minutaModeloInfo.trocado) {
         perfilNota.hidden = true;
         perfilNota.textContent = "";
         return;
       }
-      const atual = escapeHtml(nomeModelo(modeloAtualId));
-      let h =
-        "<b>" +
-        atual +
-        "</b> rende melhor para <b>ler e analisar</b> os autos; para redigir, " +
-        "costuma sair abaixo dos modelos voltados a texto.";
-      if (sugestaoModelo && sugestaoModelo.model) {
-        const alvo = escapeHtml(nomeModelo(sugestaoModelo.model));
-        h += sugestaoModelo.mesmoProvedor
-          ? " Experimente o <b>" +
-            alvo +
-            "</b> — mesmo provedor, mesma chave: é só trocar nas opções da extensão."
-          : " Experimente o <b>" +
-            alvo +
-            "</b> (exige a chave do provedor dele, configurada nas opções).";
-      }
-      h += " A minuta funciona assim mesmo — isto é uma sugestão, não um impedimento.";
-      perfilNota.innerHTML = h;
+      const alvo = escapeHtml(nomeModelo(minutaModeloInfo.model));
+      const chat = escapeHtml(nomeModelo(minutaModeloInfo.modelChat || modeloAtualId));
+      // Escolha MANUAL não recebe as afirmações do automático. "Mais adequado a
+      // redigir" e "custa mais" descrevem a troca análise → redação; quem está
+      // no Sol e fixa o Terra receberia as duas invertidas — o Terra não redige
+      // melhor que o Sol, e custa menos. Aqui a extensão só relata o que vai
+      // acontecer, que é tudo o que ela sabe.
+      perfilNota.innerHTML = minutaModeloInfo.fixado
+        ? "Esta minuta será redigida pelo <b>" +
+          alvo +
+          "</b>, que você fixou em <b>Modelo para minutas</b> nas opções — o chat " +
+          "segue no <b>" +
+          chat +
+          "</b>."
+        : "Esta minuta será redigida pelo <b>" +
+          alvo +
+          "</b> — mais adequado a redigir que o <b>" +
+          chat +
+          "</b>, que você usa no chat. Custa mais por minuta; para fixar outro, " +
+          "use <b>Modelo para minutas</b> nas opções da extensão.";
       perfilNota.hidden = false;
     }
 
@@ -2174,6 +2184,8 @@ var PjePanel = (function () {
       minutaAtoSel.addEventListener("change", () => {
         atoTocado = true;
         atualizarLinhaTese();
+        // A divergência espécie × categoria dos modelos muda com este gesto.
+        atualizarNotaModelos();
       });
     }
     // Re-detecta espécie e categoria enquanto o usuário DIGITA a instrução.
@@ -4557,14 +4569,11 @@ var PjePanel = (function () {
     // primeiro modelo sempre entra, mesmo acima do teto de caracteres.
     const MODELOS_MAX_ENVIO = 12;
     const MODELOS_TETO_CHARS = 180000; // ~45 mil tokens no total
-    function modelosMinutaSelecionados() {
-      if (!minutaModeloSel || !minutaModeloWrap || minutaModeloWrap.hidden) return [];
-      // A linha aparece também no estado VAZIO (só o convite para cadastrar):
-      // ali o <select> está oculto e não há o que enviar. Sem esta guarda a
-      // função dependeria de o select estar sem opções para devolver [].
-      if (minutaModeloSel.hidden) return [];
-      const cat = minutaModeloSel.value;
-      if (!cat) return [];
+    // Cálculo PURO da seleção: devolve o que vai e o total da categoria, sem
+    // logar nada. Separado de `modelosMinutaSelecionados` porque a nota da UI
+    // (atualizarNotaModelos) precisa do mesmo número a cada repintura, e chamar
+    // a função que loga encheria o console de linhas idênticas.
+    function selecaoDeModelos(cat) {
       const doGrupo = modelosLib
         .filter((m) => (m.categoria || "outro") === cat && m.texto)
         .sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0));
@@ -4592,11 +4601,70 @@ var PjePanel = (function () {
       // assim mesmo — escolher uma categoria precisa fazer alguma coisa, e um
       // envio silenciosamente sem modelo nenhum seria a feature não acontecer.
       if (!out.length && doGrupo.length) out.push(doGrupo[0]);
-      // "sem cap silencioso": avisa no console quando corta modelos da categoria
-      if (doGrupo.length > out.length) {
+      return { out, total: doGrupo.length };
+    }
+
+    // "Conjunto vazio se EXPLICA, não desaparece" — a mesma regra da .sel-nota
+    // dos degraus e da própria .minutabar. Três coisas aconteciam em SILÊNCIO e
+    // davam, para quem gerava, o mesmo sintoma ("não seguiu os meus modelos"):
+    // nenhuma categoria escolhida, modelos cortados pelo teto de contexto, e a
+    // categoria dos modelos divergindo da espécie do ato.
+    //
+    // Aviso SUAVE (--warn-*), nunca a .alertbar: em nenhum dos casos algo está
+    // quebrado — a minuta sai, só que sem o que o usuário talvez esperasse.
+    function atualizarNotaModelos() {
+      const nota = $(".mm-nota");
+      if (!nota) return;
+      const dizer = (t) => {
+        nota.textContent = t || "";
+        nota.hidden = !t;
+      };
+      if (!minutaMode || !minutaModeloWrap || minutaModeloWrap.hidden) return dizer("");
+      // Biblioteca vazia: a .mm-vazio ao lado já explica e já oferece a saída.
+      if (!modelosLib.length || !minutaModeloSel || minutaModeloSel.hidden) return dizer("");
+      const cat = minutaModeloSel.value;
+      if (!cat) {
+        return dizer(
+          "Nenhuma categoria escolhida: a minuta sai no estilo padrão, sem seguir as suas peças-modelo."
+        );
+      }
+      const { out, total } = selecaoDeModelos(cat);
+      const partes = [];
+      if (total > out.length) {
+        partes.push(
+          out.length + " de " + total + " peças-modelo desta categoria cabem no contexto; " +
+            "as demais ficam de fora (as mais recentes entram primeiro)."
+        );
+      }
+      // A espécie do ato e a categoria dos modelos são <select> INDEPENDENTES:
+      // dá para pedir "Sentença" e mandar modelos de "Despachos". Pode ser
+      // deliberado — por isso não bloqueia —, mas calado vira defeito.
+      const ato = minutaAtoSel && minutaAtoSel.value;
+      if (ato && cat !== ato && MLIB.CATEGORIAS.some((c) => c.valor === ato)) {
+        const esp = ESPECIES_ATO.find((e) => e.valor === ato);
+        partes.push(
+          "O ato é " + ((esp && esp.rotulo) || ato) + " e os modelos são de " +
+            MLIB.rotuloCategoria(cat) + "."
+        );
+      }
+      dizer(partes.join(" "));
+    }
+
+    function modelosMinutaSelecionados() {
+      if (!minutaModeloSel || !minutaModeloWrap || minutaModeloWrap.hidden) return [];
+      // A linha aparece também no estado VAZIO (só o convite para cadastrar):
+      // ali o <select> está oculto e não há o que enviar. Sem esta guarda a
+      // função dependeria de o select estar sem opções para devolver [].
+      if (minutaModeloSel.hidden) return [];
+      const cat = minutaModeloSel.value;
+      if (!cat) return [];
+      const { out, total } = selecaoDeModelos(cat);
+      // "sem cap silencioso": o corte agora vai à UI (atualizarNotaModelos), e o
+      // console fica como registro de diagnóstico para quem abre o F12.
+      if (total > out.length) {
         try {
           console.info(
-            "[PJe IA] minuta: " + out.length + " de " + doGrupo.length +
+            "[PJe IA] minuta: " + out.length + " de " + total +
               " modelos da categoria couberam no teto de contexto (" +
               MODELOS_TETO_CHARS + " chars); os demais ficaram de fora."
           );
@@ -4619,6 +4687,7 @@ var PjePanel = (function () {
       if (!minutaModeloWrap) return;
       if (!on || !temMlib || !modelosHabilitado) {
         minutaModeloWrap.hidden = true;
+        atualizarNotaModelos();
         return;
       }
       const vazio = !modelosLib.length;
@@ -4627,6 +4696,7 @@ var PjePanel = (function () {
       minutaModeloSel.hidden = vazio;
       if (!vazio) popularSeletorModelos(detectarCategoria(inEl.value));
       minutaModeloWrap.hidden = false;
+      atualizarNotaModelos();
     }
     // Atalho do estado vazio: abre o gerenciador já no formulário — o caminho
     // até aqui (barra de ferramentas → Modelos → Novo) é justamente o que
@@ -4636,6 +4706,7 @@ var PjePanel = (function () {
     if (minutaModeloSel) {
       minutaModeloSel.addEventListener("change", () => {
         catModeloTocada = true;
+        atualizarNotaModelos();
       });
     }
     if (minutaModeloAdd) {
@@ -6357,12 +6428,13 @@ var PjePanel = (function () {
       // Habilita a biblioteca de modelos só nos modelos de 1M tokens (chamada
       // pelo content.js quando as caps chegam/mudam).
       setModelosHabilitado,
-      // Perfil de uso do modelo ativo + qual sugerir para redigir. Chamado pelo
-      // content.js quando as caps chegam/mudam; a nota só aparece no modo
-      // minuta, então trocar de modelo com o modo ligado a reescreve na hora.
-      setPerfilModelo(perfil, sugestao) {
-        perfilModelo = perfil || null;
-        sugestaoModelo = sugestao || null;
+      // Qual modelo vai REDIGIR a minuta. Chamado pelo content.js quando as
+      // caps chegam/mudam; a nota só aparece no modo minuta, então trocar de
+      // modelo (ou o campo "Modelo para minutas") a reescreve na hora.
+      // Substitui o antigo `setPerfilModelo`: duas APIs escrevendo no mesmo
+      // elemento divergiriam na primeira edição.
+      setModeloMinuta(info) {
+        minutaModeloInfo = info || null;
         atualizarPerfilNota();
       },
       // Número CNJ do processo, exibido sob o nome do produto no cabeçalho.

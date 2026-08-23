@@ -2,6 +2,7 @@ const apiKeyEl = document.getElementById("apiKey");
 const geminiKeyEl = document.getElementById("geminiApiKey");
 const openaiKeyEl = document.getElementById("openaiApiKey");
 const modelEl = document.getElementById("model");
+const modeloMinutaEl = document.getElementById("modeloMinuta");
 const effortEl = document.getElementById("effort");
 const customEl = document.getElementById("customPrompt");
 // Só existe na página de opções (o popup é o console rápido). Como todo
@@ -144,6 +145,54 @@ function sugestaoDeRedacao() {
   return null;
 }
 
+// O seletor "Modelo para minutas". Os <option> são CLONADOS do #model: manter
+// uma segunda lista no HTML criaria mais um lugar para divergir dos ids reais
+// (o mesmo motivo pelo qual o teste extrai tudo dos fontes).
+//
+// O primeiro item é o AUTOMÁTICO, e ele nomeia o modelo resolvido. Um item só
+// escrito "Automático" obriga o usuário a adivinhar o que vai acontecer, que é
+// justamente a dúvida que este campo existe para tirar.
+function montarModeloMinuta() {
+  if (!modeloMinutaEl) return;
+  const escolhido = modeloMinutaEl.value;
+  modeloMinutaEl.textContent = "";
+  const auto = document.createElement("option");
+  auto.value = "";
+  modeloMinutaEl.appendChild(auto);
+  // SÓ o provedor do modelo do chat. O worker recusa um override de outro
+  // provedor (as peças já subiram à Files API do provedor ativo, e um file_id
+  // trocado vira 400) — oferecer aqui o que lá é ignorado faria a tela mostrar
+  // uma escolha que não acontece. Filtrando, a UI passa a espelhar a verdade: o
+  // que sobra é exatamente o que pode valer.
+  const prov = provedorDoModelo();
+  for (const g of modelEl.querySelectorAll('optgroup[data-prov="' + prov + '"]')) {
+    const c = g.cloneNode(true);
+    // Só o NOME do modelo aqui. Os rótulos do #model trazem o detalhe de
+    // janela/páginas e, no caso do Luna, a palavra "(padrão)" — que neste campo
+    // seria falsa: o padrão daqui é o "Automático" do topo. Mesmo corte de
+    // `nomeDoModelo()`, no primeiro " (".
+    for (const op of c.querySelectorAll("option")) {
+      op.textContent = op.textContent.split(" (")[0].trim();
+    }
+    modeloMinutaEl.appendChild(c);
+  }
+  // Id que não está entre os <option> — porque saiu da tabela OU porque é de
+  // outro provedor — deixa o campo vazio, e vazio AQUI significa automático.
+  // É a MESMA decisão que o worker toma (modeloDaMinuta), então a tela e o
+  // comportamento não têm como divergir.
+  modeloMinutaEl.value = escolhido;
+  pintarAutoMinuta();
+}
+
+function pintarAutoMinuta() {
+  const auto = modeloMinutaEl && modeloMinutaEl.options[0];
+  if (!auto) return;
+  const sug = sugestaoDeRedacao();
+  auto.textContent = sug
+    ? "Automático — " + sug
+    : "Automático — o mesmo do chat (" + nomeDoModelo() + ")";
+}
+
 // A linha de indicação abaixo do <select>. É AJUDA, não regra: nenhum modelo é
 // impedido de nada — a extensão só diz o que a experiência de uso mostrou.
 function pintarPerfil() {
@@ -284,7 +333,16 @@ function pintarMascaras() {
 // inexistente. Quem mostra a chave do provedor ativo agora é `pintarProvedores`.
 
 chrome.storage.local.get(
-  ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort", "customPrompt", "memoriaCaso"],
+  [
+    "apiKey",
+    "geminiApiKey",
+    "openaiApiKey",
+    "model",
+    "effort",
+    "customPrompt",
+    "memoriaCaso",
+    "modeloMinuta",
+  ],
   (v) => {
     if (v.apiKey) apiKeyEl.value = v.apiKey;
     if (v.geminiApiKey) geminiKeyEl.value = v.geminiApiKey;
@@ -295,6 +353,10 @@ chrome.storage.local.get(
     // "Salvar" gravaria modelo vazio. Acontece com config de uma versão que
     // oferecia outro modelo — o padrão atual é a saída correta.
     if (!modelEl.value) modelEl.value = MODELO_PADRAO;
+    // Depois de `modelEl.value`: o rótulo do "Automático" é calculado a partir
+    // do modelo do chat, então montar antes mostraria a sugestão do modelo errado.
+    montarModeloMinuta();
+    if (modeloMinutaEl) modeloMinutaEl.value = v.modeloMinuta || "";
     if (v.effort) setEffort(v.effort);
     if (customEl && v.customPrompt) customEl.value = v.customPrompt;
     // Default LIGADO, e por isso o teste é `!== false`: quem nunca abriu esta
@@ -356,6 +418,10 @@ personas.forEach((b) => {
 modelEl.addEventListener("change", () => {
   // setChip → pintarProvedores já revela a chave do provedor recém-escolhido.
   setChip();
+  // Trocar o modelo do chat pode trocar o PROVEDOR, e a lista de minutas é só
+  // do provedor ativo — remontar (e não apenas repintar o rótulo do automático)
+  // é o que impede o campo de continuar oferecendo a família anterior.
+  montarModeloMinuta();
 });
 apiKeyEl.addEventListener("input", setChip);
 geminiKeyEl.addEventListener("input", setChip);
@@ -448,6 +514,9 @@ saveBtn.addEventListener("click", () => {
   const geminiApiKey = geminiKeyEl.value.trim();
   const openaiApiKey = openaiKeyEl ? openaiKeyEl.value.trim() : "";
   const cfg = { apiKey, geminiApiKey, openaiApiKey, model: modelEl.value };
+  // "" = automático. Gravado SEMPRE que o campo existe, para desfazer uma
+  // escolha anterior ser possível voltando ao automático.
+  if (modeloMinutaEl) cfg.modeloMinuta = modeloMinutaEl.value;
   if (effortEl) cfg.effort = getEffort();
   if (customEl) cfg.customPrompt = customEl.value.trim();
   if (memoriaEl) cfg.memoriaCaso = memoriaEl.checked;

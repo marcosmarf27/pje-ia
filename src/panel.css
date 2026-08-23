@@ -2326,6 +2326,18 @@ button > svg { flex: none; }
    modelo nenhum, e a minuta sai no estilo padrão. */
 .mm-vazio { flex: 1; min-width: 0; color: var(--muted); }
 .mm-vazio[hidden] { display: none; }
+/* Por que ESTES modelos (e não outros) vão na minuta. Aviso SUAVE (--warn-*),
+   irmão da .mt-nota e da .perfil-nota — nunca a .alertbar: a minuta sai, só que
+   sem o que o usuário talvez esperasse. Linha inteira da faixa (flex-wrap),
+   para não espremer os seletores. */
+.mm-nota {
+  flex-basis: 100%;
+  font-size: var(--fs-micro); line-height: 1.45;
+  color: var(--warn-ink); background: var(--warn-bg);
+  border: 1px solid var(--warn-line); border-radius: var(--r-tight);
+  padding: var(--sp-2) var(--sp-2b); margin-top: 2px;
+}
+.mm-nota[hidden] { display: none; }
 .mm-add {
   flex: none; display: inline-flex; align-items: center; gap: 5px;
   border: 1px solid var(--pje); background: #fff; color: var(--pje-2);

@@ -3064,6 +3064,177 @@ que abriu a rodada.
   `gemini-3.7-flash` foram MEDIDOS em uso real** (19/08/2026); os outros oito são
   inferência do tier, e isso está dito no comentário de cada linha.
 
+### O `perfil` deixou de ser conselho e virou AÇÃO (v0.48.0)
+
+Até a v0.47 o `perfil` só alimentava uma **nota** na barra de minuta mandando
+"trocar nas opções", e a minuta saía no modelo do chat de todo jeito. Agora ela
+roda mesmo num irmão de redação do MESMO provedor: Luna→**Terra**,
+Haiku→**Sonnet 5**, Flash-Lite→**Gemini 3.7 Flash**.
+
+- **A tabela é a que já existia**: `sugestaoRedacao` devolve exatamente esses
+  três (filtra `perfil !== "analise"`, prefere o mesmo provedor, desempata pelo
+  menor `preco.out`). Um modelo novo entra por uma linha em `MODEL_CAPS`, não
+  por um ramo novo na UI — a regra "condicionar por caps, nunca por nome de
+  modelo" continua valendo inclusive aqui.
+- **`modeloDoTurno(cfg, pedido)` é o override de MODELO por turno**, irmão do
+  de `effort`, e vive ao lado dele em `executarTurno`. Aceito **só dentro do
+  mesmo provedor**, e a guarda não é zelo: as peças já subiram à Files API do
+  provedor do modelo CONFIGURADO, e é com ele que `precisaUpload`,
+  `fileIdValido` e `montarBlocos` decidem. Um modelo de outro provedor faria o
+  request sair com `file_id` da API errada e morrer num 400 críptico.
+- **O custo se corrige sozinho.** `capsDe(model)` e `custoUsdDe` já derivam do
+  `model` resolvido dentro do `executarTurno`: o rodapé, o tooltip e o degrau
+  de preço acima de 272k saem certos sem nenhuma linha a mais. O salto é real —
+  Luna 0,20/1,20 → Terra 2/12 —, e é por isso que a barra anuncia antes.
+- **`countTokens` precisa do MESMO override.** Sem ele o pré-voo mede na janela
+  do modelo do chat, e no caso Haiku→Sonnet são 200 mil contra 1 milhão: a
+  guarda de 90% barraria minutas que cabem com folga.
+- **`modeloDaMinuta` decide por "o usuário ESCOLHEU?", nunca por "o escolhido é
+  diferente do chat?"** — e a distinção já custou um bug na revisão do plano.
+  Fixar o próprio modelo do chat é escolha legítima ("quero minutar no Luna
+  mesmo, é mais barato"); comparar os dois fazia o automático sobrescrevê-la em
+  silêncio, e o campo das opções prometia controle negando justamente a opção de
+  NÃO trocar. Só cai no automático quando a escolha não tem COMO ser honrada: id
+  fora da tabela, ou de outro provedor.
+- **`caps` devolve `minuta: {model, caps, trocado}`** — as caps do redator
+  viajam junto para o content decidir por elas sem conhecer nome de modelo, a
+  mesma regra do campo `caps`. `modeloMinuta` entra no `storage.onChanged`.
+- **O gate da biblioteca de peças-modelo passou a olhar as caps da MINUTA**
+  (`content.js`, `setModelosHabilitado`), e isto corrige um silêncio caro: quem
+  escolhe "Anthropic" no popup cai no `claude-haiku-4-5` (200k), o gate
+  desligava o botão 📚 e `modelosMinutaSelecionados()` devolvia `[]` **sem
+  aviso no envio** — a minuta saía sem peça-modelo nenhuma. Como ela agora roda
+  no Sonnet 5, medir pelo chat seria negar a feature por um limite que não se
+  aplica. Mesma lógica em `guardaPaginas(ids, caps)` e `optsDoTurno(caps)` (as
+  versões de `web_search` variam entre irmãos Anthropic).
+- **`minutarAgora` passou a chamar `await garantirCaps()`**, e isso é
+  consequência DIRETA de a nota ter virado afirmação. Enquanto ela sugeria, a
+  corrida era inofensiva; anunciando "GPT-5.6 Terra" numa janela em que as caps
+  ainda não chegaram, o turno sairia no Luna (sem `payload.model` o worker cai
+  no `cfg.model`) e a tela estaria mentindo. **Mudar o modo verbal de um texto
+  de UI pode criar um requisito técnico novo.**
+- **`origem.modelo` grava o REDATOR, não o modelo do chat**: é esse campo que o
+  `editor.js` imprime como "Texto produzido com auxílio de IA (…)", o registro
+  dos arts. 19, §6º e 21, §2º da Res. CNJ 615. Com o do chat ele passaria a
+  mentir no instante em que a minuta trocou de modelo.
+- **Imprecisões ACEITAS e comentadas no código**: `tetoTextoChars` e o selo da
+  toolbar continuam no modelo do chat. O primeiro corta o texto das peças mais
+  do que precisaria no caso Haiku→Sonnet (degradação graciosa, já avisada por
+  `pecasTruncadas`; mexer nele exigiria manter `montarBlocos`, `pecasTruncadas`
+  e `estimativaLocalTokens` em sincronia). O segundo é deliberado: o selo
+  descreve a CONFIGURAÇÃO, e quem responde "quem redige esta minuta" é a barra,
+  no gesto.
+- **`setPerfilModelo` SAIU** e deu lugar a `setModeloMinuta({model, modelChat,
+  trocado})`: duas APIs escrevendo no mesmo elemento divergiriam. O gatilho da
+  nota é `trocado`, não `perfil === "analise"` — quem fixa outro modelo nas
+  opções também precisa ser avisado.
+- **Campo "Modelo para minutas"** (`chrome.storage.local.modeloMinuta`, "" =
+  automático) nas duas telas. Os `<option>` são **clonados do `#model` em JS**
+  (`montarModeloMinuta`): uma segunda lista no HTML seria mais um lugar para
+  divergir dos ids reais. O item "Automático" **nomeia o modelo resolvido** —
+  "Automático" sozinho obriga a adivinhar o que vai acontecer, que é a dúvida
+  que o campo existe para tirar.
+- **A lista mostra SÓ o provedor do modelo do chat**, e trocar o modelo do chat
+  a REMONTA. Oferecer os outros faria a tela exibir uma escolha que o worker
+  recusa (`modeloDoTurno`); assim, um valor salvo de outro provedor some do
+  campo sozinho — a MESMA decisão que `modeloDaMinuta` toma, então tela e
+  comportamento não têm como divergir. O `Salvar` grava o que está na tela.
+- **`modeloDaMinuta` devolve `{model, fixado}`, e o `fixado` não é enfeite**: a
+  nota da barra afirma "mais adequado a redigir" e "custa mais", e as duas só
+  valem no automático (análise → redação). Quem está no Sol e fixa o Terra
+  receberia as duas INVERTIDAS — o Terra não redige melhor que o Sol, e custa
+  menos. Na escolha manual a nota apenas RELATA o que vai acontecer, que é tudo
+  o que a extensão sabe.
+
+### O system da MINUTA é PRÓPRIO (`systemMinuta`, v0.48.0)
+
+A minuta usava o system do CHAT, e três trechos dele trabalhavam contra o
+resultado. Não era teoria: é o que explica "a minuta não segue os meus modelos".
+
+- **`PROMPT_INICIO` mandava "Baseie-se SOMENTE nos documentos anexados (peças
+  selecionadas pelo usuário)"** — e peça-modelo **não é** peça selecionada.
+  Havia uma regra no system mandando ignorar a moldura
+  `<modelos_de_referencia>`. Na minuta ela vira `PROMPT_FONTE_MINUTA`, que
+  separa os eixos: conteúdo dos autos, forma dos modelos.
+- **`PROMPT_FIM` pedia "para uma pergunta pontual, responda em uma ou duas
+  frases corridas, sem estruturar"** numa tarefa cuja estrutura é obrigatória.
+  Virou `PROMPT_FORMATO_CHAT`, fora da minuta.
+- **`PROMPT_DESTAQUES` mandava usar `> [!ALERTA]` e o `SUFIXO_MINUTA` gasta a
+  última frase PROIBINDO** — dois comandos contraditórios no mesmo payload. O
+  comentário do `PROMPT_DESTAQUES` sempre AFIRMOU que ele não ia na minuta; ia,
+  porque a minuta chama `systemPromptAtual()`. **Doc contra realidade — agora a
+  afirmação é verdade**, e a frase do sufixo fica como cinto-e-suspensório.
+- **Os prompts foram PARTIDOS, nunca reescritos**: `PROMPT_PAPEL` +
+  `PROMPT_FONTE_CHAT|MINUTA` + `PROMPT_RASTREIO`, `PROMPT_FIM_COMUM` +
+  `PROMPT_FORMATO_CHAT`, e os dois trechos de citação em `PROMPT_CIT_NATIVA`/
+  `PROMPT_CIT_TEXTUAL`. Como `join(" ")` sobre arrays concatenados é
+  associativo, o system do CHAT sai **byte a byte** o de antes (5.302 e 5.381
+  chars) — e há teste que compara com o `git show HEAD`.
+- **A citação é SEMPRE a TEXTUAL** (`PROMPT_CIT_TEXTUAL`), e `citacoesNativas`
+  NÃO é consultada aqui — o que num outro fluxo seria descuido, aqui é a regra.
+  Duas razões: (a) a citação nativa **não existe no produto final** — a minuta
+  vira markdown, abre no editor e sai em `.docx` para o PJe, enquanto os
+  `page_location` da API ficariam na bolha do chat, que neste fluxo nem existe
+  (a resposta vira um card); (b) o `PROMPT_CIT_NATIVA` manda literalmente "NÃO
+  repita id nem folha no corpo do texto" e o `SUFIXO_MINUTA` exige "(Título da
+  peça, id 123456, fl. 7)" em TODA afirmação — num modelo Anthropic eram dois
+  comandos OPOSTOS sobre a rastreabilidade, que é a coisa mais importante do
+  ato. Some-se que é a mesma regra peça·id·folha das cinco saídas. Coberto por
+  teste que monta a minuta com caps de citação nativa.
+- **`comBusca` é PARÂMETRO**, não uma leitura de `panel.isSearchOn()` lá
+  dentro: `systemMinuta` é chamada DUAS vezes por turno (pré-voo e stream) e as
+  duas precisam da MESMA string — um toggle alternado entre elas faria o
+  `count_tokens` medir um request diferente do que sai.
+- **Pré-requisito que era um bug**: `estimarContexto` chamava
+  `systemPromptAtual()` HARDCODED e ignorava `opts.system`. O mecanismo de
+  override por turno já existia (a triagem passa `{system: systemTriagem()}` e
+  `stream` faz `Object.assign`), mas o pré-voo não o via.
+
+### A INSTRUÇÃO do usuário tem moldura e vai no fim (v0.48.0)
+
+Ela era concatenada crua na frente do `SUFIXO_MINUTA` — sem tag, sem separador
+— e perdia nas duas dimensões que decidem o que um modelo obedece:
+
+- **FRONTEIRA**: a tese tem `<orientacao_decisoria>`, os modelos têm
+  `<modelos_de_referencia>`, e o pedido do usuário era o ÚNICO texto livre sem
+  moldura, indistinguível das regras do produto. ~80 chars de instrução contra
+  ~3.000 de imperativo categórico logo depois; um pedido que contrariasse o
+  sufixo ("sem tabelas", "texto corrido") perdia.
+- **RECÊNCIA**: depois dela ainda vinham a lista de ids, as datas de juntada e
+  até ~15 mil chars de linha do tempo. A última coisa lida NÃO era o pedido.
+
+`blocoInstrucao` resolve as duas, e três detalhes não podem cair:
+
+- **Ela sobe, mas fica ANTES de `blocoOrientacao`.** A tese continua sendo a
+  última coisa que o modelo lê, porque é obrigação normativa (a decisão de quem
+  assina); a instrução é regra de forma. Rebaixar a tese para dar recência à
+  forma seria inverter a hierarquia que a Res. CNJ 615 estabelece.
+- **Com a `INSTRUCAO_MINUTA_PADRAO` a moldura é NEUTRA**, sem a cláusula de
+  prevalência: o painel injeta esse texto sozinho no campo vazio, e dar-lhe peso
+  de "o usuário pediu isto" seria fabricar uma ordem que ninguém deu.
+- `SUFIXO_MINUTA.trimStart()` — ele começa com um espaço, herdado de quando
+  vinha depois da instrução, e agora abre o bloco.
+
+E na `molduraModelos` a **REGRA ABSOLUTA passou para DEPOIS dos modelos**: é a
+frase mais categórica do bloco, e abrindo-o dominava a leitura — o modelo
+entrava nos `<modelo>` já convencido de não aproveitar nada deles, que é
+exatamente o "ignorou o meu modelo". A ordem que funciona é **o que fazer → os
+modelos → o limite**.
+
+### Os silêncios da seleção de modelos (`.mm-nota`, v0.48.0)
+
+"Conjunto vazio se EXPLICA, não desaparece" — a regra da `.sel-nota` e da
+`.minutabar`. Três coisas aconteciam em silêncio e davam, para quem gerava, o
+MESMO sintoma: nenhuma categoria escolhida, modelos cortados pelo teto de
+180.000 chars (reportados só no `console.info`) e a categoria dos modelos
+divergindo da espécie do ato (são `<select>` independentes: dá para pedir
+"Sentença" e mandar modelos de "Despachos"). A nota diz qual foi, com tokens
+`--warn-*` e nunca a `.alertbar` — a minuta sai, só que sem o que o usuário
+talvez esperasse; a divergência pode ser deliberada e por isso não bloqueia.
+O cálculo puro foi extraído para `selecaoDeModelos(cat)`, separado de
+`modelosMinutaSelecionados`, porque a nota repinta a cada gesto e chamar a
+função que loga encheria o console de linhas idênticas.
+
 ### O aviso de novidades: a ATUALIZAÇÃO é o canal
 
 **A Chrome Web Store não tem push para quem já instalou** — não existe API para

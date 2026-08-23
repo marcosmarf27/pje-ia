@@ -311,6 +311,47 @@ function sugestaoRedacao(model) {
   return { model: id, mesmoProvedor: mesmo.length > 0 };
 }
 
+// Override de MODELO por turno — irmão do override de `effort` (ver EFFORTS,
+// mais abaixo). Aceito SÓ dentro do mesmo provedor, e isso não é zelo: as peças
+// já subiram à Files API do provedor do modelo CONFIGURADO, e é com ele que
+// `precisaUpload`/`fileIdValido`/`montarBlocos` (content.js) decidem se o
+// arquivo pode ir por referência. Um modelo de outro provedor faria o request
+// sair com file_id da API errada e morrer num 400 críptico — exatamente o que
+// aqueles predicados existem para evitar. Id fora da tabela cai no configurado,
+// em vez de virar um 404 da API.
+function modeloDoTurno(cfg, pedido) {
+  if (!pedido || !MODEL_CAPS[pedido]) return cfg.model;
+  if (providerDe(pedido) !== providerDe(cfg.model)) return cfg.model;
+  return pedido;
+}
+
+// Qual modelo REDIGE a minuta. Redigir é dominado pelo OUTPUT, e os modelos de
+// perfil `analise` — o padrão `gpt-5.6-luna`, o `claude-haiku-4-5` que é o
+// padrão Anthropic do popup, o `gemini-3.5-flash-lite` — são justamente os mais
+// fracos nele. Daí a minuta rodar num irmão de redação do MESMO provedor, em
+// vez do modelo do chat.
+//
+// O critério da preferência é "o usuário ESCOLHEU alguma coisa?", NUNCA "o
+// escolhido é diferente do modelo do chat?". Fixar o próprio modelo do chat é
+// escolha legítima ("quero minutar no Luna mesmo, é mais barato"), e comparar
+// os dois faria o automático sobrescrevê-la em silêncio: o campo das opções
+// prometeria controle e negaria justamente a opção de NÃO trocar.
+// Devolve {model, fixado}: `fixado` diz que a escolha veio do usuário, e não
+// do automático. A UI PRECISA distinguir os dois — a nota da barra afirma "mais
+// adequado a redigir" e "custa mais", que só são verdade no automático
+// (análise → redação). Quem está no Sol e fixa o Terra receberia as duas
+// afirmações invertidas: o Terra não redige melhor que o Sol, e custa menos.
+function modeloDaMinuta(cfg) {
+  if (cfg.modeloMinuta) {
+    const fixo = modeloDoTurno(cfg, cfg.modeloMinuta);
+    // Só cai no automático quando a escolha não tem COMO ser honrada: id que
+    // saiu da tabela, ou de provedor diferente daquele que subiu as peças.
+    if (fixo === cfg.modeloMinuta) return { model: fixo, fixado: true };
+  }
+  const s = sugestaoRedacao(cfg.model);
+  return { model: (s && s.model) || cfg.model, fixado: false };
+}
+
 // Default: GPT-5.6 Luna — 1,05M de tokens cobrem os autos inteiros sem a
 // guarda de páginas estourar (o caso comum aqui) e é o mais barato dos
 // modelos de janela grande: US$ 0,20/1,20 por 1M, contra 1,50/7,50 do Gemini
@@ -330,7 +371,7 @@ function sugestaoRedacao(model) {
 function getCfg() {
   return new Promise((resolve) =>
     chrome.storage.local.get(
-      ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort"],
+      ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort", "modeloMinuta"],
       (v) =>
         resolve({
           apiKey: v.apiKey,
@@ -338,6 +379,9 @@ function getCfg() {
           openaiApiKey: v.openaiApiKey,
           model: v.model || "gpt-5.6-luna",
           effort: v.effort || "high",
+          // "" = automático (ver modeloDaMinuta). Um id fixado aqui só vale
+          // dentro do provedor do modelo do chat.
+          modeloMinuta: v.modeloMinuta || "",
         })
     )
   );
@@ -454,15 +498,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } catch {
         /* sem chave para este provedor: nada a invalidar */
       }
+      const { model: mMin, fixado: minFixado } = modeloDaMinuta(cfg);
       sendResponse({
         model: cfg.model,
         effort: cfg.effort,
         caps: capsDe(cfg.model),
-        // Qual modelo sugerir para REDIGIR quando o ativo é de perfil
-        // `analise`. Calculado aqui, e não no painel, porque a tabela de
-        // modelos mora só no worker — o painel condiciona por caps e nunca
-        // conhece nome de modelo. `null` quando o ativo já serve para redigir.
-        sugestao: sugestaoRedacao(cfg.model),
+        // O modelo que vai REDIGIR a minuta, com as caps DELE. As caps viajam
+        // junto para o content decidir por elas — janela, páginas, citação
+        // nativa — sem nunca conhecer nome de modelo, a mesma regra do campo
+        // `caps` acima. É daqui que saem o gate da biblioteca de peças-modelo
+        // e o anúncio na barra de minuta.
+        minuta: {
+          model: mMin,
+          caps: capsDe(mMin),
+          trocado: mMin !== cfg.model,
+          fixado: minFixado,
+        },
         chaveHash,
       });
     })();
@@ -555,20 +606,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     (async () => {
       try {
         const cfg = await getCfg();
-        const provider = providerDe(cfg.model);
+        // MESMO override de modelo do `executarTurno`: o pré-voo tem de medir o
+        // request que vai de fato. Sem isto a minuta seria medida na janela do
+        // modelo do CHAT — no caso Haiku→Sonnet 5 são 200 mil tokens contra 1
+        // milhão, e a guarda de 90% barraria minutas que cabem com folga.
+        const model = modeloDoTurno(cfg, msg.payload.model);
+        const provider = providerDe(model);
         const apiKey = chaveDe(cfg, provider);
         let tokens;
         if (provider === "gemini") {
           tokens = await countTokensGemini({
             apiKey,
-            model: cfg.model,
+            model,
             system: msg.payload.system,
             messages: msg.payload.messages,
           });
         } else if (provider === "openai") {
           tokens = await countTokensOpenAI({
             apiKey,
-            model: cfg.model,
+            model,
             system: msg.payload.system,
             messages: msg.payload.messages,
             tools: msg.payload.tools,
@@ -576,14 +632,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         } else {
           tokens = await countTokens({
             apiKey,
-            model: cfg.model,
+            model,
             system: msg.payload.system,
             messages: msg.payload.messages,
             tools: msg.payload.tools,
             betas: msg.payload.betas,
           });
         }
-        sendResponse({ tokens, contextTokens: capsDe(cfg.model).contextTokens });
+        sendResponse({ tokens, contextTokens: capsDe(model).contextTokens });
       } catch (e) {
         sendResponse({ error: String((e && e.message) || e) });
       }
@@ -823,14 +879,19 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Executa um turno completo (com continuações pause_turn), emitindo o progresso
 // pelo Port. Retorna {content, stopReason}; lança erro em falha ou recusa.
-// payload: {system, messages, tools?, betas?, maxTokens?}
+// payload: {system, messages, tools?, betas?, maxTokens?, effort?, model?}
 // Níveis aceitos no override de effort (o payload vem do content script, que é
 // nosso, mas um valor fora da escala viraria 400 na API em vez de erro claro).
 const EFFORTS = new Set(["low", "medium", "high"]);
 
 async function executarTurno(port, payload) {
   const cfg = await getCfg();
-  const { model } = cfg;
+  // O MODELO é o da configuração, SALVO quando o turno pede outro — hoje só a
+  // minuta pede (ver modeloDaMinuta). Tudo abaixo deriva daqui: `capsDe`, o
+  // provedor, a chave, o `baseReq.model` e — o que mais importa — o
+  // `custoUsdDe` do fim, que assim cobra pela tabela do modelo que de fato
+  // respondeu, sem nenhuma linha a mais.
+  const model = modeloDoTurno(cfg, payload.model);
   // O effort é o da configuração, SALVO quando o turno pede outro. Turnos
   // utilitários — a triagem do "Escolher com IA" é o caso — são classificação
   // sobre metadados, não análise jurídica: com raciocínio alto o usuário espera
