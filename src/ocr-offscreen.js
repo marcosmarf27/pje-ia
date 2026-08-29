@@ -296,6 +296,13 @@ async function medirBackends(buf, msWasm, resWasm) {
     // campeão rápido demais (warm-up do rival conta a favor dele), e o teto de
     // 60 s garante que a página inteira caiba no `OCR_TIMEOUT_1A_MS` do
     // content.js — teto que existe do outro lado e que o duelo não pode furar.
+    // VIÉS CONHECIDO E ACEITO: o WebGPU compila os shaders na PRIMEIRA execução,
+    // então ele disputa carregando um custo que não se repete. O viés é contra
+    // ele — isto é, a favor do WASM, que é a base universal e previsível —, e
+    // corrigi-lo custaria uma inferência de aquecimento na primeira página, que
+    // é justamente a que o usuário está esperando. Medido em máquina real: o
+    // WebGPU ganhou mesmo assim, o que mostra que quando ele é de fato melhor a
+    // margem cobre o viés.
     const orcamento = Math.min(60000, Math.max(20000, msWasm * 4));
     const t0 = Date.now();
     const r = await comTeto(
@@ -304,7 +311,25 @@ async function medirBackends(buf, msWasm, resWasm) {
       "o reconhecimento no WebGPU"
     );
     const msGpu = Date.now() - t0;
-    d("DUELO -> WASM", msWasm + "ms", "| WebGPU", msGpu + "ms");
+    // O DUELO NÃO PODE SER SÓ DE VELOCIDADE. Um backend que perde operadores
+    // para a CPU pode devolver MENOS TEXTO e, por isso mesmo, terminar antes —
+    // e aí "ganhar" significaria trocar leitura por rapidez, em silêncio e para
+    // sempre (a decisão é memorizada). Os dois resultados já estão em mãos, e o
+    // tamanho do texto é o sinal mais barato que existe: um vencedor que lê
+    // menos de 70% do que o adversário leu não venceu nada.
+    //
+    // O limiar é FROUXO de propósito: os dois rodam o mesmo modelo e uma
+    // diferença de poucos por cento é o ruído normal do reamostramento. O que
+    // 70% pega é o colapso — a página que volta pela metade ou vazia.
+    const nGpu = ((r && r.text) || "").trim().length;
+    const nWasm = ((resWasm && resWasm.text) || "").trim().length;
+    const leuMenos = nWasm > 0 && nGpu < nWasm * 0.7;
+    d("DUELO -> WASM", msWasm + "ms/" + nWasm + " chars", "| WebGPU", msGpu + "ms/" + nGpu + " chars");
+    if (leuMenos) {
+      d("WebGPU foi mais rápido mas leu MENOS texto -> fica o WASM");
+      gravar({ escolha: "wasm", ms: { wasm: msWasm, webgpu: msGpu }, motivo: "WebGPU leu menos texto" });
+      return { res: resWasm, ms: msWasm };
+    }
     if (msGpu < msWasm) {
       // O WebGPU venceu: ele passa a ser o serviço vivo e o WASM é liberado.
       const perdedor = servico;

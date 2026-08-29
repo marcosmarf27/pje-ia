@@ -158,10 +158,15 @@ const MAX_TAXA_INVALIDOS = 0.02;
 // então este processo não muda de comportamento — o que muda é a página fora do
 // padrão, que era onde a escala fixa errava.
 const LADO_ALVO_PX = 1700;
-// Piso e teto da escala. O piso evita ampliar um PDF já pequeno até o absurdo
-// (ampliar não cria informação que o scan não tem); o teto protege a memória do
-// canvas numa página enorme.
-const ESCALA_MIN = 1.0;
+// QUEM EVITA AMPLIAR DEMAIS É O TETO, e confundir isso já custou um bug: um piso
+// de 1.0 não impede ampliação nenhuma — ele impede REDUZIR, e numa planta ou num
+// mapa em A0 (2384×3370 pt) forçava 8 MP onde o alvo pede 2, com ~32 MB de canvas
+// RGBA, para o detector encolher tudo logo depois.
+//
+// O teto de 4× é que protege a página pequena: ampliar 12× um recorte não cria
+// informação que o scan não tem. O piso é só sanidade numérica, para um mediabox
+// absurdo não produzir escala zero ou negativa.
+const ESCALA_MIN = 0.05;
 const ESCALA_MAX = 4.0;
 
 function escalaPara(pagina) {

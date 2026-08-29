@@ -30,10 +30,18 @@ if (remedirOcrBtn) {
     chrome.storage.local.get("ocrBackend", (o) => {
       void chrome.runtime.lastError;
       const antes = o && o.ocrBackend;
-      chrome.storage.local.remove("ocrBackend", () => {
+      // Quem apaga é o WORKER, não esta tela: além da chave, é preciso fechar o
+      // documento offscreen, senão o motor já criado continua em uso e a
+      // promessa "vai medir de novo" fica falsa até o Chrome derrubá-lo por
+      // ociosidade. Só o worker tem `chrome.offscreen`.
+      chrome.runtime.sendMessage({ type: "ocrEsquecerBackend" }, (r) => {
         void chrome.runtime.lastError;
         remedirOcrBtn.disabled = false;
         if (!ocrStatus) return;
+        if (r && r.ok === false) {
+          ocrStatus.textContent = "Não deu para apagar a medição. Tente de novo.";
+          return;
+        }
         // Dizer o que estava valendo é o que torna o botão inteligível: sem
         // isso ninguém sabe se havia o que refazer, nem o que mudou.
         ocrStatus.textContent = antes

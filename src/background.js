@@ -682,6 +682,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // tokens fixos por página de PDF e não cobra o texto nativo, mandar o texto
   // extraído levou o contexto de 59% para 153%. O destino aqui é arquivo para o
   // usuário.
+  if (msg.type === "ocrEsquecerBackend") {
+    esquecerBackendOcr().then(sendResponse);
+    return true;
+  }
+
   if (msg.type === "ocrReconhecer") {
     (async () => {
       // O motor leva alguns segundos no warm-up da PRIMEIRA página (carrega
@@ -899,6 +904,11 @@ const MAX_MAPAS = 5;
 // chave (o botão "medir de novo" nas opções) e a extensão reaprende sozinha.
 const CHAVE_BACKEND_OCR = "ocrBackend";
 
+// Lida a CADA página, de propósito. Um cache em variável de módulo pareceria
+// óbvio (são ~1 ms de storage local contra páginas de segundos), mas precisaria
+// de invalidação: o botão "medir de novo" apaga a chave, e um worker com cache
+// quente continuaria mandando a decisão velha. Ler sempre é mais simples e não
+// tem como divergir do disco.
 async function lerBackendOcr() {
   try {
     const o = await chrome.storage.local.get(CHAVE_BACKEND_OCR);
@@ -906,6 +916,31 @@ async function lerBackendOcr() {
   } catch {
     return null;
   }
+}
+
+// Apagar a chave NÃO BASTA, e essa foi a promessa quebrada da primeira versão:
+// o documento offscreen pode estar VIVO com o motor já criado, e ele ignora a
+// decisão que chega no pedido quando já tem serviço de pé (trocar de backend no
+// meio jogaria fora o warm-up). O botão dizia "a próxima extração vai medir de
+// novo" e a próxima extração reusava o motor antigo — só depois de o Chrome
+// derrubar o offscreen por ociosidade é que a medição aconteceria.
+//
+// Fechar o documento é o que torna a promessa verdadeira: o próximo pedido o
+// recria do zero, sem decisão gravada, e o duelo roda. É best-effort — se não
+// houver documento aberto (o caso comum), não há o que fechar.
+async function esquecerBackendOcr() {
+  try {
+    await chrome.storage.local.remove(CHAVE_BACKEND_OCR);
+  } catch (e) {
+    console.warn("[PJe IA OCR] não deu para apagar a decisão de backend:", e);
+    return { ok: false, erro: String((e && e.message) || e) };
+  }
+  try {
+    if (chrome.offscreen && chrome.offscreen.closeDocument) await chrome.offscreen.closeDocument();
+  } catch {
+    // "No offscreen document" é o caso normal, não um erro.
+  }
+  return { ok: true };
 }
 
 async function gravarBackendOcr(decisao) {

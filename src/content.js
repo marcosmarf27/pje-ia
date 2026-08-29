@@ -1959,12 +1959,26 @@
       // extração.
       const prepararPeca = async (d) => {
         try {
+          // CEDE ao cancelamento, e a guarda que importa é a de DEPOIS do
+          // download. MEDIDO: o laço dispara o preparo da peça seguinte antes do
+          // OCR da atual, então quando o usuário cancela o download dela já
+          // começou e não há como evitá-lo — mas a RASTERIZAÇÃO ainda não, e é
+          // ela que ocuparia o iframe com o pdf.js depois de o usuário já ter
+          // desistido. Uma folha órfã por cancelamento, e ela acontece DEPOIS
+          // que o turno termina, que é o que a torna invisível.
+          //
+          // A guarda de entrada cobre a janela (curta) entre o disparo e a
+          // primeira linha, e o `telaMorta` — que aí sim vale a pena: com a view
+          // do PJe morta, cada requisição restante é só mais um POST que produz
+          // erro.
+          if (sinal.cancelado || telaMorta) return { d, cancelada: true };
           panel.setPrepState(d.id, "loading");
           // `{bytes:true}` é obrigatório: peça retomada da memória de caso tem
           // `fileId` e ZERO bytes, e sem a flag ela sairia vazia — em silêncio.
           const tBaixa = Date.now();
           const c = await garantirBaixada(d.id, { bytes: true });
           msBaixando += Date.now() - tBaixa;
+          if (sinal.cancelado) return { d, cancelada: true };
           if (!c) throw new Error("peça vazia");
           if (c.kind !== "pdf" || !c.b64) return { d, c };
           if (c.b64.length > MAX_B64_EXTRACAO) {
@@ -2002,6 +2016,10 @@
             ? prepararPeca(emOrdem[iPeca + 1])
             : null;
         const d = pronta.d;
+        // Peça abandonada no preparo (cancelamento/tela morta): não é falha —
+        // ninguém tentou baixá-la. O `if` do topo do laço já jogou o turno fora;
+        // este ramo só evita que ela vire um erro nomeado no relatório.
+        if (pronta.cancelada) throw new Error("cancelado");
         try {
           if (pronta.erro) throw pronta.erro;
           const c = pronta.c;
@@ -2050,6 +2068,14 @@
                 );
                 mostrarDiag(o && o.resultado && o.resultado.diag);
                 const t = (o.resultado && o.resultado.texto) || "";
+                // FORA do `if (t)`: a página que o motor processou e devolveu
+                // vazia (a foto sem texto legível) consumiu o mesmo tempo, e
+                // deixá-la de fora tornava a média otimista. Pior, `backendOcr`
+                // saía junto: num processo só de fotos ilegíveis o cabeçalho do
+                // .md ficaria SEM o nome do motor — exatamente o campo que
+                // existe para diagnosticar lentidão.
+                if (typeof o.resultado.ms === "number") msOcr += o.resultado.ms;
+                if (o.resultado.backend) backendOcr = o.resultado.backend;
                 if (t) {
                   f.texto = t;
                   f.ocr = true;
@@ -2065,8 +2091,6 @@
                   // vira registro de trabalho; ele não pode mentir sobre o que
                   // leu.
                   f.estado = "ocr-ok";
-                  if (typeof o.resultado.ms === "number") msOcr += o.resultado.ms;
-                  if (o.resultado.backend) backendOcr = o.resultado.backend;
                 } else {
                   f.estado = "ocr-vazio";
                 }
@@ -2129,13 +2153,23 @@
       // de "o download do PJe está lento" — e as duas pedem correções opostas.
       const msTotal = Date.now() - t0Ocr;
       const seg = (ms) => (ms / 1000).toFixed(1) + "s";
+      // A SOMA DAS ETAPAS PASSA DO TOTAL, e isso é o pipeline funcionando: o
+      // preparo de uma peça corre debaixo do OCR da anterior. O campo que estava
+      // aqui era "outros", calculado como `max(0, total − soma)` — com
+      // sobreposição ele dá SEMPRE zero, escondendo justamente o que a mudança
+      // economizou e sugerindo que não sobrou nada por explicar. Os dois números
+      // agora são ditos pelo nome: o que se ganhou sobrepondo, e o que nenhuma
+      // etapa reivindica (o transporte da imagem entre os três contextos e a
+      // montagem do arquivo).
+      const somaEtapas = msBaixando + msLendoPdf + msOcr;
       console.log(
         "%c[PJe IA OCR] fim", "font-weight:bold",
         "| total", seg(msTotal),
         "| download", seg(msBaixando),
         "| leitura+raster", seg(msLendoPdf),
         "| OCR", seg(msOcr) + (pagsOcr ? " (" + seg(msOcr / pagsOcr) + "/pág)" : ""),
-        "| outros", seg(Math.max(0, msTotal - msBaixando - msLendoPdf - msOcr)),
+        "| sobreposto", seg(Math.max(0, somaEtapas - msTotal)),
+        "| não medido", seg(Math.max(0, msTotal - somaEtapas)),
         "|", backendOcr || "sem OCR"
       );
 
