@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TecJustiça PJe — Análise de Processos",
-  "version": "0.51.1",
+  "version": "0.51.2",
   "description": "Chat com IA (Claude, Gemini ou GPT) sobre os autos do PJe de qualquer tribunal: selecione peças e converse. Por TecJustiça.",
   "permissions": [
     "storage",

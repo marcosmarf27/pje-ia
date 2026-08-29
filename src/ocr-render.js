@@ -16,13 +16,99 @@
 //    segundo plano. `getTextContent()` funciona no offscreen; `render()` não.
 //
 // Um IFRAME de página de extensão não é nenhum dos três: tem origem
-// `chrome-extension://` (então valem a CSP e os globais da extensão, não os do
-// tribunal) e é um documento normal, para efeito de rAF.
+// `chrome-extension://`, então valem a CSP e os globais da extensão, não os do
+// tribunal.
+//
+// MAS ELE TAMBÉM É OCULTO, e essa é a lição desta rodada: o que travava o
+// `render()` no offscreen nunca foi SER OFFSCREEN — era ESTAR OCULTO. Este
+// iframe tem 1×1 px, `opacity:0` e vive a `left:-9999px`, fora da viewport, e é
+// cross-origin em relação à página do tribunal: o Chrome aplica render
+// throttling e congela o rAF exatamente como no offscreen. Trocar de contexto
+// preservando a propriedade errada reproduziu o mesmo travamento com outra
+// roupa — sintoma idêntico e pior, porque `page.render()` não resolve NEM
+// rejeita: o log morre entre "classificado" e "raster fl.1", sem erro nenhum.
+// É por isso que existe o shim logo abaixo.
 //
 // UMA PÁGINA POR VEZ. Uma A4 a 144 dpi em RGBA já são ~13 MB antes do JPEG;
 // guardar as páginas de um processo de 300 folhas mataria a aba.
 // ---------------------------------------------------------------------------
 import * as pdfjsLib from "../vendor/pdf.min.mjs";
+
+// SHIM DE rAF — o que faz a rasterização funcionar em documento oculto.
+//
+// `InternalRenderTask._scheduleNext()` do pdf.js chama `window.requestAnimationFrame`
+// quando o intent é de display (só o de impressão usa microtask). Ele NÃO o usa
+// para animar: usa como agendador de cedência — "executei 15 ms de operadores,
+// devolvo o event loop e me chame de volta". Numa página que não pinta nada na
+// tela, o rAF não tem outra função, e `setTimeout(fn, 0)` preserva a semântica
+// que importa (macrotask, cede ao event loop) FUNCIONANDO em contexto oculto.
+//
+// Trocar o intent para "print" também evitaria o rAF, mas mudaria o que é
+// desenhado (aparência de impressão das anotações) — e o que se quer no OCR é a
+// folha como o usuário a vê no visualizador do PJe.
+//
+// Esta página é 100% nossa, sem animação e sem saída visual: substituir aqui não
+// alcança nem o painel nem a página do tribunal.
+//
+// E a cedência é por MessageChannel, NÃO por `setTimeout(fn, 0)`. Os dois
+// funcionam em documento oculto, mas o Chrome estrangula timers a ~1/s em aba de
+// SEGUNDO PLANO — e abrir processos com Ctrl+clique em várias abas é o padrão de
+// trabalho no PJe. Uma extração de 54 folhas dura minutos: o usuário troca de
+// aba no meio, e com timer estrangulado cada folha passaria a custar segundos de
+// espera pura. `MessagePort.postMessage` é macrotask e NÃO é estrangulado.
+// `setTimeout` fica de reserva para o contexto sem MessageChannel (o `vm` dos
+// testes), onde o estrangulamento não existe.
+if (typeof window !== "undefined") {
+  let idRaf = 0;
+  const pendentes = new Map();
+
+  const canal = typeof MessageChannel === "function" ? new MessageChannel() : null;
+  if (canal) {
+    canal.port1.onmessage = (ev) => {
+      const id = ev.data;
+      const fn = pendentes.get(id);
+      if (!fn) return; // cancelado entre o agendamento e a entrega
+      pendentes.delete(id);
+      try {
+        fn(performance.now());
+      } catch (e) {
+        console.error("[PJe IA OCR][pdf] callback de render falhou:", e);
+      }
+    };
+    canal.port1.start();
+  }
+
+  window.requestAnimationFrame = (fn) => {
+    const id = ++idRaf;
+    if (canal) {
+      pendentes.set(id, fn);
+      canal.port2.postMessage(id);
+    } else {
+      pendentes.set(
+        id,
+        setTimeout(() => {
+          pendentes.delete(id);
+          try {
+            fn(performance.now());
+          } catch (e) {
+            console.error("[PJe IA OCR][pdf] callback de render falhou:", e);
+          }
+        }, 0)
+      );
+    }
+    return id;
+  };
+
+  // O pdf.js CANCELA o frame agendado quando a tarefa de render é abortada
+  // (`RenderTask.cancel`, que a guarda de tempo do `rasterizar` chama). Sem o
+  // par, um cancelamento deixaria o callback rodar sobre um canvas já zerado.
+  window.cancelAnimationFrame = (id) => {
+    const v = pendentes.get(id);
+    if (v === undefined) return;
+    pendentes.delete(id);
+    if (!canal) clearTimeout(v);
+  };
+}
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("vendor/pdf.worker.min.mjs");
 
@@ -56,6 +142,12 @@ const ESCALA_RASTER = 2.0;
 // JPEG e não PNG: um scan A4 vira ~200 KB em vez de ~2 MB, e a diferença some no
 // OCR. 0.82 é o valor medido na skill do usuário.
 const JPEG_QUALIDADE = 0.82;
+
+// Teto de uma rasterização. Generoso de propósito: uma A4 medida neste processo
+// leva 159 ms, então 60 s não interrompe folha nenhuma que esteja de fato
+// trabalhando — ele existe só para o caso de o render PENDURAR, que é o defeito
+// que originou o shim de rAF no topo do arquivo.
+const RASTER_TIMEOUT_MS = 60000;
 
 // --- montagem do texto de UMA página ---------------------------------------
 // getTextContent() emite os itens na ordem do CONTENT STREAM, que é a ordem em
@@ -264,7 +356,36 @@ async function rasterizar(pagina) {
   // vira PRETO no JPEG — o OCR receberia uma folha preta.
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await pagina.render({ canvasContext: ctx, viewport }).promise;
+
+  // TETO DE TEMPO, e ele existe por causa de um travamento REAL (o rAF congelado
+  // do shim acima). Um `render()` que não resolve nem rejeita pendurava a peça
+  // inteira; com teto, a FOLHA falha com motivo e as outras seguem — a mesma
+  // regra que faz uma peça que não baixa não derrubar o turno. `cancel()` é
+  // obrigatório: sem ele a tarefa abandonada continua desenhando num canvas que
+  // já vai ser zerado.
+  const tarefaRender = pagina.render({ canvasContext: ctx, viewport });
+  let estourou;
+  try {
+    await Promise.race([
+      tarefaRender.promise,
+      new Promise((_, rej) => {
+        estourou = setTimeout(
+          () => rej(new Error("a rasterização não respondeu em 60s")),
+          RASTER_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } catch (e) {
+    try {
+      tarefaRender.cancel();
+    } catch {}
+    canvas.width = 0;
+    canvas.height = 0;
+    throw e;
+  } finally {
+    clearTimeout(estourou);
+  }
+
   const url = canvas.toDataURL("image/jpeg", JPEG_QUALIDADE);
   // Zerar o canvas solta os bytes antes da próxima página.
   canvas.width = 0;
@@ -330,6 +451,11 @@ async function lerPeca(bytes, querImagens) {
         if (f.estado !== "escaneada" && f.estado !== "camada-ruim") continue;
         try {
           const t0 = Date.now();
+          // Linha ANTES do trabalho, não só depois. Quando o render pendurava,
+          // o rastro morria entre "classificado" e o "raster fl.N ->" final, e
+          // não dava para saber se o laço sequer tinha entrado na folha. Log de
+          // etapa longa se escreve na ENTRADA.
+          dr("rasterizando fl." + f.p + "…");
           if (objs[i] && objs[i].pagina) f.img = await rasterizar(objs[i].pagina);
           dr("raster fl." + f.p, "->", Date.now() - t0, "ms,", Math.round((f.img || "").length / 1024), "KB");
         } catch (e) {

@@ -1725,14 +1725,49 @@ Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técni
   é distinguida de "em branco" pelo `getOperatorList` — que só roda nas páginas
   candidatas, porque é a parte cara.
 - **A DIVISÃO DE CONTEXTO É OBRIGATÓRIA, e cada peça está onde está por um
-  motivo diferente.** `pdf.js` vive no IFRAME (`src/ocr-render.js`), porque
-  `page.render()` **trava em documento offscreen** — offscreen é sempre
-  "hidden" e o rAF fica congelado, o mesmo congelamento que já derrubou o
-  primeiro desenho do mapa mental. O MOTOR DE OCR vive no OFFSCREEN, porque o
-  iframe morre no F5 da página do tribunal e sofre throttling de aba em segundo
-  plano, e um processo de 300 folhas leva minutos. E nenhum dos dois no service
-  worker, que não tem `new Worker`. `getTextContent()` funcionaria no offscreen;
-  `render()` não.
+  motivo diferente.** `pdf.js` vive no IFRAME (`src/ocr-render.js`); o MOTOR DE
+  OCR vive no OFFSCREEN, porque o iframe morre no F5 da página do tribunal e
+  sofre throttling de aba em segundo plano, e um processo de 300 folhas leva
+  minutos. E nenhum dos dois no service worker, que não tem `new Worker`.
+  `getTextContent()` funciona em qualquer um dos três; `render()` é que é
+  exigente — ver a regra do rAF abaixo.
+- **O QUE TRAVA O `render()` É ESTAR OCULTO, NÃO SER OFFSCREEN — e confundir as
+  duas coisas custou uma versão inteira.** A nota antiga aqui dizia "trava em
+  documento offscreen", e a leitura natural dela é *mude de contexto e o
+  problema acaba*. Mudei: o pdf.js saiu do offscreen para um **iframe também
+  oculto** (1×1, `opacity:0`, `left:-9999px`, cross-origin com a página do
+  tribunal) — o Chrome aplica render throttling ali exatamente como no
+  offscreen, e o travamento voltou idêntico. **Ao mover código para fugir de um
+  defeito, nomeie a PROPRIEDADE que o causa, não o lugar onde ele apareceu**:
+  eu preservei a propriedade errada e troquei o sintoma de endereço.
+  - `InternalRenderTask._scheduleNext()` chama **`window.requestAnimationFrame`**
+    quando o intent é de display (só o de impressão usa microtask). Em contexto
+    oculto o rAF nunca dispara e `page.render()` **não resolve NEM rejeita** —
+    o pior modo de falha que existe: sem erro, sem fim, sem arquivo, e o log
+    morre entre duas linhas vizinhas sem nada que aponte a causa.
+  - A saída é o **shim de rAF** no topo de `ocr-render.js`, e não trocar o
+    intent para `"print"` (que também evita o rAF, mas muda o que é desenhado —
+    aparência de impressão das anotações; no OCR se quer a folha como o usuário
+    a vê no visualizador do PJe). O pdf.js não usa o rAF para animar: usa como
+    agendador de CEDÊNCIA, e essa semântica se preserva inteira.
+  - **A cedência é por `MessageChannel`, não por `setTimeout(fn, 0)`.** Os dois
+    funcionam em documento oculto, mas o Chrome estrangula timers a ~1/s em aba
+    de SEGUNDO PLANO — e abrir processos com Ctrl+clique em várias abas é o
+    padrão de trabalho no PJe. Numa extração de 54 folhas o usuário troca de
+    aba, e o timer estrangulado devolveria a lentidão silenciosa que as threads
+    do WASM acabaram de eliminar. `setTimeout` fica de reserva para contexto sem
+    `MessageChannel`.
+  - **Rede independente da causa**: `rasterizar` tem teto de tempo POR PÁGINA
+    (`RASTER_TIMEOUT_MS`, 60 s contra os 159 ms medidos) e chama
+    `tarefaRender.cancel()` ao estourar — sem o cancelamento, a tarefa abandonada
+    seguiria desenhando num canvas já zerado. Assim um travamento futuro custa
+    UMA FOLHA, nomeada no `.md`, e não a peça inteira.
+  - **Log na ENTRADA da etapa longa, não só na saída.** O rastro registrava
+    `raster fl.N ->` depois do trabalho: quando o render pendurou, não dava para
+    saber se o laço sequer havia entrado na folha.
+  - Coberto por teste que EXTRAI o shim do fonte por varredura de chaves e roda
+    em `vm` contra uma janela cujo rAF nunca dispara — o primeiro caso reproduz
+    o travamento, e ele existe para que a correção nunca vire fé.
 - **THREADS NO WASM: 21× — e é a diferença entre usável e não.** Medido na mesma
   página, mesmo modelo, mesma máquina: **2.357 ms com 4 threads contra ~50.000 ms
   numa thread só**. Num processo real com 54 folhas digitalizadas isso é 2 minutos
@@ -1789,10 +1824,14 @@ Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técni
 - **Página que o OCR leu vem MARCADA no `.md`, com a confiança.** OCR erra, e
   quem assina precisa saber o que conferir. E imagem sem texto legível — a foto
   de uma estrada rural — sai dizendo isso: o resultado vazio ali está CERTO.
-- **LACUNA CONHECIDA (BUG-21): `page.render()` do pdf.js TRAVA em documento
-  offscreen.** Não afeta a Fatia 1 (só `getTextContent`), mas a rasterização do OCR
-  **não pode** nascer aqui. Vai para um iframe oculto de página de extensão — origem
-  `chrome-extension://`, então nem é a página do tribunal nem é offscreen.
+- **BUG-21 RESOLVIDO, e a lição não é a que o nome sugere.** Ele foi catalogado
+  como "`page.render()` trava em documento offscreen", e o iframe de página de
+  extensão foi adotado como a saída. **O iframe é oculto e o travamento veio
+  junto** — a causa era o rAF congelado em contexto que não pinta, e isso vale
+  para offscreen, para `display:none` e para iframe cross-origin fora da
+  viewport. Quem resolve é o shim de rAF (ver a regra acima); o iframe continua
+  certo pelos outros motivos (CSP e globais de extensão, nenhum bundle em página
+  de tribunal), só não era suficiente sozinho.
 
 ## Seleção assistida por IA (`✨ Escolher com IA`)
 
