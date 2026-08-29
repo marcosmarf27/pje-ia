@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>87 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>88 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,7 +103,34 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.52.0</span> O OCR escolhe o motor <strong>medindo</strong>, e ficou at&#233; 7&#215; mais r&#225;pido</h2>
+        <h2><span class="v novo">v0.53.0</span> O texto das peças agora pode sair <strong>um arquivo por documento</strong>, com índice</h2>
+        <p>
+          A extração de texto entregava <strong>um <code>.md</code> só</strong>, com o processo
+          inteiro dentro. Num processo de 66 peças esse arquivo é grande e
+          <strong>indivisível</strong>: para trabalhar uma peça é preciso carregar todas, uma
+          busca não diz de qual documento veio o resultado, e não dá para pedir a uma
+          ferramenta de IA “leia só a contestação”.
+        </p>
+        <p>
+          O menu da setinha ao lado de <strong>⬇ Baixar .zip</strong> ganhou a segunda saída:
+          <strong>“Extrair o texto (um .md por peça)…”</strong>. Sai um <code>.zip</code> com
+          um arquivo por peça em <code>pecas/</code>, numerado na ordem do processo e com o
+          <strong>id no nome</strong>, mais um <strong><code>indice.md</code></strong> com uma
+          linha e um <strong>link</strong> por peça — quantas páginas tem, quantas o OCR leu,
+          quando foi juntada e por quem. O topo de cada arquivo traz os dados da peça, então
+          ele se explica sozinho mesmo lido fora da pasta.
+        </p>
+        <p>
+          <strong>Nada foi tirado.</strong> O arquivo único continua no mesmo lugar, no mesmo
+          formato — e vai <strong>junto, dentro do pacote</strong>. Escolher o novo formato não
+          custa o antigo, e quem já usa o <code>.md</code> com o TecJustiça Sigilo não muda
+          nada: o botão <strong>Extrair texto</strong> da faixa segue entregando exatamente o
+          que entregava.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.52.0</span> O OCR escolhe o motor <strong>medindo</strong>, e ficou at&#233; 7&#215; mais r&#225;pido</h2>
         <p>
           A v0.51.0 deixou o reconhecimento 21&#215; mais r&#225;pido &#8212; e a extens&#227;o podia
           jogar isso fora sem avisar. Ela testava a <strong>placa de v&#237;deo</strong> primeiro e
@@ -1793,6 +1820,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.53.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O texto das peças pode sair um arquivo por documento, com índice.</strong> A extração entregava um <code>.md</code> só, com o processo inteiro dentro — indivisível: para trabalhar uma peça era preciso carregar todas, uma busca não dizia de qual documento veio o resultado e não dava para pedir a uma ferramenta de IA “leia só a contestação”. O menu do ⬇ Baixar .zip ganhou <strong>“Extrair o texto (um .md por peça)…”</strong>: um <code>.zip</code> com um arquivo por peça, numerado na ordem do processo e com o id no nome, e um <strong><code>indice.md</code></strong> com link para cada uma, quantas páginas tem e quantas o OCR leu. Cada arquivo traz os dados da peça no topo, então se explica sozinho fora da pasta. <strong>Nada foi tirado</strong>: o arquivo único continua no mesmo lugar e ainda vai junto, dentro do pacote</td></tr>
             <tr><td><span class="v">0.52.1</span></td><td>29/08/2026</td><td>Revis&#227;o da v0.52.0, com <strong>cinco corre&#231;&#245;es</strong>. A escolha do motor de OCR passou a comparar tamb&#233;m o <strong>texto lido</strong>, e n&#227;o s&#243; o tempo: um motor que perde opera&#231;&#245;es para o processador pode ler menos E terminar antes, e vencer assim seria trocar leitura por rapidez — com a troca guardada para sempre. O bot&#227;o &#8220;Medir de novo&#8221; passou a <strong>fechar o motor em mem&#243;ria</strong>: apagar a medi&#231;&#227;o n&#227;o bastava, porque o motor j&#225; criado continuava em uso e a promessa ficava falsa. A rasteriza&#231;&#227;o de p&#225;ginas GRANDES (plantas, mapas) deixou de gerar 4&#215; mais pixels que o necess&#225;rio. O tempo m&#233;dio e o nome do motor passam a contar tamb&#233;m as p&#225;ginas em que o OCR n&#227;o achou texto — sem isso, num processo s&#243; de fotos ileg&#237;veis o arquivo saía sem dizer qual motor rodou. E cancelar a extra&#231;&#227;o para tamb&#233;m a folha que j&#225; estava sendo preparada</td></tr>
             <tr class="marco"><td><span class="v">0.52.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O motor do OCR passou a ser escolhido por MEDI&#199;&#195;O.</strong> A extens&#227;o preferia a placa de v&#237;deo sempre que o motor conseguisse iniciar &#8212; mas iniciar n&#227;o &#233; ser r&#225;pido: num processo real de 93 folhas digitalizadas deu <strong>~18 s por p&#225;gina</strong> contra <strong>2,4 s</strong> no processador. Agora os dois disputam a primeira p&#225;gina real e a resposta fica guardada (bot&#227;o &#8220;Medir de novo&#8221; nas op&#231;&#245;es). O <strong>preparo da pr&#243;xima pe&#231;a</strong> passou a acontecer durante o reconhecimento da atual; o progresso separa o tempo do OCR do tempo total (o n&#250;mero &#250;nico somava a fila de download do PJe ao motor); a rasteriza&#231;&#227;o mira uma resolu&#231;&#227;o ALVO em vez de uma escala fixa, que entregava resolu&#245;es diferentes conforme o tamanho da p&#225;gina; e o cabe&#231;alho do arquivo parou de contar como &#8220;sem texto reconhec&#237;vel&#8221; justamente as p&#225;ginas que o OCR tinha lido</td></tr>
             <tr><td><span class="v">0.51.2</span></td><td>29/08/2026</td><td>A extra&#231;&#227;o de texto <strong>travava na primeira p&#225;gina digitalizada</strong> e nunca terminava. O leitor de PDF roda num quadro oculto, e o Chrome congela ali o rel&#243;gio de desenho que a biblioteca usa para trabalhar em fatias &#8212; a rasteriza&#231;&#227;o ficava esperando um sinal que nunca vinha, sem erro e sem fim. A cedência passou a usar um canal de mensagens, que funciona em quadro oculto <em>e</em> em aba de segundo plano (o padr&#227;o de quem abre v&#225;rios processos ao mesmo tempo). Cada folha ganhou teto de tempo pr&#243;prio: se travar, falha <em>aquela folha</em> com o motivo escrito e o resto do processo segue</td></tr>

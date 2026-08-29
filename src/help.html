@@ -687,6 +687,32 @@
         segredo de justiça, o LEIA-ME e o índice avisam no topo — mas a guarda do arquivo
         passa a ser sua. A extensão não pede a permissão de <em>downloads</em> do Chrome: ela
         não enxerga nem gerencia a sua pasta de downloads.</p>
+
+        <h2>Extrair só o <em>texto</em> das peças</h2>
+        <p>O menu da setinha ao lado de <strong>Baixar .zip</strong> tem também
+        <strong>Extrair o texto</strong>. Em vez dos arquivos originais, ele lê o texto de
+        cada peça — a camada de texto do PDF e, nas páginas digitalizadas, o que o
+        <strong>OCR local</strong> reconhecer. Nada disso vai para a conversa nem sai do seu
+        computador: o reconhecimento roda dentro do navegador e o resultado vai direto para o
+        seu disco.</p>
+        <p>São <strong>dois formatos</strong>, e o trabalho é o mesmo nos dois — muda só como
+        o resultado é embalado:</p>
+        <ul>
+          <li><strong>Um arquivo <code>.md</code></strong> — o processo inteiro num arquivo
+          só, uma seção por peça e uma subseção por página. É o formato que o
+          <strong>TecJustiça Sigilo</strong> espera.</li>
+          <li><strong>Um <code>.md</code> por peça</strong> — um <code>.zip</code> com um
+          arquivo por peça em <code>pecas/</code>, um <code>indice.md</code> com link para
+          cada uma e o arquivo único acima junto, no mesmo pacote. É o formato para
+          trabalhar peça a peça: dá para abrir só a contestação, buscar com
+          <code>grep</code> e saber de qual documento veio cada resultado. O topo de cada
+          arquivo traz os metadados da peça, então ele se explica sozinho mesmo lido fora
+          da pasta.</li>
+        </ul>
+        <p>Página que o OCR leu vem <strong>marcada</strong>, com a confiança medida, e
+        página que ele não conseguiu ler também — nunca em branco e em silêncio. Assinaturas,
+        carimbos e imagens não aparecem no texto: <strong>confira sempre no documento
+        original</strong>.</p>
       </div>
 
       <h1 class="serif" id="resolucao615">A Resolução CNJ 615/2025 e por que a extensão pede a tese</h1>

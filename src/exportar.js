@@ -60,9 +60,15 @@
 
   // Imagem (anexo em foto/print) guarda o formato de ORIGEM em `fmt` — é o que
   // dá a extensão certa no pacote em vez de um .txt de lixo binário.
+  // `md` NÃO é formato de conteúdo de peça — nenhum `c.fmt` vale "md", então
+  // `montarZip` segue byte a byte o de antes. Ele existe para o pacote de TEXTO
+  // (`montarZipTexto`) poder reusar o `nomeArquivo` e sair com a mesma convenção
+  // `NNN_Titulo_ID` do pacote de PDFs: extraídos lado a lado, os dois casam
+  // peça a peça.
   const EXTENSAO = {
     pdf: ".pdf", html: ".txt", rtf: ".txt", texto: ".txt",
     jpeg: ".jpeg", png: ".png", gif: ".gif", webp: ".webp",
+    md: ".md",
   };
 
   function nomeArquivo(doc, ordem, fmt) {
@@ -853,8 +859,347 @@
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // PACOTE DE TEXTO — um `.md` por peça, com índice
+  //
+  // Irmão do `montarZip`, e a diferença não é de embalagem: aquele leva o
+  // ARQUIVO ORIGINAL da peça (o PDF que o tribunal serve), este leva o TEXTO já
+  // extraído dela — a camada nativa do PDF mais o que o OCR local reconheceu.
+  //
+  // Existe porque o `.md` único do processo inteiro é INDIVISÍVEL: para
+  // trabalhar UMA peça é preciso carregar todas, o `grep` não devolve o nome do
+  // documento, e não há como pedir "leia só a contestação". O pacote é um
+  // SUPERCONJUNTO — o consolidado vai dentro dele —, então escolher este formato
+  // não custa o outro.
+  //
+  // Como `montarZip`, recebe o `zip` INJETÁVEL: um sink de sistema de arquivos
+  // satisfaz os mesmos três métodos (é o que o CLI faz com `montarZip`).
+  // ---------------------------------------------------------------------------
+
+  // ESCAPE. O título da peça vem dos autos e passa a entrar em DUAS gramáticas
+  // novas; cada uma quebra de um jeito próprio, e as duas em SILÊNCIO:
+  //
+  //  - YAML: "Petição: emenda" faz do valor um mapa aninhado e o arquivo deixa
+  //    de ser lido por qualquer parser. Por isso TODO valor de texto sai entre
+  //    aspas duplas — inclusive os que "a gente sabe" que são seguros, porque a
+  //    exceção é justamente o que se esquece de manter.
+  //  - Tabela markdown: um `|` no título fecha a célula e desloca a linha
+  //    inteira, trocando o link de uma peça pelo de outra.
+  //
+  // Mesmo eixo do escape-first do `renderMd` e do `textContent` do preview:
+  // conteúdo dos autos nunca vai cru para uma gramática.
+  function escYaml(v) {
+    if (v === null || v === undefined) return '""';
+    if (typeof v === "number" && isFinite(v)) return String(v);
+    return (
+      '"' +
+      String(v)
+        .replace(/[\r\n\t]+/g, " ")
+        // a barra invertida PRIMEIRO: na ordem inversa, a que este passo insere
+        // para escapar a aspa seria ela própria dobrada pelo passo seguinte
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"') +
+      '"'
+    );
+  }
+
+  function escTabela(v) {
+    return String(v === null || v === undefined ? "" : v)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\|/g, "\\|");
+  }
+
+  // Metadados legíveis por máquina no topo de cada arquivo. O NOME do arquivo já
+  // carrega ordem, título e id — é o único metadado que sobrevive a sair da
+  // ferramenta —, mas um arquivo LIDO SOZINHO, que é o ponto deste formato,
+  // precisa dizer de que PROCESSO ele é e o que dentro dele veio de OCR.
+  function frontMatterPeca(p, info) {
+    const L = ["---"];
+    const par = (k, v) => L.push(k + ": " + escYaml(v));
+    par("processo", info.cnj || "");
+    par("ordem", p.ordem);
+    par("id", String(p.doc.id));
+    par("peca", semIdInicial(p.doc.titulo) || p.doc.titulo || "");
+    if (p.doc.tipo) par("tipo", p.doc.tipo);
+    if (p.doc.juntadoEm) par("juntado_em", p.doc.juntadoEm);
+    if (p.doc.juntadoPor) par("juntado_por", p.doc.juntadoPor);
+    par("paginas", p.paginas || 0);
+    par("paginas_ocr", p.paginasOcr || 0);
+    par("paginas_sem_texto", p.paginasSemTexto || 0);
+    par("formato_origem", p.formato || "pdf");
+    par("extraido_em", info.geradoIso);
+    L.push("---", "");
+    return L.join("\n");
+  }
+
+  // Uma TABELA, ao contrário do `indice.txt` do pacote de peças. Lá a tabela foi
+  // recusada porque dez campos só caberiam truncando; aqui são seis campos e,
+  // principalmente, o LINK — que só existe em markdown e é o que transforma o
+  // índice em navegação.
+  function montarIndiceTexto(info) {
+    const { cnj, gerado, criterio, itens, falhas, ficha, origemLista } = info;
+    const r = info.resumo || {};
+    const L = [];
+    L.push("# Texto das peças — processo " + (cnj || "(número não identificado)"), "");
+    if (sobSegredo(ficha)) {
+      L.push(
+        "> ## ⛔ Segredo de justiça",
+        ">",
+        "> Este processo tramita em segredo de justiça. O conteúdo desta pasta é",
+        "> de acesso restrito — não redistribua.",
+        ""
+      );
+    }
+    L.push(
+      "> Extraído pela extensão **TecJustiça PJe** em " + gerado + ".",
+      "> Ordem das peças: " + criterio + ".",
+      "> " +
+        itens.length +
+        " peça(s), " +
+        (r.pagsNativas || 0) +
+        " página(s) com texto nativo" +
+        (r.pagsOcr
+          ? ", " +
+            r.pagsOcr +
+            " reconhecida(s) por OCR local (PP-OCRv6" +
+            (r.backend ? ", " + r.backend : "") +
+            (r.msPorPagina ? ", " + (r.msPorPagina / 1000).toFixed(1) + " s/página" : "") +
+            ")"
+          : "") +
+        (r.pagsSemOcr ? ", " + r.pagsSemOcr + " sem texto reconhecível" : "") +
+        ".",
+      ""
+    );
+    if (r.pagsOcr) {
+      L.push(
+        "> **O texto reconhecido por OCR pode conter erros.** As páginas lidas assim vêm",
+        "> marcadas no corpo do arquivo, com a confiança medida — confira no documento",
+        "> original antes de citar.",
+        ""
+      );
+    }
+    L.push(
+      "## O que tem aqui",
+      "",
+      "- **`pecas/`** — um arquivo `.md` por peça, na ordem dos autos. O topo de cada um",
+      "  traz os metadados em YAML (processo, id, tipo, data de juntada, páginas), então",
+      "  o arquivo se explica sozinho mesmo lido fora desta pasta.",
+      "- **`" + info.arquivoConsolidado + "`** — o processo inteiro num arquivo só, no",
+      "  mesmo formato de sempre. É o que alimenta o TecJustiça Sigilo e ferramentas que",
+      "  esperam um documento único.",
+      "- **`indice.json`** — os mesmos dados desta página, para consumo por programa.",
+      "",
+      "## Como os arquivos são nomeados",
+      "",
+      "```",
+      "NNN_Titulo-da-peca_ID.md",
+      "```",
+      "",
+      "- **NNN** — posição da peça no processo, em ordem cronológica crescente, para a",
+      "  ordenação alfabética da pasta já ser a ordem dos autos. O critério usado nesta",
+      "  extração foi: " + criterio + ".",
+      "- **ID** — o identificador da peça no PJe. É por ele que ela é reencontrada na",
+      "  linha do tempo do processo, e é ele que deve aparecer em qualquer citação.",
+      "",
+      "O nome é o MESMO do pacote `⬇ Baixar .zip` (que traz os PDFs originais): extraídos",
+      "lado a lado, os dois casam peça a peça.",
+      "",
+      "## Como citar",
+      "",
+      "```",
+      "(Título da peça, id 123456, fl. 7)",
+      "```",
+      "",
+      "O **id** é obrigatório: é o número que abre o título da peça e o único jeito de",
+      "quem lê reencontrá-la no PJe. Citar só o nome não serve — processos têm várias",
+      "peças com o mesmo nome.",
+      ""
+    );
+    const fichaLinhas = blocoFicha(ficha);
+    if (fichaLinhas.length) {
+      L.push("## Ficha do processo", "", "```");
+      for (const l of fichaLinhas) L.push(l);
+      L.push("```", "");
+    }
+    L.push(
+      "## Peças (" + itens.length + ")",
+      "",
+      "| # | Peça | id | Juntada | Páginas | Arquivo |",
+      "|--:|---|--:|---|---|---|"
+    );
+    for (const it of itens) {
+      const pags =
+        (it.paginas || 0) +
+        (it.paginasOcr ? " (" + it.paginasOcr + " por OCR)" : "") +
+        (it.paginasSemTexto ? " · " + it.paginasSemTexto + " sem texto" : "");
+      L.push(
+        "| " +
+          [
+            String(it.ordem).padStart(3, "0"),
+            escTabela(it.titulo),
+            it.id,
+            escTabela(it.juntadoEm || "—"),
+            pags,
+            "[" + escTabela(it.arquivo) + "](pecas/" + encodeURI(it.arquivo) + ")",
+          ].join(" | ") +
+          " |"
+      );
+    }
+    L.push("");
+    if (falhas.length) {
+      L.push(
+        "## Peças que não entraram (" + falhas.length + ")",
+        "",
+        "Cada uma consumiu o seu número de ordem, que por isso NÃO aparece em `pecas/` —",
+        "é daí que vêm os saltos na numeração (…002, 004…). O salto é a peça que faltou,",
+        "não um erro de contagem.",
+        "",
+        "| # | id | Peça | Motivo |",
+        "|--:|--:|---|---|"
+      );
+      for (const f of falhas) {
+        L.push(
+          "| " +
+            [
+              String(f.ordem).padStart(3, "0"),
+              f.id,
+              // O id já está na coluna anterior; o título das falhas chega do
+              // content.js com ele na frente ("123456 - Nome"), e `semIdInicial`
+              // é idempotente para quem já vem limpo (o `montarZip` corta na
+              // origem).
+              escTabela(semIdInicial(f.titulo) || f.titulo || ""),
+              escTabela(f.motivo),
+            ].join(" | ") +
+            " |"
+        );
+      }
+      L.push("");
+    }
+    L.push(
+      "## Limites que valem saber",
+      "",
+      "- **A lista pode não ser o processo inteiro**: " + origemLista + ".",
+      "- **Assinaturas, carimbos e imagens não aparecem aqui.** O que sobrevive é o",
+      "  texto; confira sempre no documento original.",
+      "- **Página digitalizada sem camada de texto** depende do OCR, e o que ele não",
+      "  reconheceu vem marcado no lugar — nunca omitido em silêncio.",
+      ""
+    );
+    return L.join("\n");
+  }
+
+  function montarIndiceTextoJson(info) {
+    return JSON.stringify(
+      {
+        processo: info.cnj || null,
+        segredoDeJustica: sobSegredo(info.ficha),
+        ficha: info.ficha || null,
+        geradoEm: info.geradoIso,
+        gerador: "TecJustiça PJe (extensão Chrome)",
+        conteudo: "texto extraído das peças (camada nativa do PDF + OCR local)",
+        ordem: info.criterio,
+        origemDaLista: info.origemLista,
+        arquivoConsolidado: info.arquivoConsolidado,
+        resumo: info.resumo || null,
+        total: info.itens.length,
+        pecas: info.itens,
+        falhas: info.falhas,
+      },
+      null,
+      2
+    );
+  }
+
+  // opts: {pecas, consolidado, cnj, ficha, origemLista, criterio, resumo, falhas,
+  //        agora:Date, zip:{criar}}
+  //
+  // `pecas`: [{doc, ordem, corpo, paginas, paginasOcr, paginasSemTexto, formato}]
+  // — `corpo` é o markdown das páginas, montado pelo content.js. Ele chega
+  // PRONTO de propósito: é a MESMA string que entra no consolidado, então os
+  // dois formatos não têm como divergir.
+  async function montarZipTexto(opts) {
+    const {
+      pecas = [],
+      consolidado = "",
+      cnj,
+      ficha = null,
+      origemLista = "lista lida da linha do tempo do processo",
+      criterio = "",
+      resumo = null,
+      falhas = [],
+      agora = new Date(),
+    } = opts;
+    const Zip = opts.zip || (typeof window !== "undefined" && window.ZipW);
+    if (!Zip) throw new Error("escritor de ZIP indisponível");
+
+    // Sem pasta raiz dentro do zip: o Explorer já cria uma com o nome do arquivo
+    // ao extrair, e a raiz interna homônima duplicaria o nome no caminho — o
+    // defeito medido no pacote de precatórias, onde o Windows recusa acima de
+    // 260 caracteres.
+    const base = nomePasta(cnj);
+    const nomeConsolidado = base + ".md";
+    const zip = Zip.criar({ data: agora });
+
+    const info = {
+      cnj,
+      ficha,
+      criterio,
+      origemLista,
+      resumo,
+      falhas,
+      arquivoConsolidado: nomeConsolidado,
+      gerado: agora.toLocaleString("pt-BR"),
+      geradoIso: agora.toISOString(),
+      itens: [],
+    };
+
+    for (const p of pecas) {
+      const arquivo = nomeArquivo(p.doc, p.ordem, "md");
+      const texto =
+        frontMatterPeca(p, info) + "\n# " + p.doc.titulo + "\n\n" + p.corpo + "\n";
+      // O nome REAL é o que volta do `add` (ele desambigua homônimos): usar o
+      // pretendido faria o link do índice apontar para um arquivo inexistente.
+      const nomeReal = await zip.add("pecas/" + arquivo, texto);
+      info.itens.push({
+        ordem: p.ordem,
+        arquivo: nomeReal.slice("pecas/".length),
+        id: p.doc.id,
+        titulo: semIdInicial(p.doc.titulo) || p.doc.titulo || "",
+        tituloCompleto: p.doc.titulo || "",
+        tipo: p.doc.tipo || null,
+        juntadoEm: p.doc.juntadoEm || null,
+        juntadoPor: p.doc.juntadoPor || null,
+        formatoOrigem: p.formato || null,
+        paginas: p.paginas || 0,
+        paginasOcr: p.paginasOcr || 0,
+        paginasSemTexto: p.paginasSemTexto || 0,
+        caracteres: p.corpo ? p.corpo.length : 0,
+        extras: p.doc.extras && Object.keys(p.doc.extras).length ? p.doc.extras : undefined,
+      });
+    }
+
+    if (consolidado) await zip.add(nomeConsolidado, consolidado);
+    await zip.add("indice.md", montarIndiceTexto(info));
+    await zip.add("indice.json", montarIndiceTextoJson(info));
+
+    return {
+      blob: zip.fechar(),
+      nome: base + "-texto.zip",
+      resumo: {
+        ok: info.itens.length,
+        falhas: falhas.length,
+        paginas: info.itens.reduce((n, it) => n + (it.paginas || 0), 0),
+      },
+      itens: info.itens,
+    };
+  }
+
   const api = {
     montarZip,
+    montarZipTexto,
+    montarIndiceTexto,
+    montarIndiceTextoJson,
+    frontMatterPeca,
     montarZipPrecatorias,
     nomePastaPacote,
     nomeArquivoPacote,

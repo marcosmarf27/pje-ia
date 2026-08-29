@@ -2943,27 +2943,45 @@ var PjePanel = (function () {
       // termina num arquivo baixado), então entra aqui e não numa quarta pílula
       // da `.docs-tip` — a fileira é `nowrap` e os rótulos já somam ~416 px numa
       // coluna de 328 px.
-      const bTexto = document.createElement("button");
-      bTexto.type = "button";
-      bTexto.className = "sep";
-      bTexto.setAttribute("role", "menuitem");
-      bTexto.textContent = "Extrair o texto…";
-      bTexto.title =
+      // DOIS destinos para o mesmo trabalho de extração, e o rótulo de cada um
+      // NOMEIA o formato: "Extrair o texto…" sozinho não dizia se saía um
+      // arquivo ou muitos, e é essa a única diferença entre os dois.
+      function itemTexto(rotulo, dica, opts) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.setAttribute("role", "menuitem");
+        b.textContent = rotulo;
+        b.title = dica;
+        b.addEventListener("click", () => {
+          fecharZipMenu();
+          if (!textoCb) return;
+          const alvo = marcadas.length ? marcadas : allDocs;
+          if (!alvo.length) {
+            statusEl.textContent = "A lista de peças está vazia — não há texto para extrair.";
+            return;
+          }
+          textoCb(alvo, Object.assign({ todas: !marcadas.length }, opts));
+        });
+        return b;
+      }
+      const bTexto = itemTexto(
+        "Extrair o texto (um arquivo .md)…",
         "Lê o texto das peças marcadas e baixa um único .md com o processo inteiro, " +
-        "uma seção por página. O texto NÃO vai para a conversa.";
-      bTexto.addEventListener("click", () => {
-        fecharZipMenu();
-        if (!textoCb) return;
-        const alvo = marcadas.length ? marcadas : allDocs;
-        if (!alvo.length) {
-          statusEl.textContent = "A lista de peças está vazia — não há texto para extrair.";
-          return;
-        }
-        textoCb(alvo, { todas: !marcadas.length });
-      });
+          "uma seção por página. O texto NÃO vai para a conversa.",
+        null
+      );
+      bTexto.className = "sep";
+      const bTextoZip = itemTexto(
+        "Extrair o texto (um .md por peça)…",
+        "Mesmo trabalho, outro empacotamento: um .zip com um arquivo .md por peça, " +
+          "um índice com links e o .md do processo inteiro junto. Serve para " +
+          "trabalhar peça a peça fora da extensão. O texto NÃO vai para a conversa.",
+        { porPeca: true }
+      );
       zipmenu.appendChild(bPecas);
       zipmenu.appendChild(bPrec);
       zipmenu.appendChild(bTexto);
+      zipmenu.appendChild(bTextoZip);
       wrap.appendChild(zipmenu);
       const larg = zipmenu.offsetWidth || 210;
       zipmenu.style.left = Math.max(6, Math.min(r.right - larg, innerWidth - larg - 6)) + "px";

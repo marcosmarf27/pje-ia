@@ -1620,8 +1620,9 @@ Code, num script, num arquivo de caso. Regras que não podem quebrar:
   campos separados por `" | "`, SEM truncar — uma tabela alinhada com dez campos só
   caberia cortando o nome de quem juntou a peça, que é justamente o que se pergunta
   a um índice) e `indice.json`. O formato de citação aqui é a **QUINTA** saída da
-  regra peça·id·folha — ao editar `PROMPT_INICIO`/`SYSTEM_PROMPT_CIT_TEXTUAL`/
-  `SUFIXO_MINUTA`/`SUFIXO_MAPA`, editar este também.
+  regra peça·id·folha (a **sexta** é o `indice.md` do pacote de TEXTO) — ao editar
+  `PROMPT_INICIO`/`SYSTEM_PROMPT_CIT_TEXTUAL`/`SUFIXO_MINUTA`/`SUFIXO_MAPA`,
+  editar os dois também.
 - **Ficha do processo** (`PJE.lerCabecalhoProcesso`): raspa `#maisDetalhes`
   (`dl.dl-horizontal` em blocos IRMÃOS — órgão julgador, cargo e competência vivem
   em `<dl>` próprios, por isso varre TODOS) e `#poloAtivo`/`#poloPassivo`. O titular
@@ -1680,11 +1681,52 @@ Code, num script, num arquivo de caso. Regras que não podem quebrar:
 
 ## Extração de texto das peças + OCR local (`ocr-render.js` + `ocr-offscreen.js`)
 
-Item **"Extrair o texto…"** no menu do split button `⬇ Baixar .zip`. Lê a camada de
-texto dos PDFs e entrega **um `.md`** com o processo inteiro — `# <peça>` /
-`## Página N`, o formato do `tjocr`, para alimentar o TecJustiça Sigilo e o Claude
-Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técnico
-`pp-ocrv6-extensao-chrome-mv3.docx`).
+Menu do split button `⬇ Baixar .zip`. Lê a camada de texto dos PDFs e aplica OCR
+local (PP-OCRv6; guia técnico `pp-ocrv6-extensao-chrome-mv3.docx`) nas páginas
+digitalizadas. **DOIS formatos de saída, e o trabalho é o mesmo nos dois** — só o
+destino da string muda, que é o que torna a adição quase-zero em risco:
+
+- **"Extrair o texto (um arquivo .md)…"** — **um `.md`** com o processo inteiro,
+  `# <peça>` / `## Página N`, o formato do `tjocr`, para alimentar o TecJustiça
+  Sigilo e o Claude Code sem adaptação. É o padrão e o que o botão `Extrair texto`
+  da faixa entrega.
+- **"Extrair o texto (um .md por peça)…"** (`opcoes.porPeca`) —
+  `processo-<CNJ>-texto.zip` com `pecas/NNN_Titulo_ID.md`, `indice.md` (tabela com
+  link por peça), `indice.json` e **o consolidado acima junto**. O `.md` único é
+  indivisível: para trabalhar UMA peça é preciso carregar todas, o `grep` não
+  devolve o nome do documento, e não há como pedir "leia só a contestação".
+
+Regras deste par:
+- **O pacote é SUPERCONJUNTO, e a igualdade é TESTADA**: o consolidado gravado
+  dentro do `.zip` é byte a byte o `.md` que o outro modo baixa. É essa invariante
+  que torna a não-regressão do caminho antigo verificável por CONSTRUÇÃO — não por
+  inspeção do diff. Ela existe porque `registrarPeca` (content.js) é o ponto ÚNICO
+  do corpo da peça: os dois formatos saem da MESMA string.
+- **Sem `opcoes.porPeca` o handler faz byte a byte o de antes.** A guarda de `ZipW`
+  vem ANTES do `startPrep`, como a de `PjeExport`: sem o escritor, o pacote só
+  falharia no FIM, depois de o usuário pagar os minutos de download e de OCR.
+- **`registrarPeca` NÃO mexe em `comTexto`.** O anexo em imagem entra no
+  consolidado e não conta como peça com texto — é assim desde sempre, e esse número
+  vai no cabeçalho do arquivo. A contagem fica nos chamadores para a distinção
+  ficar visível em vez de escondida num parâmetro.
+- **A `ordem` sai do índice do laço, nunca de `pecasTexto.length`**: peça que falha
+  CONSOME o número e a numeração de `pecas/` salta nela (regra do `montarZip`). Por
+  isso a `ordem` vai também no registro da falha — sem ela o salto vira mistério
+  para quem abre o pacote no destino.
+- **Todo formato de saída novo traz o seu próprio ESCAPE** (`escYaml`/`escTabela`
+  em exportar.js). O título vem dos autos e "Petição: emenda | fls. 30" quebra as
+  DUAS gramáticas novas, em silêncio: os dois-pontos fazem do valor YAML um mapa
+  aninhado, e a barra vertical fecha a célula da tabela e desloca a linha inteira,
+  trocando o link de uma peça pelo de outra. Todo valor de texto sai entre aspas —
+  inclusive os que "a gente sabe" que são seguros, porque a exceção é o que se
+  esquece de manter. Mesmo eixo do escape-first do `renderMd`.
+- **`EXTENSAO.md` é aditivo**: nenhum `c.fmt` de conteúdo vale `"md"`, então
+  `montarZip` não muda e `montarZipTexto` reusa `nomeArquivo` — os dois pacotes,
+  extraídos lado a lado, casam peça a peça.
+- **Armadilha medida na revisão**: `arquivo: nomeReal.slice("pecas/".length)`
+  aparece IDÊNTICA em `montarZip` e em `montarZipTexto`. Uma edição por busca de
+  texto acerta a primeira; foi o que aconteceu com uma mutação de teste, que
+  quebrou o pacote de PDFs enquanto o teste do pacote de texto seguia verde.
 
 - **INVARIANTE: o texto extraído NUNCA entra no payload de um request.** A extração
   da v0.21.0 foi removida (`6248c2c`) exatamente por isso: no Gemini, que cobra 258

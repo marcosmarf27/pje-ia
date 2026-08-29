@@ -1722,9 +1722,15 @@
   // ---------------------------------------------------------------------------
   // EXTRAÇÃO DE TEXTO DAS PEÇAS
   //
-  // Lê a camada de texto dos PDFs (pdf.js, no documento offscreen) e devolve UM
-  // `.md` com o processo inteiro — `# <peça>` / `## Página N`, o mesmo formato
-  // do tjocr, para alimentar o TecJustiça Sigilo e o Claude Code sem adaptação.
+  // Lê a camada de texto dos PDFs (pdf.js, no iframe de render) e aplica OCR
+  // local nas páginas digitalizadas. DOIS formatos de saída, e o trabalho é o
+  // mesmo nos dois — o que muda é só o destino da string:
+  //
+  //  - **um `.md` só** (padrão) — `# <peça>` / `## Página N`, o formato do
+  //    tjocr, para alimentar o TecJustiça Sigilo e o Claude Code sem adaptação;
+  //  - **um `.md` por peça** (`opcoes.porPeca`) — dentro de um `.zip` com
+  //    índice, front-matter YAML em cada arquivo e o consolidado acima junto,
+  //    para trabalhar peça a peça sem carregar o processo inteiro.
   //
   // INVARIANTE: o texto extraído NÃO entra no payload de nenhum request de chat.
   // A extração da v0.21.0 foi removida exatamente por isso — no Gemini, que
@@ -1886,6 +1892,16 @@
       panel.setStatus("Extração indisponível: recarregue a página do processo.");
       return;
     }
+    // DOIS formatos de saída, e o padrão é o de sempre: sem `porPeca` esta
+    // função faz byte a byte o que fazia — um `.md` só, direto no Downloads.
+    const porPeca = !!(opcoes && opcoes.porPeca);
+    // Irmã da guarda acima, e pelo MESMO motivo: sem o escritor de ZIP o pacote
+    // por documento só falharia no FIM, depois de o usuário pagar os minutos de
+    // download e de OCR. O `.md` único não depende dele e segue funcionando.
+    if (porPeca && typeof ZipW === "undefined") {
+      panel.setStatus("Pacote por documento indisponível: recarregue a página do processo.");
+      return;
+    }
     if (!docs || !docs.length) {
       panel.setStatus("A lista de peças está vazia — não há texto para extrair.");
       return;
@@ -1914,6 +1930,10 @@
       "|", docs.length, "peça(s)"
     );
     const partes = [];
+    // Só no modo por documento: o corpo de cada peça com os metadados que o
+    // front-matter e o índice pedem. No modo de sempre fica vazio e não custa
+    // nada.
+    const pecasTexto = [];
     const falhas = [];
     let comTexto = 0;
     let pagsNativas = 0;
@@ -1935,6 +1955,31 @@
     // nativo" na interface — e para deixar explícito, no código, que a
     // rasterização é o que separa segundos de minutos.
     const comOcr = true;
+
+    // PONTO ÚNICO do corpo da peça. Os dois formatos — o `.md` consolidado e o
+    // arquivo individual dentro do pacote — saem da MESMA string. Se cada um
+    // montasse a sua, divergiriam no primeiro que alguém editasse, e a
+    // divergência só apareceria num arquivo já gravado no disco do usuário.
+    //
+    // NÃO mexe em `comTexto`, de propósito: o anexo em imagem entra no
+    // consolidado e NÃO conta como peça com texto — é assim desde sempre, e
+    // esse número vai no cabeçalho do arquivo. Deixar a contagem nos chamadores
+    // é o que mantém a distinção visível em vez de escondida num parâmetro.
+    function registrarPeca(d, ordem, corpo, meta) {
+      partes.push("# " + d.titulo + "\n\n" + corpo + "\n");
+      if (!porPeca) return;
+      const m = meta || {};
+      pecasTexto.push({
+        doc: d,
+        ordem,
+        corpo,
+        formato: m.formato || "",
+        paginas: m.paginas || 0,
+        paginasOcr: m.paginasOcr || 0,
+        paginasSemTexto: m.paginasSemTexto || 0,
+      });
+    }
+
     try {
       const { docs: emOrdem, criterio } = PjeExport.ordenarCronologico(docs);
 
@@ -2016,6 +2061,12 @@
             ? prepararPeca(emOrdem[iPeca + 1])
             : null;
         const d = pronta.d;
+        // A posição CRONOLÓGICA da peça, que vira o prefixo NNN do arquivo. Sai
+        // do índice do laço e nunca de `pecasTexto.length`: peça que falha
+        // CONSOME o seu número, e a numeração da pasta salta nela — é a mesma
+        // regra do `montarZip`, e é por isso que a `ordem` vai também para o
+        // registro da falha.
+        const ordem = iPeca + 1;
         // Peça abandonada no preparo (cancelamento/tela morta): não é falha —
         // ninguém tentou baixá-la. O `if` do topo do laço já jogou o turno fora;
         // este ramo só evita que ela vire um erro nomeado no relatório.
@@ -2027,7 +2078,7 @@
 
           if (c.kind === "text") {
             // HTML e RTF do editor já são texto: não há PDF para abrir.
-            partes.push("# " + d.titulo + "\n\n" + (c.text || "").trim() + "\n");
+            registrarPeca(d, ordem, (c.text || "").trim(), { formato: c.fmt || "texto" });
             comTexto++;
           } else if (resPronta) {
             // O download, o teto de tamanho e a leitura do PDF já aconteceram em
@@ -2110,12 +2161,13 @@
             // sem achar texto — a foto de uma estrada rural, em que o resultado
             // vazio está CERTO. A página lida com sucesso saiu daqui ao ganhar
             // o estado "ocr-ok".
-            pagsSemOcr += res.folhas.filter(
+            const semTextoAqui = res.folhas.filter(
               (f) =>
                 f.estado === "escaneada" ||
                 f.estado === "camada-ruim" ||
                 f.estado === "ocr-vazio"
             ).length;
+            pagsSemOcr += semTextoAqui;
 
             const folhas = res.folhas
               .map((f) => {
@@ -2132,17 +2184,32 @@
                 return "## Página " + f.p + "\n\n" + corpo + marca;
               })
               .join("\n\n");
-            partes.push("# " + d.titulo + "\n\n" + folhas + "\n");
+            registrarPeca(d, ordem, folhas, {
+              formato: "pdf",
+              paginas: res.folhas.length,
+              paginasOcr: res.folhas.filter((f) => f.ocr).length,
+              paginasSemTexto: semTextoAqui,
+            });
             comTexto++;
           } else {
             // Imagem anexada: não tem camada de texto para ler. Dizer o motivo
             // vale mais que uma seção vazia (regra do projeto: conjunto vazio
             // se explica, não desaparece).
-            partes.push("# " + d.titulo + "\n\n_[anexo em imagem — o texto depende do OCR]_\n");
+            registrarPeca(d, ordem, "_[anexo em imagem — o texto depende do OCR]_", {
+              formato: c.fmt || "img",
+            });
           }
           panel.setPrepState(d.id, "done");
         } catch (e) {
-          falhas.push({ id: d.id, titulo: d.titulo, motivo: (e && e.message) || String(e) });
+          // A `ordem` vai junto porque ela foi CONSUMIDA por esta peça: a
+          // numeração de `pecas/` salta nela, e sem o número o salto vira um
+          // mistério para quem abre o pacote no destino.
+          falhas.push({
+            ordem,
+            id: d.id,
+            titulo: d.titulo,
+            motivo: (e && e.message) || String(e),
+          });
           panel.setPrepState(d.id, "erro");
         }
       }
@@ -2216,11 +2283,43 @@
         "|", comTexto, "peça(s) |", pagsNativas, "nativas |", pagsOcr, "por OCR |",
         errosOcr.length, "falhas de OCR |", falhas.length, "peças de fora"
       );
+      // O consolidado é o MESMO nos dois formatos, e no pacote ele vai DENTRO,
+      // byte a byte igual: escolher "por documento" não custa o formato de
+      // sempre. É essa igualdade que o teste afirma — o que torna a
+      // não-regressão deste caminho verificável por construção, não por
+      // inspeção.
+      let nomeSaida = "processo-" + cnj + ".md";
+      let blobSaida = new Blob([md], { type: "text/markdown" });
+      let extraStatus = "";
+      if (porPeca) {
+        const r = await PjeExport.montarZipTexto({
+          pecas: pecasTexto,
+          consolidado: md,
+          cnj,
+          // Ficha do processo: sai do DOM que já está na tela e é o que faz o
+          // pacote se explicar sozinho no destino, como no `.zip` de peças.
+          ficha: PJE.lerCabecalhoProcesso(),
+          origemLista: descreverOrigemLista(todas),
+          criterio,
+          falhas,
+          resumo: {
+            comTexto,
+            pagsNativas,
+            pagsOcr,
+            pagsSemOcr,
+            backend: backendOcr,
+            msPorPagina: pagsOcr ? Math.round(msOcr / pagsOcr) : 0,
+          },
+        });
+        nomeSaida = r.nome;
+        blobSaida = r.blob;
+        extraStatus = " em " + r.resumo.ok + " arquivo(s) + índice";
+      }
       panel.endPrep();
-      baixarBlob("processo-" + cnj + ".md", new Blob([md], { type: "text/markdown" }));
+      baixarBlob(nomeSaida, blobSaida);
       panel.setStatus(
-        "✅ Texto de " + comTexto + " peça(s) baixado" +
-          (pagsOcr ? " — " + pagsOcr + " página(s) lidas por OCR local." : ".")
+        "✅ " + nomeSaida + " — texto de " + comTexto + " peça(s)" + extraStatus +
+          (pagsOcr ? ", " + pagsOcr + " página(s) lidas por OCR local." : ".")
       );
     } catch (e) {
       const msg = (e && e.message) || String(e);
