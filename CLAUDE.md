@@ -1728,6 +1728,31 @@ Regras deste par:
   texto acerta a primeira; foi o que aconteceu com uma mutação de teste, que
   quebrou o pacote de PDFs enquanto o teste do pacote de texto seguia verde.
 
+- **O QUE PASSA PELO OCR é decidido POR PÁGINA, não por documento** — e o portão
+  é `if (c.kind !== "pdf" || !c.b64) return { d, c }` em `prepararPeca`:
+  - **HTML e RTF** (peças do editor) não abrem no pdf.js e não vão ao OCR: já são
+    texto quando chegam do PJe.
+  - **PDF com camada de texto** usa a camada; **PDF digitalizado** vai ao OCR;
+    **PDF misto** faz os dois, folha a folha (`classificarPagina`).
+  - **ANEXO EM IMAGEM (JPEG/PNG) VAI AO OCR desde a v0.53.1**, sem pdf.js e sem
+    rasterização: o b64 já está no cache, já reduzido por `normalizarImagem`, e
+    vira data URL direto. Até a v0.53.0 este ramo escrevia "_[anexo em imagem —
+    o texto depende do OCR]_" e **não chamava o motor**: o rótulo nasceu na
+    v0.49.0, quando OCR não existia, e a v0.50.0 não revisitou o ramo. O
+    resultado era o mesmo documento fotografado ter sorte diferente conforme
+    tivesse chegado como PDF ou como JPEG — e uma frase que parecia explicação
+    ("o OCR tentou e não conseguiu") no lugar do texto que ninguém buscou.
+    **Lição: ao acrescentar uma capacidade, varrer os rótulos que a MENCIONAM —
+    eles viram promessa no instante em que ela passa a existir.**
+  - **`reconhecerImagem` é o ponto ÚNICO da chamada ao motor**, usado pela folha
+    de PDF e pelo anexo: com duas chamadas, a nota de progresso, a média de OCR
+    e o nome do backend divergiriam no primeiro ajuste feito só de um lado. Ela
+    LANÇA no erro — o que se escreve no arquivo quando o reconhecimento falha é
+    diferente numa folha e num anexo.
+  - O anexo só conta em `comTexto` **quando o OCR de fato leu algo**: o número
+    vai no cabeçalho do `.md` e não pode inflar com anexos que saíram vazios.
+    Vazio é resultado LEGÍTIMO numa foto (a estrada rural não tem texto) e entra
+    em `pagsSemOcr`, com rótulo que distingue "não achou" de "não tentou".
 - **INVARIANTE: o texto extraído NUNCA entra no payload de um request.** A extração
   da v0.21.0 foi removida (`6248c2c`) exatamente por isso: no Gemini, que cobra 258
   tokens fixos por página de PDF e **não cobra o texto nativo**, mandar o texto

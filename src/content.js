@@ -1965,6 +1965,57 @@
     // consolidado e NÃO conta como peça com texto — é assim desde sempre, e
     // esse número vai no cabeçalho do arquivo. Deixar a contagem nos chamadores
     // é o que mantém a distinção visível em vez de escondida num parâmetro.
+    // PONTO ÚNICO da chamada ao motor de OCR. A folha de PDF rasterizada e o
+    // ANEXO EM IMAGEM passam pelo mesmo lugar: são o mesmo trabalho, pagam o
+    // mesmo preço e alimentam os mesmos contadores. Com duas chamadas, a nota
+    // de progresso, a média de OCR e o nome do backend divergiriam no primeiro
+    // ajuste feito só de um lado.
+    //
+    // Devolve `{texto, score}` e LANÇA no erro: o que se escreve no arquivo
+    // quando o reconhecimento falha é diferente numa folha e num anexo, então
+    // essa decisão fica com o chamador.
+    async function reconhecerImagem(img, rotulo) {
+      // O card marca uma linha por PEÇA, e uma peça pode ter 22 páginas
+      // escaneadas: sem esta nota o usuário fica minutos olhando o mesmo
+      // spinner sem saber se anda. Ela conta PÁGINAS, que é a unidade real do
+      // trabalho, e mostra o ritmo medido — não uma promessa.
+      const feitas = pagsOcr;
+      // DUAS grandezas, porque respondem a perguntas diferentes e confundi-las
+      // foi o defeito: o RITMO (tudo ÷ páginas) é o que permite estimar quando
+      // termina, e o tempo de OCR é o que diz se o motor está no backend certo.
+      // Enquanto havia só o ritmo, um download lento da fila do PJe aparecia
+      // como "o OCR está lento".
+      const ritmo = feitas && Date.now() > t0Ocr ? (Date.now() - t0Ocr) / feitas : 0;
+      const mediaOcr = feitas ? msOcr / feitas : 0;
+      panel.setPrepNota(
+        "Reconhecendo texto (OCR) — " +
+          (feitas + 1) + "ª página" +
+          (mediaOcr ? " · OCR " + (mediaOcr / 1000).toFixed(1) + " s" : "") +
+          (ritmo ? " · ritmo " + (ritmo / 1000).toFixed(1) + " s/pág" : "") +
+          " · " + rotulo
+      );
+      // A PRIMEIRA paga o warm-up do motor E o duelo entre WASM e WebGPU, daí o
+      // teto maior. Vale para quem chegar primeiro — folha de PDF ou anexo.
+      const primeira = pagsOcr === 0;
+      const o = await comTeto(
+        rpc({ type: "ocrReconhecer", payload: { img } }),
+        primeira ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
+        "o reconhecimento de texto"
+      );
+      mostrarDiag(o && o.resultado && o.resultado.diag);
+      // FORA do `if (texto)`: a página que o motor processou e devolveu vazia
+      // (a foto sem texto legível) consumiu o mesmo tempo, e deixá-la de fora
+      // tornava a média otimista. Pior, `backendOcr` saía junto: num processo
+      // só de fotos ilegíveis o cabeçalho do .md ficaria SEM o nome do motor —
+      // exatamente o campo que existe para diagnosticar lentidão.
+      if (o.resultado && typeof o.resultado.ms === "number") msOcr += o.resultado.ms;
+      if (o.resultado && o.resultado.backend) backendOcr = o.resultado.backend;
+      return {
+        texto: (o.resultado && o.resultado.texto) || "",
+        score: o.resultado && o.resultado.score,
+      };
+    }
+
     function registrarPeca(d, ordem, corpo, meta) {
       partes.push("# " + d.titulo + "\n\n" + corpo + "\n");
       if (!porPeca) return;
@@ -2091,46 +2142,15 @@
             for (const f of res.folhas) {
               if (!f.img) continue;
               if (sinal.cancelado) throw new Error("cancelado");
-              // O card marca uma linha por PEÇA, e uma peça pode ter 22 páginas
-              // escaneadas: sem esta nota o usuário fica minutos olhando o mesmo
-              // spinner sem saber se anda. Ela conta PÁGINAS, que é a unidade
-              // real do trabalho, e mostra o ritmo medido — não uma promessa.
-              const feitas = pagsOcr;
-              // DUAS grandezas, porque respondem a perguntas diferentes e
-              // confundi-las foi o defeito: o RITMO (tudo ÷ páginas) é o que
-              // permite estimar quando termina, e o tempo de OCR é o que diz se
-              // o motor está no backend certo. Enquanto havia só o ritmo, um
-              // download lento da fila do PJe aparecia como "o OCR está lento".
-              const ritmo = feitas && Date.now() > t0Ocr ? (Date.now() - t0Ocr) / feitas : 0;
-              const mediaOcr = feitas ? msOcr / feitas : 0;
-              panel.setPrepNota(
-                "Reconhecendo texto (OCR) — " +
-                  (feitas + 1) + "ª página" +
-                  (mediaOcr ? " · OCR " + (mediaOcr / 1000).toFixed(1) + " s" : "") +
-                  (ritmo ? " · ritmo " + (ritmo / 1000).toFixed(1) + " s/pág" : "") +
-                  " · " + d.titulo.slice(0, 32) + ", fl. " + f.p
-              );
               try {
-                const primeira = pagsOcr === 0;
-                const o = await comTeto(
-                  rpc({ type: "ocrReconhecer", payload: { img: f.img } }),
-                  primeira ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
-                  "o reconhecimento de texto"
+                const r = await reconhecerImagem(
+                  f.img,
+                  d.titulo.slice(0, 32) + ", fl. " + f.p
                 );
-                mostrarDiag(o && o.resultado && o.resultado.diag);
-                const t = (o.resultado && o.resultado.texto) || "";
-                // FORA do `if (t)`: a página que o motor processou e devolveu
-                // vazia (a foto sem texto legível) consumiu o mesmo tempo, e
-                // deixá-la de fora tornava a média otimista. Pior, `backendOcr`
-                // saía junto: num processo só de fotos ilegíveis o cabeçalho do
-                // .md ficaria SEM o nome do motor — exatamente o campo que
-                // existe para diagnosticar lentidão.
-                if (typeof o.resultado.ms === "number") msOcr += o.resultado.ms;
-                if (o.resultado.backend) backendOcr = o.resultado.backend;
-                if (t) {
-                  f.texto = t;
+                if (r.texto) {
+                  f.texto = r.texto;
                   f.ocr = true;
-                  f.score = o.resultado.score;
+                  f.score = r.score;
                   pagsOcr++;
                   // O ESTADO PRECISA SER LIMPO no sucesso. Ele nasce da
                   // classificação ("escaneada"/"camada-ruim") e era usado
@@ -2192,12 +2212,76 @@
             });
             comTexto++;
           } else {
-            // Imagem anexada: não tem camada de texto para ler. Dizer o motivo
-            // vale mais que uma seção vazia (regra do projeto: conjunto vazio
-            // se explica, não desaparece).
-            registrarPeca(d, ordem, "_[anexo em imagem — o texto depende do OCR]_", {
+            // ANEXO EM IMAGEM: a foto do BO, o print da conversa, o comprovante
+            // fotografado. Não é PDF, então não passa pelo pdf.js — mas é
+            // exatamente o material que o OCR existe para ler.
+            //
+            // Até a v0.53.0 este ramo escrevia "_[anexo em imagem — o texto
+            // depende do OCR]_" e NÃO chamava o motor. O rótulo nasceu na
+            // v0.49.0, quando OCR não existia na extensão; quando ele entrou
+            // (v0.50.0) este ramo não foi revisitado, e a frase passou a
+            // prometer o que ninguém cumpria — quem lia entendia "o OCR tentou
+            // e não conseguiu". O mesmo documento fotografado tinha sorte
+            // diferente conforme tivesse chegado como PDF ou como JPEG.
+            //
+            // Não há rasterização aqui: a imagem já está em base64 no cache e
+            // já foi reduzida por `normalizarImagem` (teto de 1568px no lado
+            // maior), então basta montar o data URL — o motor recebe o mesmo
+            // formato que recebe de uma folha rasterizada.
+            if (sinal.cancelado) throw new Error("cancelado");
+            let corpo = "";
+            let leu = false;
+            if (comOcr && c.b64) {
+              try {
+                const r = await reconhecerImagem(
+                  "data:" + (c.mime || "image/jpeg") + ";base64," + c.b64,
+                  d.titulo.slice(0, 32)
+                );
+                if (r.texto) {
+                  pagsOcr++;
+                  leu = true;
+                  corpo =
+                    r.texto +
+                    "\n\n_[anexo em imagem, texto reconhecido por OCR" +
+                    (typeof r.score === "number"
+                      ? " — confiança " + r.score.toFixed(0) + "%"
+                      : "") +
+                    "]_";
+                } else {
+                  // Resultado vazio numa FOTO costuma estar CERTO: o retrato de
+                  // uma estrada rural não tem texto. Dizer isso vale mais que
+                  // uma seção vazia — e é diferente de "não tentamos".
+                  pagsSemOcr++;
+                  corpo = "_[anexo em imagem — o OCR não encontrou texto legível]_";
+                }
+              } catch (e) {
+                const motivo = (e && e.message) || String(e);
+                errosOcr.push(motivo);
+                mostrarDiag(e && e.diag);
+                console.warn("[PJe IA OCR] falhou no anexo em imagem", d.id, "->", motivo);
+                pagsSemOcr++;
+                corpo =
+                  "_[anexo em imagem — o reconhecimento de texto falhou: " + motivo + "]_";
+              }
+              panel.setPrepNota("");
+            } else {
+              // Só alcançável pelo dia em que houver um "só o texto nativo" na
+              // interface (`comOcr`) ou por um anexo sem bytes. Diz o que é, em
+              // vez de repetir a promessa antiga.
+              pagsSemOcr++;
+              corpo = "_[anexo em imagem — o OCR não foi aplicado]_";
+            }
+            registrarPeca(d, ordem, corpo, {
               formato: c.fmt || "img",
+              paginas: 1,
+              paginasOcr: leu ? 1 : 0,
+              paginasSemTexto: leu ? 0 : 1,
             });
+            // Só conta como peça COM TEXTO se o OCR de fato leu alguma coisa: o
+            // número vai no cabeçalho do .md e não pode inflar com anexos que
+            // saíram vazios. Antes desta versão o ramo NUNCA contava, porque
+            // nunca havia texto.
+            if (leu) comTexto++;
           }
           panel.setPrepState(d.id, "done");
         } catch (e) {
