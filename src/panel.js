@@ -308,6 +308,13 @@ var PjePanel = (function () {
     enviar: '<path d="M5 12h13"/><path d="M12 6l6 6-6 6"/>',
     mais: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     lista: '<path d="M4 5h13"/><path d="M4 12h10"/><path d="M4 19h7"/>',
+    // Extrair texto: a FOLHA com linhas escritas e uma seta saindo dela. A folha
+    // sozinha diria "documento" (que é o que a lista inteira já é); é a seta que
+    // diz que algo SAI daqui.
+    extrairTexto:
+      '<path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-7"/>' +
+      '<path d="M8 8h6"/><path d="M8 12h5"/><path d="M8 16h4"/>' +
+      '<path d="M18 3v7"/><path d="M15 7l3 3 3-3"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
     // Relógio para o selo da linha do tempo processual. Ponteiros em 10h10 (e
     // não 12h00, que a 14px vira um traço só): é o desenho que se lê como
@@ -404,6 +411,7 @@ var PjePanel = (function () {
     lista: ic(P.lista, 15, 1.9),
     reload: ic(P.reload, 13, 2),
     zip: ic(P.download, 13, 2),
+    extrairTexto: ic(P.extrairTexto, 13, 2),
     malote: ic(P.malote, 14, 1.9),
     caret: ic(P.caret, 11, 2.2),
     play: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l10 7-10 7z"/></svg>',
@@ -872,7 +880,8 @@ var PjePanel = (function () {
               <span class="tip-txt"></span>
               <button type="button" class="tip-load" title="Rola a linha do tempo do processo automaticamente até o fim para carregar TODAS as peças do processo na lista">${SVG.reload}<span class="lbl">Carregar tudo</span></button>
               <button type="button" class="tip-ia" title="Envia à IA só a LISTA de peças (id, título, tipo e data — nenhum conteúdo) e pede que ela escolha as relevantes. Se houver texto no campo de pergunta, escolhe para AQUELA pergunta; vazio, escolhe as peças que descrevem o processo. Custa alguns centavos e leva poucos segundos.">${SVG.ia}<span class="lbl">Escolher com IA</span></button>
-              <span class="zipwrap">
+              <button type="button" class="tip-txt-ocr" title="Extrair o texto das peças para um arquivo .md — lê a camada de texto do PDF e aplica OCR local nas páginas digitalizadas. O texto NÃO vai para a conversa.">${SVG.extrairTexto}<span class="lbl">Extrair texto</span></button>
+      <span class="zipwrap">
                 <button type="button" class="tip-zip" title="Baixa os arquivos ORIGINAIS das peças (PDF, HTML) num único .zip, numerados na ordem do processo e com um índice de tipo, data e autor da juntada. Exporta as peças MARCADAS; sem nenhuma marcada, exporta todas as da lista.">${SVG.zip}<span class="lbl">Baixar .zip</span></button>
                 <button type="button" class="tip-zip-mais" aria-haspopup="menu" aria-expanded="false" title="Outras formas de baixar — inclusive o pacote pronto de carta precatória" aria-label="Outras formas de baixar">${SVG.caret}</button>
               </span>
@@ -1111,6 +1120,7 @@ var PjePanel = (function () {
     const tipLoad = $(".tip-load");
     const tipZip = $(".tip-zip");
     const tipIa = $(".tip-ia");
+    const tipOcr = $(".tip-txt-ocr");
     // `{titulo, texto}` quando esta página é de um PJe cujo dialeto a extensão
     // ainda não lê (ver `PJE.dialeto`); `null` no caso normal, que é o de todos
     // os tribunais suportados — nada aqui muda para eles.
@@ -2873,6 +2883,21 @@ var PjePanel = (function () {
     const tipZipMais = $(".tip-zip-mais");
     let precCb = null;
     let textoCb = null;
+
+    // Botão PRÓPRIO na faixa, e não só o item do menu do split button: com a
+    // coluna estreita os botões viram só-ícone e o caret fica um alvo de ~10px
+    // colado no download. O usuário clicou no corpo do botão e recebeu o .zip.
+    // Ação que não se acha não existe.
+    tipOcr.addEventListener("click", () => {
+      if (!textoCb || tipOcr.disabled) return;
+      const marcadas = getSelectedDocs();
+      const alvo = marcadas.length ? marcadas : allDocs;
+      if (!alvo.length) {
+        statusEl.textContent = "A lista de peças está vazia — não há texto para extrair.";
+        return;
+      }
+      textoCb(alvo, { todas: !marcadas.length });
+    });
     let zipmenu = null;
     function fecharZipMenu() {
       if (zipmenu) zipmenu.remove();
@@ -3141,6 +3166,7 @@ var PjePanel = (function () {
       // que acontecia aqui — e ainda com um rótulo ("⬇ Documentos") que nem
       // batia com o do template ("Baixar .zip").
       rotulo(tipZip, on ? "Baixando…" : "Baixar .zip");
+      tipOcr.disabled = !!on;
     }
 
     // -------------------------------------------------------------------------
@@ -5936,7 +5962,7 @@ var PjePanel = (function () {
         // que é a frase com que o próprio `aplicarDegrau` justifica a nota que
         // aqui deixou de existir. O aviso logo acima é a explicação; o
         // `disabled` é o que impede a pergunta.
-        for (const b of [tipLoad, tipIa, tipZip, tipZipMais, chkEss, chkMain, chkAll, docQ]) {
+        for (const b of [tipLoad, tipIa, tipOcr, tipZip, tipZipMais, chkEss, chkMain, chkAll, docQ]) {
           if (!b) continue;
           b.disabled = true;
           b.title = motivo;

@@ -855,7 +855,7 @@ button > svg { flex: none; }
 /* "Carregar tudo", "Escolher com IA" e "Baixar .zip" são ações IRMÃS sobre a
    lista inteira — compartilham a regra de propósito, para não divergirem com o
    tempo. */
-.tip-load, .tip-zip, .tip-ia, .tip-zip-mais {
+.tip-load, .tip-zip, .tip-ia, .tip-txt-ocr, .tip-zip-mais {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   height: 30px; padding: 0 var(--sp-3b);
   border: 1px solid var(--line-strong); background: #fff; color: var(--pje);
@@ -864,11 +864,11 @@ button > svg { flex: none; }
   cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease;
   font-family: inherit;
 }
-.tip-load svg, .tip-zip svg, .tip-ia svg, .tip-zip-mais svg { flex: none; }
-.tip-load:hover, .tip-zip:hover, .tip-ia:hover, .tip-zip-mais:hover {
+.tip-load svg, .tip-zip svg, .tip-ia svg, .tip-txt-ocr svg, .tip-zip-mais svg { flex: none; }
+.tip-load:hover, .tip-zip:hover, .tip-ia:hover, .tip-txt-ocr:hover, .tip-zip-mais:hover {
   border-color: var(--line-focus); background: var(--hover-2);
 }
-.tip-load:disabled, .tip-zip:disabled, .tip-ia:disabled, .tip-zip-mais:disabled {
+.tip-load:disabled, .tip-zip:disabled, .tip-ia:disabled, .tip-txt-ocr:disabled, .tip-zip-mais:disabled {
   opacity: 0.6; cursor: default;
 }
 
@@ -882,7 +882,11 @@ button > svg { flex: none; }
 .zipwrap .tip-zip { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .tip-zip-mais {
   border-top-left-radius: 0; border-bottom-left-radius: 0;
-  border-left: none; padding: 0 var(--sp-2);
+  border-left: none;
+  /* Era `0 var(--sp-2)`: com a coluna estreita o alvo ficava em ~10px, colado no
+     ícone do download, e quem queria o menu clicava no corpo do botão e recebia
+     o .zip. Alvo de toque nunca deve depender de pontaria. */
+  padding: 0 var(--sp-3);
 }
 /* A borda que separa as duas zonas é interna e discreta: com a borda cheia do
    `--line-strong` o par parecia dois controles distintos. */
@@ -953,10 +957,10 @@ button > svg { flex: none; }
    que a lista é uma faixa de até 712px. Ali os três rótulos cabem com folga, e
    escondê-los seria perder informação sem motivo. */
 .wrap:is(.estreito, .expanded, .livre-wide) .docs-tip { gap: var(--sp-2); }
-.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-zip) .lbl {
+.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-txt-ocr, .tip-zip) .lbl {
   display: none;
 }
-.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-zip) {
+.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-txt-ocr, .tip-zip) {
   padding: 0 var(--sp-2b);
 }
 

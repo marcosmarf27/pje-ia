@@ -37,6 +37,7 @@ const MODELOS = {
 let servico = null;
 let iniciando = null;
 let backendAtivo = "";
+let threads = 1;
 
 async function baixarLocal(caminho) {
   const r = await fetch(chrome.runtime.getURL(caminho));
@@ -56,7 +57,35 @@ async function criarServico() {
 
   // Os binários do ORT (.wasm E .mjs) precisam sair do PACOTE e da MESMA
   // compilação do JS. Copiar só o .wasm devolve "no available backend found".
+  //
+  // E tem de ser DEPOIS do bundle carregar: o `ppu-paddle-ocr/web` chama
+  // `applyDefaultWasmPaths()` no próprio import e aponta o ORT para o
+  // jsDelivr. Sob MV3 esse fetch nunca aconteceria (código remoto é proibido),
+  // então sobrescrever aqui não é preferência — é o que faz funcionar.
   API.ort.env.wasm.wasmPaths = chrome.runtime.getURL("vendor/ort/");
+
+  // THREADS. É a diferença entre 2 minutos e 45 minutos, e não é figura de
+  // linguagem: medido na mesma página, mesmo modelo, mesma máquina —
+  // **2.357 ms com 4 threads contra ~50.000 ms numa thread só**, 21×.
+  //
+  // O ORT só usa threads com `SharedArrayBuffer`, que o Chrome só entrega em
+  // contexto CROSS-ORIGIN ISOLATED. Para páginas de extensão isso se declara no
+  // manifest (`cross_origin_embedder_policy` + `cross_origin_opener_policy`);
+  // sem as duas chaves, `crossOriginIsolated` é false, o ORT cai para uma thread
+  // e o OCR de um processo inteiro deixa de ser viável.
+  //
+  // O teto de 4 é deliberado: mais threads também é mais CPU, mais energia e
+  // mais disputa com o resto da máquina do usuário — que está trabalhando.
+  if (self.crossOriginIsolated && typeof SharedArrayBuffer === "function") {
+    API.ort.env.wasm.numThreads = Math.max(1, Math.min(4, navigator.hardwareConcurrency || 1));
+    threads = API.ort.env.wasm.numThreads;
+  } else {
+    // Não é fatal: o WASM roda numa thread e o OCR sai, devagar. Mas é a
+    // primeira coisa a conferir se alguém reclamar de lentidão.
+    console.warn(
+      "[PJe IA] sem cross-origin isolation: o OCR vai rodar numa thread só e ficar ~20x mais lento"
+    );
+  }
 
   const [detection, recognition, charactersDictionary] = await Promise.all([
     baixarLocal(MODELOS.detection),
@@ -69,7 +98,18 @@ async function criarServico() {
   // compilação do shader, por memória ou por device lost. Por isso a escolha é
   // por TENTATIVA de sessão real, com fallback para WASM — e o WASM é a base
   // universal, nunca o contrário.
-  const temGpu = (await API.isWebGpuAvailable?.().catch(() => false)) || false;
+  // COM TETO DE TEMPO. `isWebGpuAvailable` faz `await navigator.gpu.requestAdapter()`,
+  // e um documento offscreen não tem superfície de renderização: se o adapter
+  // nunca resolver, o turno inteiro fica pendurado SEM erro — que é o pior
+  // sintoma possível, indistinguível de travamento. Rota que pendura precisa de
+  // alternativa, não de paciência: estourou, segue em WASM.
+  const temGpu = await Promise.race([
+    Promise.resolve()
+      .then(() => API.isWebGpuAvailable?.())
+      .then((v) => !!v)
+      .catch(() => false),
+    new Promise((r) => setTimeout(() => r(false), 3000)),
+  ]);
   const base = {
     model: { detection, recognition, charactersDictionary },
     // `canvas-native` evita arrastar o OpenCV em WASM (ppu-ocv) para dentro do
@@ -82,7 +122,7 @@ async function criarServico() {
       const s = new API.PaddleOcrService(base);
       await s.initialize();
       servico = s;
-      backendAtivo = "webgpu";
+      backendAtivo = "WebGPU";
       return s;
     } catch (e) {
       console.warn("[PJe IA] WebGPU recusou o modelo, caindo para WASM:", (e && e.message) || e);
@@ -94,7 +134,10 @@ async function criarServico() {
   );
   await s.initialize();
   servico = s;
-  backendAtivo = "wasm";
+  // O numero de threads vai JUNTO do nome do backend porque e' ele que explica a
+  // velocidade: "WASM x1" e "WASM x4" sao 21x diferentes, e sem isso escrito no
+  // arquivo a lentidao volta a ser invisivel para quem for diagnosticar.
+  backendAtivo = "WASM x" + threads;
   return s;
 }
 

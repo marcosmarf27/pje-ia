@@ -1733,6 +1733,32 @@ Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técni
   plano, e um processo de 300 folhas leva minutos. E nenhum dos dois no service
   worker, que não tem `new Worker`. `getTextContent()` funcionaria no offscreen;
   `render()` não.
+- **THREADS NO WASM: 21× — e é a diferença entre usável e não.** Medido na mesma
+  página, mesmo modelo, mesma máquina: **2.357 ms com 4 threads contra ~50.000 ms
+  numa thread só**. Num processo real com 54 folhas digitalizadas isso é 2 minutos
+  contra 45. O ORT só usa threads com `SharedArrayBuffer`, que o Chrome só entrega
+  em contexto CROSS-ORIGIN ISOLATED — para páginas de extensão isso se declara no
+  manifest (`cross_origin_embedder_policy: require-corp` +
+  `cross_origin_opener_policy: same-origin`), e as duas chaves **não** geram aviso
+  de instalação. Sem elas o recurso "funciona" e é inviável, que é o pior estado.
+  Conferido: nenhuma página de extensão carrega subrecurso externo (os `https://`
+  dos HTMLs são todos `<a href>` de navegação, que a COEP não governa).
+- **O backend vai ESCRITO no `.md`** (`WebGPU` ou `WASM ×4`). Sem isso, uma
+  regressão de isolamento faria o OCR voltar aos 50 s/página **sem sintoma
+  nenhum** além de lentidão — e lentidão sem causa visível não se diagnostica.
+- **O teste de WebGPU tem TETO DE TEMPO.** `isWebGpuAvailable` faz
+  `await navigator.gpu.requestAdapter()`, e um documento offscreen não tem
+  superfície de renderização: adapter que não resolve pendura o turno inteiro sem
+  erro. Rota que pendura precisa de ALTERNATIVA, não de paciência — a mesma regra
+  que o `MOVS_TIMEOUT_MS` das movimentações e o `pje login` do CLI já registram.
+- **O progresso conta PÁGINAS, não peças.** O card marca uma linha por peça, e uma
+  peça pode ter 22 folhas escaneadas: ver o mesmo ícone girando por minutos é
+  indistinguível de travamento — foi assim que a v0.50.0 chegou ao usuário como
+  "travou". A `.prep-nota` mostra a contagem e o ritmo MEDIDO, nunca uma promessa.
+- **O bundle aponta o ORT para um CDN no próprio import** (`applyDefaultWasmPaths()`
+  roda ao carregar). Sob MV3 esse fetch nunca aconteceria — código remoto é
+  proibido. Sobrescrever `wasmPaths` depois do bundle carregar não é preferência:
+  é o que faz funcionar.
 - **PP-OCRv6 tier TINY, e a escolha foi MEDIDA, não herdada.** O guia
   `pp-ocrv6-extensao-chrome-mv3.docx` recomenda Small — e ele próprio manda
   decidir com documentos reais. Nas 4 páginas digitalizadas de um processo real:

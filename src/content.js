@@ -1866,6 +1866,7 @@
     let pagsOcr = 0;
     let pagsSemOcr = 0;
     let backendOcr = "";
+    const t0Ocr = Date.now();
     // Hoje sempre com OCR. A flag existe para o dia em que houver um "só o texto
     // nativo" na interface — e para deixar explícito, no código, que a
     // rasterização é o que separa segundos de minutos.
@@ -1904,8 +1905,17 @@
             for (const f of res.folhas) {
               if (!f.img) continue;
               if (sinal.cancelado) throw new Error("cancelado");
+              // O card marca uma linha por PEÇA, e uma peça pode ter 22 páginas
+              // escaneadas: sem esta nota o usuário fica minutos olhando o mesmo
+              // spinner sem saber se anda. Ela conta PÁGINAS, que é a unidade
+              // real do trabalho, e mostra o ritmo medido — não uma promessa.
+              const feitas = pagsOcr;
+              const ritmo = feitas && Date.now() > t0Ocr ? (Date.now() - t0Ocr) / feitas : 0;
               panel.setPrepNota(
-                "Reconhecendo texto — " + d.titulo.slice(0, 40) + ", página " + f.p + "…"
+                "Reconhecendo texto (OCR) — " +
+                  (feitas + 1) + "ª página" +
+                  (ritmo ? " · ~" + (ritmo / 1000).toFixed(1) + " s por página" : "") +
+                  " · " + d.titulo.slice(0, 32) + ", fl. " + f.p
               );
               try {
                 const o = await rpc({ type: "ocrReconhecer", payload: { img: f.img } });
