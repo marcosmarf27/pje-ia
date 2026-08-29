@@ -2,18 +2,23 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <title>Extração de texto (TecJustiça PJe)</title>
+    <title>OCR local (TecJustiça PJe)</title>
     <!--
       Documento OFFSCREEN, sem interface. O service worker o cria sob demanda
-      (razão "WORKERS") para ter um contexto com DOM, canvas e `new Worker` de
-      verdade — nada disso existe no service worker MV3, e nada disso pode
-      entrar na página do tribunal (1,7 MB de pdf.js em toda página *.jus.br,
-      expostos a qualquer script do PJe).
+      (razão "WORKERS") para hospedar o motor de OCR: o service worker MV3 não
+      tem `new Worker` e é morto em tarefa longa, e o iframe da página do
+      tribunal morre no primeiro F5.
 
-      Só `chrome.runtime` é garantido aqui — não usar outras APIs chrome.
+      Aqui NÃO entra pdf.js: `page.render()` trava em documento offscreen,
+      porque o rAF fica congelado em contexto oculto. Quem rasteriza é
+      src/ocr-render.js, no iframe.
+
+      Só `chrome.runtime` é garantido no offscreen — não usar outras APIs chrome.
+      O bundle vem ANTES do script da página (padrão de mapa.html).
     -->
   </head>
   <body>
-    <script type="module" src="ocr-offscreen.js"></script>
+    <script src="../vendor/ppu-ocr.web.bundle.js"></script>
+    <script src="ocr-offscreen.js"></script>
   </body>
 </html>

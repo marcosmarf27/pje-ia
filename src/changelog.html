@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>83 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>84 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,7 +103,29 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.49.0</span> Baixar o texto do processo inteiro num arquivo só</h2>
+        <h2><span class="v novo">v0.50.0</span> O OCR chegou: p&#225;gina digitalizada tamb&#233;m vira texto</h2>
+        <p>
+          A v0.49.0 lia a camada de texto dos PDFs e marcava as p&#225;ginas
+          <em>digitalizadas</em> como n&#227;o lidas &#8212; o comprovante de resid&#234;ncia, a foto do
+          documento, a matr&#237;cula antiga saíam vazios. Agora essas p&#225;ginas passam por
+          <strong>OCR no seu pr&#243;prio computador</strong>, e o texto entra no arquivo.
+        </p>
+        <p>
+          O motor &#233; o <strong>PP-OCRv6</strong> (PaddleOCR) rodando em ONNX Runtime:
+          <strong>WebGPU</strong> quando a sua m&#225;quina permite, WebAssembly quando n&#227;o.
+          Fica tudo embarcado na extens&#227;o &#8212; <strong>nada &#233; enviado a servidor
+          nenhum</strong>, funciona sem internet, e n&#227;o consome cr&#233;dito de API.
+        </p>
+        <p>
+          Cada p&#225;gina lida por OCR vem <strong>marcada</strong> no arquivo, com o grau de
+          confian&#231;a, porque OCR erra e quem assina precisa saber o que conferir. Foto sem
+          texto leg&#237;vel &#8212; o retrato de uma estrada, um documento ileg&#237;vel &#8212; sai dizendo
+          isso, em vez de sair vazia sem explica&#231;&#227;o.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.49.0</span> Baixar o texto do processo inteiro num arquivo s&#243;</h2>
         <p>
           No menu do <strong>&#8681; Baixar .zip</strong> há um item novo: <strong>&#8220;Extrair
           o texto&#8230;&#8221;</strong>. Ele lê as pe&#231;as marcadas e devolve <strong>um
@@ -1719,6 +1741,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.50.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>OCR local: p&#225;gina digitalizada tamb&#233;m vira texto.</strong> As p&#225;ginas sem camada de texto passam pelo <strong>PP-OCRv6</strong> (PaddleOCR sobre ONNX Runtime), com WebGPU quando dispon&#237;vel e WebAssembly como piso &#8212; tudo embarcado, sem servidor, sem internet e sem consumir cr&#233;dito de API. O tier <em>tiny</em> foi escolhido por medi&#231;&#227;o em p&#225;ginas reais: 5&#215; menor e 2,1&#215; mais r&#225;pido que o Small, com leitura igual ou melhor. Cada p&#225;gina lida por OCR vem marcada com a confian&#231;a; imagem sem texto leg&#237;vel diz isso em vez de sair vazia. O pdf.js saiu do documento offscreen para um iframe de p&#225;gina de extens&#227;o &#8212; o <code>render()</code> trava no offscreen, onde o rAF fica congelado</td></tr>
             <tr class="marco"><td><span class="v">0.49.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>Baixar o texto do processo inteiro num arquivo s&#243;.</strong> Novo item &#8220;Extrair o texto&#8230;&#8221; no menu do &#8681; Baixar .zip: l&#234; a camada de texto dos PDFs das pe&#231;as marcadas, no pr&#243;prio computador, e entrega um <code>.md</code> em ordem cronol&#243;gica com uma se&#231;&#227;o por p&#225;gina. O carimbo de assinatura eletr&#244;nica repetido em toda folha &#233; removido &#8212; sem isso uma folha 100% digitalizada &#8220;tem texto&#8221; e o arquivo sairia s&#243; com rodap&#233;. P&#225;gina sem camada de texto sai <em>marcada</em>, nunca vazia em sil&#234;ncio. O texto extra&#237;do <strong>n&#227;o entra na conversa</strong> nem no envio &#224; IA</td></tr>
             <tr class="marco"><td><span class="v">0.48.0</span></td><td>23/08/2026</td><td><span class="dot-marco"></span><strong>A minuta passa a seguir as suas peças-modelo e as suas instruções.</strong> As regras que ela herdava do chat mandavam se basear <em>somente</em> nos documentos anexados — e peça-modelo, sendo de outro processo, não é um documento anexado: havia uma instrução interna mandando ignorá-las. Agora o <strong>conteúdo</strong> sai só das peças deste processo e a <strong>forma</strong> vem dos seus modelos. O que você escreve no campo saiu do meio das regras fixas e vai <strong>por último e destacado</strong>, prevalecendo sobre as regras de forma (a tese continua sendo a última palavra). A minuta passou a ser redigida pelo modelo mais adequado a escrever do <strong>mesmo provedor</strong> — Luna→Terra, Haiku→Sonnet 5, Flash-Lite→3.7 Flash —, sem trocar o modelo do chat; custa mais, e a faixa da minuta diz qual vai redigir <strong>antes</strong> de gerar. Quem escolhia Claude caía no Haiku e a biblioteca de peças-modelo ficava desabilitada: a minuta saía sem modelo nenhum, calada. Novo campo <strong>"Modelo para minutas"</strong> nas opções</td></tr>
             <tr><td><span class="v">0.47.0</span></td><td>19/08/2026</td><td>A tela de configuração passa a dizer <strong>para que serve cada modelo</strong> — analisar os autos, redigir expedientes ou os dois —, e quem liga o modo minuta com um modelo de análise recebe a sugestão de qual usar, de preferência do mesmo provedor (sem exigir outra chave); é sugestão, nunca impedimento. A tabela do guia ganhou a coluna para os dez modelos. Além disso, atualizações com novidade de verdade passam a acender um selo <strong>"novo"</strong> no ícone da extensão, com uma linha no painel levando a estas notas — antes as melhorias chegavam em silêncio. E o pedido de avaliação na Chrome Web Store entrou nas telas de apoio</td></tr>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Leitura de PDF (TecJustiça PJe)</title>
+    <!--
+      Página de trabalho, SEM interface: o content script a carrega num iframe
+      oculto (1×1, aria-hidden) só para ter um contexto onde o pdf.js possa abrir
+      um Worker de verdade E rasterizar — o `page.render()` trava em documento
+      offscreen, porque lá o rAF fica congelado.
+    -->
+    <style>
+      html,
+      body {
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="ocr-render.js"></script>
+  </body>
+</html>

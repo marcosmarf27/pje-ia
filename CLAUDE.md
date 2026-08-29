@@ -1678,7 +1678,7 @@ Code, num script, num arquivo de caso. Regras que não podem quebrar:
   (~1,33× os bytes) e é materializado em Uint8Array ao zipar. Estourar mata a aba
   sem dizer por quê; a mensagem manda exportar em levas marcando parte das peças.
 
-## Extração de texto das peças (`ocr-offscreen.js` + pdf.js)
+## Extração de texto das peças + OCR local (`ocr-render.js` + `ocr-offscreen.js`)
 
 Item **"Extrair o texto…"** no menu do split button `⬇ Baixar .zip`. Lê a camada de
 texto dos PDFs e entrega **um `.md`** com o processo inteiro — `# <peça>` /
@@ -1724,6 +1724,45 @@ Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técni
 - **Página sem camada de texto sai MARCADA**, nunca vazia em silêncio, e "escaneada"
   é distinguida de "em branco" pelo `getOperatorList` — que só roda nas páginas
   candidatas, porque é a parte cara.
+- **A DIVISÃO DE CONTEXTO É OBRIGATÓRIA, e cada peça está onde está por um
+  motivo diferente.** `pdf.js` vive no IFRAME (`src/ocr-render.js`), porque
+  `page.render()` **trava em documento offscreen** — offscreen é sempre
+  "hidden" e o rAF fica congelado, o mesmo congelamento que já derrubou o
+  primeiro desenho do mapa mental. O MOTOR DE OCR vive no OFFSCREEN, porque o
+  iframe morre no F5 da página do tribunal e sofre throttling de aba em segundo
+  plano, e um processo de 300 folhas leva minutos. E nenhum dos dois no service
+  worker, que não tem `new Worker`. `getTextContent()` funcionaria no offscreen;
+  `render()` não.
+- **PP-OCRv6 tier TINY, e a escolha foi MEDIDA, não herdada.** O guia
+  `pp-ocrv6-extensao-chrome-mv3.docx` recomenda Small — e ele próprio manda
+  decidir com documentos reais. Nas 4 páginas digitalizadas de um processo real:
+  tiny 3417 chars em 3079 ms; Small 3242 em 6470 ms. 5× menor (5,96 MB contra
+  29,6), 2,1× mais rápido, e melhor onde dá para ver a olho ("Acesse o vídeo
+  clicando na imagem acima" contra "Acee ide cliad na magem acima").
+- **WebGPU se prova por SESSÃO, nunca por `navigator.gpu`.** A API existir não
+  diz que os operadores do modelo rodam; a sessão pode falhar na criação, na
+  compilação do shader, por memória ou por device lost. `criarServico` TENTA a
+  sessão WebGPU e cai para WASM no erro — e o WASM é a base universal, nunca o
+  contrário.
+- **O `.wasm` e o `.mjs` do ORT vêm da MESMA compilação, e os dois vão no
+  pacote.** Copiar só o `.wasm` devolve "no available backend found". A variante
+  é a `jsep`, que traz WebGPU **e** o caminho WASM no mesmo arquivo — conferir
+  com `grep -o "ort-wasm[a-z0-9.-]*" vendor/ppu-ocr.web.bundle.js` ao atualizar.
+- **Rasteriza-se SÓ o que vai ao OCR.** Num processo real, 4 páginas de 41. Uma
+  A4 a 144 dpi em RGBA são ~13 MB antes do JPEG; rasterizar tudo mataria a aba e
+  trocaria segundos por minutos. O canvas ganha FUNDO BRANCO antes do render:
+  PDF sem fundo declarado renderiza transparente, e transparente vira PRETO no
+  JPEG — o OCR receberia uma folha preta.
+- **A página vai ao offscreen como data URL, nunca Blob**: um Blob atravessa
+  `chrome.runtime.sendMessage` como `{}` vazio. Já o PDF vai ao iframe por
+  `postMessage` com o ArrayBuffer TRANSFERIDO — cópia zero; pelo worker ele
+  viraria base64 (+33%) e mais duas cópias de string.
+- **O NONCE do iframe não é zelo**: ele é criado a partir do contexto da página
+  do tribunal, e qualquer script dela pode postar nele. Sem o nonce, um script
+  do PJe mandaria um PDF arbitrário para processamento.
+- **Página que o OCR leu vem MARCADA no `.md`, com a confiança.** OCR erra, e
+  quem assina precisa saber o que conferir. E imagem sem texto legível — a foto
+  de uma estrada rural — sai dizendo isso: o resultado vazio ali está CERTO.
 - **LACUNA CONHECIDA (BUG-21): `page.render()` do pdf.js TRAVA em documento
   offscreen.** Não afeta a Fatia 1 (só `getTextContent`), mas a rasterização do OCR
   **não pode** nascer aqui. Vai para um iframe oculto de página de extensão — origem

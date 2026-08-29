@@ -1730,15 +1730,98 @@
   // ---------------------------------------------------------------------------
   let extraindoTexto = false;
 
-  // Teto por peça no caminho content → worker → offscreen. ~36 MB de PDF; acima
-  // disso a serialização em JSON custa mais memória do que o resultado vale.
-  const MAX_B64_EXTRACAO = 48 * 1024 * 1024;
+  // Teto por peça. O PDF vai ao iframe por postMessage TRANSFERÍVEL (cópia
+  // zero), então o teto aqui é de sanidade de memória, não de serialização.
+  const MAX_B64_EXTRACAO = 96 * 1024 * 1024;
+
+  // --- iframe de leitura de PDF ---------------------------------------------
+  // Página de extensão embutida oculta. Não é o content script (nenhum bundle
+  // entra em página de tribunal) nem o offscreen (`page.render()` trava lá, com
+  // o rAF congelado). Ver o cabeçalho de src/ocr-render.js.
+  let renderFrame = null;
+  let renderPronto = null;
+  const RENDER_NONCE = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const RENDER_TIMEOUT_MS = 20000;
+  let reqSeq = 0;
+
+  function garantirRender() {
+    if (renderPronto) return renderPronto;
+    renderPronto = new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        limparRender();
+        reject(new Error("a leitura de PDF não iniciou a tempo"));
+      }, RENDER_TIMEOUT_MS);
+      function aoPronto(ev) {
+        const m = ev.data;
+        if (!m || m.__pjeia !== "render-pronto" || m.nonce !== RENDER_NONCE) return;
+        clearTimeout(t);
+        window.removeEventListener("message", aoPronto);
+        resolve(renderFrame);
+      }
+      window.addEventListener("message", aoPronto);
+      const fr = document.createElement("iframe");
+      fr.src = chrome.runtime.getURL("src/ocr-render.html?n=" + encodeURIComponent(RENDER_NONCE));
+      fr.setAttribute("aria-hidden", "true");
+      fr.setAttribute("tabindex", "-1");
+      fr.style.cssText =
+        "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0";
+      document.documentElement.appendChild(fr);
+      renderFrame = fr;
+    });
+    return renderPronto;
+  }
+
+  function limparRender() {
+    if (renderFrame && renderFrame.parentNode) renderFrame.parentNode.removeChild(renderFrame);
+    renderFrame = null;
+    renderPronto = null;
+  }
+
+  function b64ParaBytes(b64) {
+    const bin = atob(b64);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  // Manda o PDF ao iframe com o ArrayBuffer TRANSFERIDO — cópia zero. Um
+  // inquérito de 140 páginas são dezenas de MB; pelo caminho do worker eles
+  // virariam base64 (+33%) e mais duas cópias de string.
+  async function lerPdfNoFrame(b64, querImagens) {
+    const fr = await garantirRender();
+    const bytes = b64ParaBytes(b64);
+    const req = ++reqSeq;
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        window.removeEventListener("message", aoLido);
+        reject(new Error("a leitura do PDF demorou demais"));
+      }, 180000);
+      function aoLido(ev) {
+        const m = ev.data;
+        if (!m || m.__pjeia !== "lido" || m.req !== req) return;
+        clearTimeout(t);
+        window.removeEventListener("message", aoLido);
+        if (m.ok) resolve(m.resultado);
+        else reject(new Error(m.erro || "falha ao ler o PDF"));
+      }
+      window.addEventListener("message", aoLido);
+      fr.contentWindow.postMessage(
+        { __pjeia: "ler", nonce: RENDER_NONCE, req, buf: bytes.buffer, querImagens },
+        "*",
+        [bytes.buffer]
+      );
+    });
+  }
 
   function rotuloEstado(e) {
-    if (e === "escaneada") return "_[página digitalizada — sem camada de texto]_";
+    if (e === "escaneada") return "_[página digitalizada — não foi possível rasterizar]_";
     if (e === "camada-ruim") return "_[camada de texto defeituosa]_";
     if (e === "vazia") return "_[página em branco]_";
     if (e === "falhou") return "_[não foi possível ler esta página]_";
+    // OCR rodou e não achou texto. É o caso da FOTO — o retrato de uma estrada
+    // rural devolve nada, e está CERTO. Dizer isso vale mais que uma seção vazia.
+    if (e === "ocr-vazio") return "_[imagem sem texto legível]_";
+    if (e === "ocr-falhou") return "_[o reconhecimento de texto falhou nesta página]_";
     return "";
   }
 
@@ -1781,6 +1864,12 @@
     let comTexto = 0;
     let pagsNativas = 0;
     let pagsOcr = 0;
+    let pagsSemOcr = 0;
+    let backendOcr = "";
+    // Hoje sempre com OCR. A flag existe para o dia em que houver um "só o texto
+    // nativo" na interface — e para deixar explícito, no código, que a
+    // rasterização é o que separa segundos de minutos.
+    const comOcr = true;
     try {
       const { docs: emOrdem, criterio } = PjeExport.ordenarCronologico(docs);
       for (const d of emOrdem) {
@@ -1807,15 +1896,53 @@
                 "peça grande demais para a extração (" + fmtMB((c.b64.length * 3) / 4) + ")"
               );
             }
-            const r = await rpc({ type: "ocrExtrair", payload: { b64: c.b64 } });
-            if (!r || !r.resultado) throw new Error("a extração não devolveu resultado");
-            const folhas = r.resultado.folhas
-              .map((f) => "## Página " + f.p + "\n\n" + (f.texto || rotuloEstado(f.estado)))
+            const res = await lerPdfNoFrame(c.b64, comOcr);
+            pagsNativas += res.nativas;
+
+            // OCR das páginas sem camada de texto, UMA POR VEZ: o motor é único
+            // e a memória de uma A4 rasterizada não é pequena.
+            for (const f of res.folhas) {
+              if (!f.img) continue;
+              if (sinal.cancelado) throw new Error("cancelado");
+              panel.setPrepNota(
+                "Reconhecendo texto — " + d.titulo.slice(0, 40) + ", página " + f.p + "…"
+              );
+              try {
+                const o = await rpc({ type: "ocrReconhecer", payload: { img: f.img } });
+                const t = (o.resultado && o.resultado.texto) || "";
+                if (t) {
+                  f.texto = t;
+                  f.ocr = true;
+                  f.score = o.resultado.score;
+                  pagsOcr++;
+                  if (o.resultado.backend) backendOcr = o.resultado.backend;
+                } else {
+                  f.estado = "ocr-vazio";
+                }
+              } catch (e) {
+                f.estado = "ocr-falhou";
+                f.erroOcr = (e && e.message) || String(e);
+              }
+              delete f.img; // solta o data URL da página antes da próxima
+            }
+            panel.setPrepNota("");
+            pagsSemOcr += res.folhas.filter(
+              (f) => f.estado === "escaneada" || f.estado === "camada-ruim"
+            ).length;
+
+            const folhas = res.folhas
+              .map((f) => {
+                const corpo = f.texto || rotuloEstado(f.estado);
+                const marca = f.ocr
+                  ? "\n\n_[texto reconhecido por OCR" +
+                    (typeof f.score === "number" ? " — confiança " + f.score.toFixed(0) + "%" : "") +
+                    "]_"
+                  : "";
+                return "## Página " + f.p + "\n\n" + corpo + marca;
+              })
               .join("\n\n");
             partes.push("# " + d.titulo + "\n\n" + folhas + "\n");
             comTexto++;
-            pagsNativas += r.resultado.nativas;
-            pagsOcr += r.resultado.precisamOcr;
           } else {
             // Imagem anexada: não tem camada de texto para ler. Dizer o motivo
             // vale mais que uma seção vazia (regra do projeto: conjunto vazio
@@ -1838,7 +1965,14 @@
         new Date().toLocaleString("pt-BR") + ".\n" +
         "> Ordem das peças: " + criterio + ".\n" +
         "> " + comTexto + " peça(s), " + pagsNativas + " página(s) com texto nativo" +
-        (pagsOcr ? ", " + pagsOcr + " digitalizada(s) ainda sem OCR" : "") + ".\n" +
+        (pagsOcr
+          ? ", " + pagsOcr + " reconhecida(s) por OCR local (PP-OCRv6" +
+            (backendOcr ? ", " + backendOcr : "") + ")"
+          : "") +
+        (pagsSemOcr ? ", " + pagsSemOcr + " sem texto reconhecível" : "") + ".\n" +
+        (pagsOcr
+          ? "> O texto reconhecido por OCR pode conter erros — confira no documento original.\n"
+          : "") +
         (falhas.length
           ? "> Não entraram: " +
             falhas.map((f) => f.titulo + " (" + f.motivo + ")").join("; ") + ".\n"
@@ -1851,7 +1985,7 @@
       baixarBlob("processo-" + cnj + ".md", new Blob([md], { type: "text/markdown" }));
       panel.setStatus(
         "✅ Texto de " + comTexto + " peça(s) baixado" +
-          (pagsOcr ? " — " + pagsOcr + " página(s) digitalizada(s) ficaram sem texto." : ".")
+          (pagsOcr ? " — " + pagsOcr + " página(s) lidas por OCR local." : ".")
       );
     } catch (e) {
       const msg = (e && e.message) || String(e);
@@ -1863,6 +1997,10 @@
     } finally {
       extraindoTexto = false;
       panel.setZipOcupado(false);
+      panel.setPrepNota("");
+      // O iframe segura 1,7 MB de pdf.js e o documento aberto. Fora de uso ele
+      // e' peso morto na aba do tribunal — e recria-lo custa ~1 s.
+      limparRender();
       // Baixou dezenas de peças que a memória ainda não conhece — mesma razão
       // do `.zip`.
       salvarCasoAgora();

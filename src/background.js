@@ -682,19 +682,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // tokens fixos por página de PDF e não cobra o texto nativo, mandar o texto
   // extraído levou o contexto de 59% para 153%. O destino aqui é arquivo para o
   // usuário.
-  if (msg.type === "ocrExtrair") {
+  if (msg.type === "ocrReconhecer") {
     (async () => {
+      // O motor leva alguns segundos no warm-up da PRIMEIRA página (carrega
+      // 6 MB de modelo e compila o WASM), e cada página seguinte pode passar de
+      // 30 s em WASM. Manter o worker vivo enquanto isso acontece é o mesmo
+      // cuidado do `manterVivo` dos turnos longos. Ele DEVOLVE a função de
+      // parada — não há `pararKeepalive` global.
+      const parar = manterVivo();
       try {
         await garantirOffscreen();
         const r = await chrome.runtime.sendMessage({
           alvo: "ocrOffscreen",
-          tipo: "extrairPeca",
-          b64: msg.payload.b64,
+          tipo: "reconhecer",
+          img: msg.payload.img,
         });
-        if (!r || !r.ok) throw new Error((r && r.erro) || "extração não respondeu");
-        sendResponse({ ok: true, resultado: r.resultado });
+        if (!r || !r.ok) throw new Error((r && r.erro) || "o OCR não respondeu");
+        sendResponse({ ok: true, resultado: r });
       } catch (e) {
         sendResponse({ error: String((e && e.message) || e) });
+      } finally {
+        parar();
       }
     })();
     return true;

@@ -15,6 +15,9 @@ peças). **Não** são carregados nas páginas do PJe.
 | `jodit.min.js` / `jodit.min.css` | [Jodit](https://xdsoft.net/jodit/) | 4.13.8 | editor | `https://cdn.jsdelivr.net/npm/jodit@4.13.8/es2021/jodit.min.{js,css}` | MIT — © Valeriy Chupurnov |
 | `docx.iife.js` | [docx](https://docx.js.org) | 9.7.1 | editor | `https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js` | MIT — © Dolan Miu |
 | `pdf.min.mjs` / `pdf.worker.min.mjs` | [pdfjs-dist](https://mozilla.github.io/pdf.js/) | 6.2.108 | extração | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.{min,worker.min}.mjs` | Apache-2.0 — © Mozilla Foundation |
+| `ppu-ocr.web.bundle.js` | [ppu-paddle-ocr](https://github.com/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr) + [onnxruntime-web](https://onnxruntime.ai) | 6.4.3 + 1.29.0 | OCR | bundle IIFE gerado com esbuild a partir de `ppu-paddle-ocr/web` | MIT + MIT |
+| `ort/ort-wasm-simd-threaded.jsep.{wasm,mjs}` | onnxruntime-web | 1.29.0 | OCR | `npm:onnxruntime-web@1.29.0/dist/` | MIT — © Microsoft |
+| `ocr-modelos/PP-OCRv6_tiny_{det,rec}.ort` + dicionário | PP-OCRv6 (PaddleOCR) | tiny | OCR | `https://huggingface.co/snowfluke/ppu-paddle-ocr-models` | Apache-2.0 — © PaddlePaddle |
 
 `markmap-view.js` é um bundle IIFE que publica `window.markmap` e **consome `d3` global** —
 por isso a ordem dos `<script>` em `mapa.html` importa (d3 primeiro).
@@ -64,3 +67,31 @@ páginas digitalizadas entrar (PP-OCRv6), reavaliar `standard_fonts/`.
 Carregado por `import` em `src/ocr-offscreen.js` — **o único ES module fora do service
 worker** —, com o worker apontado por `chrome.runtime.getURL`. A CSP de páginas de extensão
 não permite `eval`, daí `isEvalSupported: false` no `getDocument`.
+
+## O bundle do OCR — por que ele é gerado, e como refazer
+
+`ppu-ocr.web.bundle.js` é o ÚNICO arquivo de `vendor/` que não vem pronto de um
+CDN: o pacote é ESM com dependências, e o projeto não tem build step. Ele é
+gerado UMA vez e commitado, como qualquer outro vendor:
+
+```
+npm i ppu-paddle-ocr@6.4.3 onnxruntime-web@1.29.0 esbuild
+# entrada.js:
+#   import { PaddleOcrService, isWebGpuAvailable } from "ppu-paddle-ocr/web";
+#   import * as ort from "onnxruntime-web";
+#   window.PpuOcr = { PaddleOcrService, isWebGpuAvailable, ort };
+npx esbuild entrada.js --bundle --format=iife --minify --target=chrome116   --external:onnxruntime-node --external:onnxruntime-react-native   --external:@shopify/react-native-skia --outfile=ppu-ocr.web.bundle.js
+```
+
+**O JS e o `.wasm` do ONNX Runtime têm de vir da MESMA versão.** Ao atualizar um,
+atualizar o outro — e conferir qual variante o bundle referencia
+(`grep -o "ort-wasm[a-z0-9.-]*" ppu-ocr.web.bundle.js`). Hoje é a `jsep`, que traz
+WebGPU **e** o caminho WASM no mesmo arquivo; copiar só o `.wasm` sem o `.mjs`
+devolve "no available backend found".
+
+**Modelos: tier TINY, e a escolha foi medida.** Contra o Small, nas 4 páginas
+digitalizadas de um processo real: tiny 3417 caracteres em 3079 ms, Small 3242 em
+6470 ms. 5× menor, 2,1× mais rápido, igual ou melhor. Os `.onnx` do repositório
+de modelos são Git LFS — baixar por `huggingface.co` ou por
+`media.githubusercontent.com/media/...`; o `raw.githubusercontent.com` devolve só
+o ponteiro LFS.
