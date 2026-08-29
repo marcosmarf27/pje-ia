@@ -103,7 +103,37 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.51.0</span> O OCR ficou <strong>21&#215; mais r&#225;pido</strong></h2>
+        <h2><span class="v novo">v0.52.0</span> O OCR escolhe o motor <strong>medindo</strong>, e ficou at&#233; 7&#215; mais r&#225;pido</h2>
+        <p>
+          A v0.51.0 deixou o reconhecimento 21&#215; mais r&#225;pido &#8212; e a extens&#227;o podia
+          jogar isso fora sem avisar. Ela testava a <strong>placa de v&#237;deo</strong> primeiro e
+          ficava com ela sempre que o motor conseguisse iniciar. S&#243; que <em>iniciar</em> n&#227;o
+          quer dizer <em>ser r&#225;pido</em>: parte das opera&#231;&#245;es volta para o processador,
+          e cada ida e volta custa caro. Num processo real de 93 folhas digitalizadas, deu
+          <strong>~18 segundos por p&#225;gina</strong> onde o processador levava
+          <strong>2,4</strong>.
+        </p>
+        <p>
+          Agora os dois disputam a <strong>primeira p&#225;gina de verdade</strong> &#8212; a mesma
+          imagem, o mesmo modelo &#8212; e ganha quem for mais r&#225;pido. A resposta fica
+          <strong>guardada</strong>, porque ela &#233; da sua m&#225;quina e n&#227;o muda de um
+          processo para o outro; trocou de placa ou de driver, h&#225; um bot&#227;o
+          &#8220;<strong>Medir de novo o motor de OCR</strong>&#8221; nas op&#231;&#245;es.
+        </p>
+        <p>
+          Outras tr&#234;s coisas nesta vers&#227;o. O <strong>download e a leitura da pr&#243;xima
+          pe&#231;a</strong> agora acontecem <em>enquanto</em> a atual est&#225; sendo reconhecida,
+          em vez de esperarem a vez. O card de progresso separa
+          <strong>o tempo do OCR do tempo total</strong> &#8212; antes ele mostrava um n&#250;mero
+          s&#243;, que somava o download ao reconhecimento e fazia a fila do PJe parecer
+          lentid&#227;o do motor. E o cabe&#231;alho do arquivo <strong>parou de mentir</strong>:
+          num processo com 93 p&#225;ginas reconhecidas, ele dizia &#8220;93 reconhecidas&#8221; e
+          &#8220;93 sem texto reconhec&#237;vel&#8221; &#8212; as mesmas 93.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.51.0</span> O OCR ficou <strong>21&#215; mais r&#225;pido</strong></h2>
         <p>
           Na v0.50.0 o reconhecimento rodava numa <strong>thread s&#243;</strong>: ~50 segundos por
           p&#225;gina. Um processo com 54 p&#225;ginas digitalizadas levava <strong>45 minutos</strong>,
@@ -1763,6 +1793,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.52.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O motor do OCR passou a ser escolhido por MEDI&#199;&#195;O.</strong> A extens&#227;o preferia a placa de v&#237;deo sempre que o motor conseguisse iniciar &#8212; mas iniciar n&#227;o &#233; ser r&#225;pido: num processo real de 93 folhas digitalizadas deu <strong>~18 s por p&#225;gina</strong> contra <strong>2,4 s</strong> no processador. Agora os dois disputam a primeira p&#225;gina real e a resposta fica guardada (bot&#227;o &#8220;Medir de novo&#8221; nas op&#231;&#245;es). O <strong>preparo da pr&#243;xima pe&#231;a</strong> passou a acontecer durante o reconhecimento da atual; o progresso separa o tempo do OCR do tempo total (o n&#250;mero &#250;nico somava a fila de download do PJe ao motor); a rasteriza&#231;&#227;o mira uma resolu&#231;&#227;o ALVO em vez de uma escala fixa, que entregava resolu&#245;es diferentes conforme o tamanho da p&#225;gina; e o cabe&#231;alho do arquivo parou de contar como &#8220;sem texto reconhec&#237;vel&#8221; justamente as p&#225;ginas que o OCR tinha lido</td></tr>
             <tr><td><span class="v">0.51.2</span></td><td>29/08/2026</td><td>A extra&#231;&#227;o de texto <strong>travava na primeira p&#225;gina digitalizada</strong> e nunca terminava. O leitor de PDF roda num quadro oculto, e o Chrome congela ali o rel&#243;gio de desenho que a biblioteca usa para trabalhar em fatias &#8212; a rasteriza&#231;&#227;o ficava esperando um sinal que nunca vinha, sem erro e sem fim. A cedência passou a usar um canal de mensagens, que funciona em quadro oculto <em>e</em> em aba de segundo plano (o padr&#227;o de quem abre v&#225;rios processos ao mesmo tempo). Cada folha ganhou teto de tempo pr&#243;prio: se travar, falha <em>aquela folha</em> com o motivo escrito e o resto do processo segue</td></tr>
             <tr><td><span class="v">0.51.1</span></td><td>29/08/2026</td><td>O OCR n&#227;o pode mais ficar em <strong>espera infinita</strong>. Se o motor n&#227;o responder, a p&#225;gina falha com o motivo escrito e a extra&#231;&#227;o SEGUE &#8212; antes ela parava na mesma pe&#231;a, sem erro, sem fim e sem arquivo. Todo diagn&#243;stico passou a aparecer no console da p&#225;gina do processo (F12), num lugar s&#243;, incluindo o do motor, que vive num console pr&#243;prio que ningu&#233;m abre</td></tr>
             <tr class="marco"><td><span class="v">0.51.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O OCR ficou 21&#215; mais r&#225;pido.</strong> O motor rodava numa thread s&#243; (~50 s por p&#225;gina) porque o Chrome s&#243; libera <code>SharedArrayBuffer</code> em contexto de isolamento de origem, e faltava declarar <code>cross_origin_embedder_policy</code>/<code>cross_origin_opener_policy</code>. Medido na mesma p&#225;gina: <strong>2.357 ms contra ~50.000 ms</strong>. Um processo com 54 folhas digitalizadas caiu de 45 minutos para ~2. O progresso passou a contar P&#193;GINAS com o ritmo ao vivo, e o arquivo diz qual motor rodou. O teste do WebGPU ganhou teto de tempo: <code>requestAdapter()</code> pode pendurar num documento offscreen, e pendura sem erro &#233; pior que erro. O <strong>Extrair texto</strong> virou bot&#227;o pr&#243;prio &#8212; estava atr&#225;s de um caret de ~10px</td></tr>

@@ -1752,7 +1752,12 @@
   //
   // Generoso de propósito: a PRIMEIRA página paga o warm-up do motor (carregar
   // 6 MB de modelo e compilar o WASM), que em máquina lenta passa de meio minuto.
-  const OCR_TIMEOUT_1A_MS = 120000;
+  // A PRIMEIRA página é especial e ficou mais cara de propósito: além do
+  // warm-up do motor, é nela que o offscreen mede WASM contra WebGPU para
+  // decidir o backend (`medirBackends`). O pior caso somado — init do WASM, o
+  // OCR do WASM, init do WebGPU e o orçamento do desafiante — cabe aqui com
+  // folga; o duelo tem tetos próprios justamente para não furar este.
+  const OCR_TIMEOUT_1A_MS = 240000;
   const OCR_TIMEOUT_MS = 60000;
 
   function comTeto(promessa, ms, oQue) {
@@ -1917,45 +1922,99 @@
     let backendOcr = "";
     const errosOcr = [];
     const t0Ocr = Date.now();
+    // TEMPO POR ETAPA, e não um número só. O card mostrava "~18,0 s por página"
+    // calculado como (agora − início) ÷ páginas reconhecidas — o que soma ao OCR
+    // o download de cada peça na fila serializada do PJe e a rasterização. O
+    // usuário lia aquilo como "o OCR leva 18 s", e não havia como saber onde o
+    // tempo estava indo: otimizar sem separar as etapas é apostar. As três são
+    // medidas em separado e vão ao log por peça e ao resumo no fim.
+    let msBaixando = 0;
+    let msLendoPdf = 0;
+    let msOcr = 0;
     // Hoje sempre com OCR. A flag existe para o dia em que houver um "só o texto
     // nativo" na interface — e para deixar explícito, no código, que a
     // rasterização é o que separa segundos de minutos.
     const comOcr = true;
     try {
       const { docs: emOrdem, criterio } = PjeExport.ordenarCronologico(docs);
-      for (const d of emOrdem) {
-        if (sinal.cancelado) throw new Error("cancelado");
-        panel.setPrepState(d.id, "loading");
+
+      // PREPARO PIPELINADO AO OCR — a mesma técnica da bomba de upload dentro de
+      // `baixarSelecionadas`. Baixar a peça e rasterizá-la não disputa recurso
+      // nenhum com o reconhecimento: o download é rede mais a fila JSF, a
+      // rasterização é o pdf.js no iframe, e o OCR é o motor no offscreen. Em
+      // série, o turno custa Σdownload + Σraster + Σocr; adiantando UMA peça,
+      // custa Σocr mais o preparo da primeira. Num processo migrado do SAJ —
+      // 96 peças de UMA página digitalizada cada — é o preparo inteiro que sai
+      // da conta.
+      //
+      // PROFUNDIDADE 1, deliberadamente. Cada folha rasterizada é um data URL de
+      // ~250 KB vivo em memória; adiantar várias peças de 20 folhas encheria a
+      // aba para ganhar um tempo que a fila serializada do PJe não deixa ganhar
+      // de todo jeito.
+      //
+      // `prepararPeca` NUNCA REJEITA: devolve `{erro}`. Uma rejeição de uma peça
+      // adiantada não teria ninguém esperando por ela no instante em que
+      // acontece — seria uma unhandled rejection derrubando um turno por causa
+      // de uma peça, o oposto da regra de que falha de download não derruba a
+      // extração.
+      const prepararPeca = async (d) => {
         try {
+          panel.setPrepState(d.id, "loading");
           // `{bytes:true}` é obrigatório: peça retomada da memória de caso tem
           // `fileId` e ZERO bytes, e sem a flag ela sairia vazia — em silêncio.
+          const tBaixa = Date.now();
           const c = await garantirBaixada(d.id, { bytes: true });
+          msBaixando += Date.now() - tBaixa;
           if (!c) throw new Error("peça vazia");
+          if (c.kind !== "pdf" || !c.b64) return { d, c };
+          if (c.b64.length > MAX_B64_EXTRACAO) {
+            throw new Error(
+              "peça grande demais para a extração (" + fmtMB((c.b64.length * 3) / 4) + ")"
+            );
+          }
+          console.log("[PJe IA OCR] lendo", d.id, d.titulo);
+          const tLeitura = Date.now();
+          const res = await comTeto(lerPdfNoFrame(c.b64, comOcr), 180000, "a leitura do PDF");
+          const msEstaLeitura = Date.now() - tLeitura;
+          msLendoPdf += msEstaLeitura;
+          console.log(
+            "[PJe IA OCR]", d.id, "->", res.paginas, "pág,", res.precisamOcr, "p/ OCR",
+            "| leitura+raster", msEstaLeitura, "ms"
+          );
+          return { d, c, res };
+        } catch (e) {
+          return { d, erro: e };
+        }
+      };
+
+      // A primeira já parte antes do laço; dentro dele, a seguinte é disparada
+      // ANTES do OCR da atual — é isso que faz as duas etapas se sobreporem.
+      let emPreparo = emOrdem.length ? prepararPeca(emOrdem[0]) : null;
+      for (let iPeca = 0; iPeca < emOrdem.length; iPeca++) {
+        if (sinal.cancelado) throw new Error("cancelado");
+        const pronta = await emPreparo;
+        // A condição é reconferida AQUI e não no topo: o `await` acima é uma
+        // janela em que o usuário pode ter cancelado e em que a view do PJe pode
+        // ter morrido. Estado conferido antes de um `await` precisa ser
+        // reconferido depois dele.
+        emPreparo =
+          iPeca + 1 < emOrdem.length && !sinal.cancelado && !telaMorta
+            ? prepararPeca(emOrdem[iPeca + 1])
+            : null;
+        const d = pronta.d;
+        try {
+          if (pronta.erro) throw pronta.erro;
+          const c = pronta.c;
+          const resPronta = pronta.res;
 
           if (c.kind === "text") {
             // HTML e RTF do editor já são texto: não há PDF para abrir.
             partes.push("# " + d.titulo + "\n\n" + (c.text || "").trim() + "\n");
             comTexto++;
-          } else if (c.kind === "pdf" && c.b64) {
-            // `chrome.runtime.sendMessage` serializa como JSON: a peça atravessa
-            // como STRING, e uma peça enorme viraria uma cópia de dezenas de MB
-            // no worker e outra no offscreen. Recusar com o motivo é melhor que
-            // travar a aba — e a peça continua no `.zip`, que não tem esse
-            // caminho.
-            if (c.b64.length > MAX_B64_EXTRACAO) {
-              throw new Error(
-                "peça grande demais para a extração (" + fmtMB((c.b64.length * 3) / 4) + ")"
-              );
-            }
-            console.log("[PJe IA OCR] lendo", d.id, d.titulo);
-          const res = await comTeto(
-            lerPdfNoFrame(c.b64, comOcr),
-            180000,
-            "a leitura do PDF"
-          );
-          console.log(
-            "[PJe IA OCR]", d.id, "->", res.paginas, "pág,", res.precisamOcr, "p/ OCR"
-          );
+          } else if (resPronta) {
+            // O download, o teto de tamanho e a leitura do PDF já aconteceram em
+            // `prepararPeca`, adiantados enquanto a peça anterior fazia OCR.
+            const res = resPronta;
             pagsNativas += res.nativas;
 
             // OCR das páginas sem camada de texto, UMA POR VEZ: o motor é único
@@ -1968,11 +2027,18 @@
               // spinner sem saber se anda. Ela conta PÁGINAS, que é a unidade
               // real do trabalho, e mostra o ritmo medido — não uma promessa.
               const feitas = pagsOcr;
+              // DUAS grandezas, porque respondem a perguntas diferentes e
+              // confundi-las foi o defeito: o RITMO (tudo ÷ páginas) é o que
+              // permite estimar quando termina, e o tempo de OCR é o que diz se
+              // o motor está no backend certo. Enquanto havia só o ritmo, um
+              // download lento da fila do PJe aparecia como "o OCR está lento".
               const ritmo = feitas && Date.now() > t0Ocr ? (Date.now() - t0Ocr) / feitas : 0;
+              const mediaOcr = feitas ? msOcr / feitas : 0;
               panel.setPrepNota(
                 "Reconhecendo texto (OCR) — " +
                   (feitas + 1) + "ª página" +
-                  (ritmo ? " · ~" + (ritmo / 1000).toFixed(1) + " s por página" : "") +
+                  (mediaOcr ? " · OCR " + (mediaOcr / 1000).toFixed(1) + " s" : "") +
+                  (ritmo ? " · ritmo " + (ritmo / 1000).toFixed(1) + " s/pág" : "") +
                   " · " + d.titulo.slice(0, 32) + ", fl. " + f.p
               );
               try {
@@ -1989,6 +2055,17 @@
                   f.ocr = true;
                   f.score = o.resultado.score;
                   pagsOcr++;
+                  // O ESTADO PRECISA SER LIMPO no sucesso. Ele nasce da
+                  // classificação ("escaneada"/"camada-ruim") e era usado
+                  // depois para contar as páginas SEM texto reconhecível — de
+                  // modo que toda página lida com sucesso continuava contada
+                  // como não lida. O cabeçalho do .md dizia, num processo real,
+                  // "93 reconhecida(s) por OCR local, 93 sem texto
+                  // reconhecível": as mesmas 93. O arquivo sai da ferramenta e
+                  // vira registro de trabalho; ele não pode mentir sobre o que
+                  // leu.
+                  f.estado = "ocr-ok";
+                  if (typeof o.resultado.ms === "number") msOcr += o.resultado.ms;
                   if (o.resultado.backend) backendOcr = o.resultado.backend;
                 } else {
                   f.estado = "ocr-vazio";
@@ -2003,8 +2080,17 @@
               delete f.img; // solta o data URL da página antes da próxima
             }
             panel.setPrepNota("");
+            // Sobram aqui os DOIS casos legítimos de "sem texto reconhecível":
+            // a página que precisava de OCR e não chegou a ser tentada (a
+            // rasterização falhou, então não houve imagem) e a que o OCR leu
+            // sem achar texto — a foto de uma estrada rural, em que o resultado
+            // vazio está CERTO. A página lida com sucesso saiu daqui ao ganhar
+            // o estado "ocr-ok".
             pagsSemOcr += res.folhas.filter(
-              (f) => f.estado === "escaneada" || f.estado === "camada-ruim"
+              (f) =>
+                f.estado === "escaneada" ||
+                f.estado === "camada-ruim" ||
+                f.estado === "ocr-vazio"
             ).length;
 
             const folhas = res.folhas
@@ -2039,6 +2125,20 @@
       if (sinal.cancelado) throw new Error("cancelado");
       if (!comTexto) throw new Error("nenhuma peça devolveu texto");
 
+      // ONDE FOI O TEMPO. Sem esta linha, "o OCR está lento" é indistinguível
+      // de "o download do PJe está lento" — e as duas pedem correções opostas.
+      const msTotal = Date.now() - t0Ocr;
+      const seg = (ms) => (ms / 1000).toFixed(1) + "s";
+      console.log(
+        "%c[PJe IA OCR] fim", "font-weight:bold",
+        "| total", seg(msTotal),
+        "| download", seg(msBaixando),
+        "| leitura+raster", seg(msLendoPdf),
+        "| OCR", seg(msOcr) + (pagsOcr ? " (" + seg(msOcr / pagsOcr) + "/pág)" : ""),
+        "| outros", seg(Math.max(0, msTotal - msBaixando - msLendoPdf - msOcr)),
+        "|", backendOcr || "sem OCR"
+      );
+
       // Os motivos de falha do OCR vão AGRUPADOS no cabeçalho: espalhados pelas
       // páginas, quem abre o arquivo teria de caçá-los folha a folha.
       const motivosOcr = [...new Set(errosOcr)];
@@ -2051,7 +2151,14 @@
         "> " + comTexto + " peça(s), " + pagsNativas + " página(s) com texto nativo" +
         (pagsOcr
           ? ", " + pagsOcr + " reconhecida(s) por OCR local (PP-OCRv6" +
-            (backendOcr ? ", " + backendOcr : "") + ")"
+            (backendOcr ? ", " + backendOcr : "") +
+            // O TEMPO MÉDIO vai junto do backend pela MESMA razão que o backend
+            // vai: uma regressão de desempenho não deixa outro vestígio. Foi a
+            // palavra "WebGPU" neste cabeçalho que revelou que o motor rodava
+            // 7,6× mais devagar que o necessário; sozinha ela dizia QUAL, e não
+            // QUANTO.
+            (pagsOcr && msOcr ? ", " + (msOcr / pagsOcr / 1000).toFixed(1) + " s/página" : "") +
+            ")"
           : "") +
         (pagsSemOcr ? ", " + pagsSemOcr + " sem texto reconhecível" : "") + ".\n" +
         (pagsOcr

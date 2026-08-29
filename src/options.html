@@ -237,6 +237,22 @@
           <span class="mem-status" id="memStatus"></span>
         </div>
 
+        <!-- MEDIÇÃO DO MOTOR DE OCR.
+             A extensão mede, na primeira página que reconhece, se a placa de
+             vídeo é mais rápida que o processador para este modelo — e guarda a
+             resposta, porque ela é da máquina e não muda de um processo para o
+             outro. O botão existe para o dia em que a máquina muda: driver
+             novo, placa nova, ou o notebook que passou a rodar na GPU
+             dedicada. Sem ele, uma medição de meses atrás valeria para sempre.
+             É a mesma disciplina da memória do `safety_settings` do Gemini:
+             memorizar a descoberta, e deixar como refazê-la. -->
+        <div class="mem-acts">
+          <button class="btn btn-sec" id="remedirOcr" type="button">
+            Medir de novo o motor de OCR
+          </button>
+          <span class="mem-status" id="ocrStatus"></span>
+        </div>
+
         <div class="save-row">
           <div class="save-hint" id="saveHint"><span>Alterações não salvas</span></div>
           <div class="save-acts">

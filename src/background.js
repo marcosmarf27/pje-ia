@@ -696,7 +696,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           alvo: "ocrOffscreen",
           tipo: "reconhecer",
           img: msg.payload.img,
+          // QUEM GUARDA A DECISÃO DE BACKEND É AQUI. Documento offscreen só tem
+          // `chrome.runtime` garantido — sem `chrome.storage` —, então a
+          // decisão medida por ele viaja de volta na resposta e é gravada deste
+          // lado. Sem isso ela morreria com o offscreen, que o Chrome derruba
+          // por ociosidade, e o duelo se repetiria a cada extração.
+          backend: await lerBackendOcr(),
         });
+        if (r && r.decisao) await gravarBackendOcr(r.decisao);
         if (!r || !r.ok) {
           const e = new Error((r && r.erro) || "o OCR não respondeu");
           e.diag = (r && r.diag) || [];
@@ -879,6 +886,38 @@ chrome.runtime.onInstalled.addListener((detalhes) => {
 // um processo; sem poda, uma tarde de uso encheria a cota de 10 MB).
 const MAX_MAPAS = 5;
 // --------------------------------------------------------------------------
+// --- decisão de backend do OCR (medida no offscreen, guardada aqui) ---------
+//
+// `chrome.storage.local` e não `session`: é propriedade da MÁQUINA (que GPU tem,
+// e se ela é mais rápida que o WASM com threads), não da sessão do navegador — a
+// GPU não muda de um processo para o outro. Guardar em `session` faria a medição
+// se repetir a cada vez que o usuário abre o Chrome, e a medição custa uma
+// primeira página lenta.
+//
+// É a mesma disciplina da memória do `safety_settings` do Gemini: MEMORIZAR a
+// descoberta em vez de fixá-la no código. Se o driver melhorar, basta apagar a
+// chave (o botão "medir de novo" nas opções) e a extensão reaprende sozinha.
+const CHAVE_BACKEND_OCR = "ocrBackend";
+
+async function lerBackendOcr() {
+  try {
+    const o = await chrome.storage.local.get(CHAVE_BACKEND_OCR);
+    return (o && o[CHAVE_BACKEND_OCR]) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function gravarBackendOcr(decisao) {
+  try {
+    await chrome.storage.local.set({ [CHAVE_BACKEND_OCR]: decisao });
+    console.log("[PJe IA OCR] backend escolhido:", decisao.escolha, decisao.ms || {});
+  } catch (e) {
+    // Best-effort: no pior caso a próxima extração mede de novo.
+    console.warn("[PJe IA OCR] não deu para guardar a decisão de backend:", e);
+  }
+}
+
 // Documento offscreen da extração de texto.
 //
 // O Chrome permite UM documento offscreen por perfil da extensão, e

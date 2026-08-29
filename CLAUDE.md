@@ -1800,11 +1800,99 @@ Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técni
   tiny 3417 chars em 3079 ms; Small 3242 em 6470 ms. 5× menor (5,96 MB contra
   29,6), 2,1× mais rápido, e melhor onde dá para ver a olho ("Acesse o vídeo
   clicando na imagem acima" contra "Acee ide cliad na magem acima").
-- **WebGPU se prova por SESSÃO, nunca por `navigator.gpu`.** A API existir não
-  diz que os operadores do modelo rodam; a sessão pode falhar na criação, na
-  compilação do shader, por memória ou por device lost. `criarServico` TENTA a
-  sessão WebGPU e cai para WASM no erro — e o WASM é a base universal, nunca o
-  contrário.
+- **O BACKEND SE PROVA POR MEDIÇÃO, nunca por disponibilidade — e a correção
+  desta regra custou 7,6× num processo real.** A versão anterior dizia "WebGPU
+  se prova por SESSÃO, nunca por `navigator.gpu`" e ficava com o WebGPU sempre
+  que `initialize()` resolvesse. Mas **`initialize()` que resolve prova que a
+  sessão SUBIU, não que ela é RÁPIDA**: no onnxruntime-web o WebGPU cobre um
+  subconjunto dos operadores, e o que ele não cobre volta à CPU pagando uma
+  transferência GPU↔CPU por operador. Medido num processo migrado do SAJ com 93
+  folhas digitalizadas: **~18 s por página no WebGPU contra os 2,4 s do WASM
+  ×4** — com o backend rápido disponível e desligado por uma decisão que nunca
+  olhou para o relógio.
+  - **A escolha antiga era INSTÁVEL, e é isso que a torna indefensável.** O
+    teste de GPU tem teto de 3 s: com a GPU fria o `requestAdapter()` estourava
+    e caía no WASM (foi assim que a v0.51.0 mediu os 2,4 s); com ela quente o
+    WebGPU vencia. O mesmo pacote, na mesma máquina, ficava 7× mais lento sem
+    ninguém mudar nada.
+  - **O duelo roda na PRIMEIRA PÁGINA REAL**, não num benchmark sintético: a
+    mesma imagem, o mesmo modelo, e o resultado do vencedor é o resultado da
+    página — a medição não custa uma página a mais. É também a página do
+    processo que o usuário está de fato extraindo, que é a régua certa.
+  - **O ORÇAMENTO DO DESAFIANTE SAI DO CAMPEÃO** (`min(60s, max(20s, 4×msWasm))`):
+    ele não precisa terminar, precisa GANHAR. Esperar o fim encareceria a
+    primeira página, que é justamente a que o usuário está olhando.
+  - **A decisão é MEMORIZADA, nunca hardcodada** — mesma lição do
+    `safety_settings` do Gemini. `chrome.storage.local` e não `session`: é
+    propriedade da MÁQUINA (que GPU tem, e se ela ganha do WASM com threads),
+    não da sessão do navegador. `VERSAO_DUELO` a invalida quando muda o modelo,
+    o ORT ou o pré-processamento, e o botão "Medir de novo o motor de OCR" nas
+    opções existe para o dia em que a máquina muda (driver, placa, o notebook
+    que passou a usar a GPU dedicada).
+  - **QUEM PERSISTE É O WORKER.** Documento offscreen só tem `chrome.runtime`
+    garantido — **nem `chrome.storage`** (a regra já estava escrita no cabeçalho
+    de `ocr-offscreen.html` e foi violada na primeira versão desta rodada). A
+    decisão lembrada chega no pedido (`msg.backend`) e a medida volta na
+    resposta (`decisao`); `background.js` grava. O offscreen VALIDA a versão,
+    porque é ele que conhece as condições sob as quais a medição vale.
+  - **O `try` em volta de `medirBackends` é a garantia por CONSTRUÇÃO.** Dentro
+    dela já há tratamento, mas tratamento é inspeção — e um `ReferenceError` no
+    próprio caminho de erro escapa dele. Foi exatamente o que aconteceu: uma
+    constante removida numa edição derrubou a página inteira a partir do bloco
+    que existia para não deixar isso acontecer. `node --check` não pega (é a
+    armadilha do `no-undef` já registrada em "Desenvolvimento e teste"); quem
+    pegou foi o teste em `vm` com motor falso.
+- **O PREPARO DA PRÓXIMA PEÇA É PIPELINADO AO OCR DA ATUAL** (`prepararPeca` +
+  `emPreparo` no laço de `onExtrairTexto`) — a mesma técnica da bomba de upload
+  dentro de `baixarSelecionadas`. Baixar e rasterizar não disputam recurso com o
+  reconhecimento: o download é rede mais a fila JSF, a rasterização é o pdf.js no
+  iframe, o OCR é o motor no offscreen. Em série o turno custa
+  `Σdownload + Σraster + Σocr`; adiantando UMA peça, custa `Σocr` mais o preparo
+  da primeira. Num processo migrado do SAJ — 96 peças de UMA página digitalizada
+  cada — é o preparo inteiro que sai da conta.
+  - **Profundidade 1**, deliberada: cada folha rasterizada é um data URL de
+    ~250 KB vivo em memória, e adiantar várias peças de 20 folhas encheria a aba
+    para ganhar um tempo que a fila serializada do PJe não deixa ganhar.
+  - **`prepararPeca` NUNCA REJEITA** (devolve `{erro}`): uma rejeição de peça
+    adiantada não teria ninguém esperando por ela no instante em que acontece —
+    seria unhandled rejection derrubando o turno por causa de uma peça, o oposto
+    da regra de que falha de download não derruba a extração.
+  - O cancelamento e o `telaMorta` são reconferidos DEPOIS do `await emPreparo`,
+    não só no topo: estado conferido antes de um `await` precisa ser reconferido
+    depois dele.
+- **TEMPO POR ETAPA, e não um número só.** O card mostrava "~18,0 s por página"
+  calculado como `(agora − início) ÷ páginas reconhecidas` — somando ao OCR o
+  download de cada peça na fila do PJe e a rasterização. O usuário lia aquilo
+  como "o OCR leva 18 s", e não havia como saber onde o tempo estava indo:
+  **otimizar sem separar as etapas é apostar.** Hoje o offscreen devolve o `ms`
+  MEDIDO do reconhecimento, o card mostra "OCR x,x s · ritmo y,y s/pág" (duas
+  grandezas, porque respondem a perguntas diferentes: o ritmo estima quando
+  termina, o tempo de OCR diz se o motor está no backend certo) e o resumo final
+  vai ao console com as quatro parcelas. A média de OCR entra no cabeçalho do
+  `.md`, ao lado do backend, pela MESMA razão que ele: uma regressão de
+  desempenho não deixa outro vestígio.
+- **A RASTERIZAÇÃO MIRA UM LADO ALVO EM PIXELS (`LADO_ALVO_PX` = 1700), não uma
+  escala fixa.** `scale: 2.0` multiplica o mediabox, e portanto entrega
+  resoluções DIFERENTES conforme o tamanho da página: numa A4 dá os 1684 px que
+  se quer, num ofício com mediabox de 300×400 pt dá 800 px — resolução baixa
+  demais, e o resultado é OCR ruim numa página que o motor leria bem. O alvo saiu
+  de dois números do próprio motor: ele recorta do canvas CHEIO limitado por
+  `maxCropSourceSideLength` = 2000 px (passar disso é rasterizar pixels que ele
+  descarta) e normaliza cada linha para 48 px de altura — numa A4 com ~45 linhas,
+  a 1700 px a linha tem ~21 px e é ampliada 2,3×; a 1264 px (a escala 1.5 que a
+  skill do usuário sugere) seria ampliada 3×, com mais borrão. **Baixar a escala
+  não é de graça: o ganho aparece na rasterização e a conta chega no
+  reconhecimento.**
+- **Página lida com sucesso PRECISA perder o `estado` de classificação.** Ele
+  nasce como `"escaneada"`/`"camada-ruim"` e era usado depois para contar as
+  páginas sem texto reconhecível, de modo que toda página lida com sucesso
+  continuava contada como não lida: num processo real o cabeçalho dizia "93
+  reconhecida(s) por OCR local" e "93 sem texto reconhecível" — as mesmas 93. O
+  corpo do arquivo estava certo (o texto sai por `f.texto`), então o defeito
+  vivia só na contagem — e o `.md` sai da ferramenta e vira registro de
+  trabalho: ele não pode mentir sobre o que leu. Hoje o sucesso grava
+  `"ocr-ok"`, e sobram na contagem os dois casos legítimos (a página que não
+  chegou a ser tentada e a que o OCR leu sem achar texto).
 - **O `.wasm` e o `.mjs` do ORT vêm da MESMA compilação, e os dois vão no
   pacote.** Copiar só o `.wasm` devolve "no available backend found". A variante
   é a `jsep`, que traz WebGPU **e** o caminho WASM no mesmo arquivo — conferir
@@ -3433,43 +3521,25 @@ novidades) — nunca no painel, pela mesma regra do PIX e do Substack.
 
 ## CLI `pje` — baixar autos em lote (`cli/`, FORA da extensão)
 
-`cli/` é um programa Node **separado**, para baixar autos por CNJ fora do
-navegador. Ele **NÃO é a extensão** e a regra dura é: **nada em `src/`,
-`manifest.json`, `vendor/`, `icons/` ou `empacotar.ps1` muda por causa dele.**
-`empacotar.ps1` copia só esses quatro, então `cli/` fica fora do pacote da Store
-**por construção**. Detalhes, conceitos e limites em `cli/README.md`.
+`cli/` é um programa Node **separado** (baixar autos por CNJ fora do navegador).
+**Nada em `src/`, `manifest.json`, `vendor/`, `icons/` ou `empacotar.ps1` muda
+por causa dele**, e ele fica fora do pacote da Store por construção. O detalhe
+vive em **`cli/CLAUDE.md`**, que carrega sozinho ao trabalhar naquele diretório.
 
-- **Ele reusa `src/exportar.js` LENDO, nunca alterando.** `opts.zip` do
-  `montarZip` não é um formato — é um **sink** (`criar`/`add`/`fechar`), e um
-  sistema de arquivos o satisfaz. Daí o pacote sair idêntico ao do botão ⬇ do
-  painel, e daí o **oráculo**: rodar os dois sobre o mesmo processo revela
-  divergência. Ao mexer em `exportar.js`, lembrar que há um segundo consumidor.
-- **Só rotas sob `pje-legacy/`, só GET, teto de tempo em tudo.** As de fora
-  (`fluxo`, `informacaoSessao`, `monitoracao`, `miniPac`) **penduram**, que é
-  pior que erro. E `Accept: application/json, text/plain, */*` sempre — com
-  `text/plain` o PJe responde **406**, que já foi lido como "cookie expirado".
-- **A sessão é uma CREDENCIAL AO PORTADOR** e vive no perfil do usuário, fora do
-  repositório. **O valor do cookie nunca sai em log, erro ou `pje status`** —
-  nem truncado. O `.gitignore` cobre `sessao.json` e as saídas.
-- **`403` costuma ser peça CANCELADA**, não falta de permissão: o movimento diz
-  `Situacao: Cancelado` e o título aparece riscado na timeline. A ausência dela
-  no pacote está CERTA.
-- **Duas lições do `pje login` que valem para o resto do projeto:**
-  - **Rota que pendura precisa de ALTERNATIVA, não de teto maior.**
-    `Storage.getCookies` não respondeu sob WSLg enquanto `Target.getTargets`
-    respondia na mesma conexão. A saída foi uma segunda rota por outro domínio e
-    outro alvo (`Network.getAllCookies` numa aba anexada).
-  - **Numa espera longa, nenhuma chamada isolada pode ser fatal.**
-    `colherCookies` estava nua dentro de um `try { while } finally { fechar }` —
-    e `finally` NÃO engole exceção. O comando que anuncia esperar dez minutos
-    morria aos 12 segundos. É a mesma regra de "falha de download não derruba o
-    turno", aplicada pela metade.
-- **`.gitattributes` existe por causa do `instalar.sh`**: com `core.autocrlf`,
-  quem clona no Windows recebe `*.sh` em CRLF e leva `bad interpreter: /bin/sh^M`
-  ao rodar no WSL. Falha **assimétrica** — quem instala por `curl | sh` não a vê.
-- **Testes fora do navegador** (scratchpad, sem dependência): sink+`montarZip`,
-  cache incremental (inclusive renumeração no meio da lista), classificação de
-  corpo (casca × despacho curto) e o parser de *Copy as cURL* (cmd e bash).
+Fica aqui só o que é preciso quando se está em `src/` — isto é, quando aquele
+arquivo NÃO carrega:
+
+- **`src/exportar.js` tem um SEGUNDO CONSUMIDOR.** O CLI o reusa lendo, nunca
+  alterando: `opts.zip` do `montarZip` não é um formato, é um **sink**
+  (`criar`/`add`/`fechar`), e um sistema de arquivos o satisfaz. Ao mexer em
+  `exportar.js`, lembrar disso — e que rodar os dois sobre o mesmo processo é um
+  **oráculo** que revela divergência.
+- **Duas regras que nasceram no `pje login` e valem para o projeto inteiro:**
+  - **Rota que pendura precisa de ALTERNATIVA, não de teto maior.** (A mesma que
+    governa o `MOVS_TIMEOUT_MS` das movimentações e o teste de WebGPU do OCR.)
+  - **Numa espera longa, nenhuma chamada isolada pode ser fatal** — `finally`
+    NÃO engole exceção, e um comando que anuncia esperar dez minutos morria aos
+    12 segundos por um `await` desguarnecido.
 
 ## Desenvolvimento e teste
 
@@ -3620,18 +3690,14 @@ expandido.
   código (nomes, CPF, OAB) são **fictícios** por regra.
 
 - Comentários e strings de UI em português do Brasil (com acentuação correta).
-- **Visual: `DESIGN.md` manda.** O parágrafo abaixo é histórico e os valores nele
-  estão desatualizados (a paleta migrou para `#12729f`, petições virou roxo e
-  provas magenta). Em qualquer conflito, vale o DESIGN.md — tokens, componentes,
-  restrições da plataforma e o porquê de as fontes não virem de CDN.
-- Identidade visual: paleta do próprio PJe — azul-petróleo `#0078aa` (`--pje`, cor
-  da barra do PJe/TJCE), escurecido `#005f88` (`--pje-2`, gradientes/hover/balão do
-  usuário — texto branco sobre `#0078aa` puro passa AA por pouco, por isso texto
-  longo usa o tom escuro), azul claro `#62a9c7` (`--pje-soft`, medidores), fundos
-  frios `#f6f9fb`, títulos em Georgia serif. Variáveis CSS no topo de `panel.css`
-  (`.wrap`) e espelhadas em `ui.css` (`:root`, popup/opções/ajuda — HTMLs têm
-  referências inline a `var(--pje-2)`). Cores semânticas preservadas: categorias
-  `--cat-*`, verde de sucesso, laranja da `.alertbar`/gauge crítico.
+- **Visual: `DESIGN.md` manda — ele é a ÚNICA fonte da paleta.** Tokens,
+  componentes, escala, restrições da plataforma e o porquê de as fontes não virem
+  de CDN vivem lá. Aqui não se repete valor de cor: a lista que existia neste
+  ponto ficou defasada (anunciava `#0078aa` depois de a paleta migrar para
+  `#12729f`, e petições/provas depois de trocarem de cor) e passou a ser lida em
+  toda sessão como se fosse verdade. Onde as variáveis moram continua valendo:
+  topo de `panel.css` (`.wrap`), espelhadas em `ui.css` (`:root`, para
+  popup/opções/ajuda, cujos HTMLs têm referências inline a `var(--pje-2)`).
 - **Escala tipográfica em variáveis** (`--fs-nano|micro|meta|ui|body|lg|lead`, no
   mesmo bloco `.wrap`): sete degraus inteiros no lugar dos 13 tamanhos com
   meios-pixels que existiam antes — variação de tamanho sem intenção é o que faz

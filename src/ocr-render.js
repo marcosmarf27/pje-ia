@@ -133,11 +133,43 @@ const CHARS_DISPENSA_EXAME = 600;
 // existe texto, mas é mojibake ou lixo de uma camada de OCR corrompida.
 const MAX_TAXA_INVALIDOS = 0.02;
 
-// Escala da rasterização. O guia PP-OCRv6 pede 200–250 dpi; a skill de OCR do
-// usuário mede que 1.5 (~108 dpi) basta e que subir mais "só encarece sem ganho
-// de acurácia". 2.0 (~144 dpi) é o meio-termo, e foi com ele que o PP-OCRv6
-// tiny leu o comprovante de residência real deste processo.
-const ESCALA_RASTER = 2.0;
+// RESOLUÇÃO DA RASTERIZAÇÃO — em PIXELS DE ALVO, não em escala fixa.
+//
+// Era `scale: 2.0`, e uma escala fixa multiplica o mediabox: ela entrega
+// resoluções DIFERENTES para páginas diferentes. Numa A4 (595×842 pt) dá 1684 px
+// de altura, que é o que se quer; num ofício digitalizado em meia página, ou num
+// recorte de jornal com mediabox de 300×400 pt, dá 800 px — resolução baixa
+// demais para o reconhecedor, e o resultado é OCR ruim numa página que o motor
+// leria bem. No outro extremo, uma planta ou um mapa em A1 renderizaria uma
+// imagem de dezenas de megapixels para ser encolhida logo depois.
+//
+// Mirar num maior lado ALVO torna o resultado independente do tamanho da página.
+// O alvo é 1700 px por duas razões medidas no próprio motor:
+//
+//  · o reconhecedor recorta do canvas CHEIO, limitado por `maxCropSourceSideLength`
+//    = 2000 px. Passar disso é rasterizar pixels que o motor descarta;
+//  · ele normaliza cada linha para 48 px de altura. Numa A4 com ~45 linhas, a
+//    1700 px a linha tem ~21 px e é AMPLIADA 2,3×; a 1264 px (a escala 1.5 que a
+//    skill sugere) teria ~16 px e seria ampliada 3×, com mais borrão. É por isso
+//    que baixar a escala não é de graça: o ganho aparece na rasterização e a
+//    conta chega no reconhecimento.
+//
+// Numa A4 o alvo de 1700 reproduz praticamente a escala 2.0 de antes (1684 px),
+// então este processo não muda de comportamento — o que muda é a página fora do
+// padrão, que era onde a escala fixa errava.
+const LADO_ALVO_PX = 1700;
+// Piso e teto da escala. O piso evita ampliar um PDF já pequeno até o absurdo
+// (ampliar não cria informação que o scan não tem); o teto protege a memória do
+// canvas numa página enorme.
+const ESCALA_MIN = 1.0;
+const ESCALA_MAX = 4.0;
+
+function escalaPara(pagina) {
+  const base = pagina.getViewport({ scale: 1 });
+  const maior = Math.max(base.width, base.height) || 1;
+  const bruta = LADO_ALVO_PX / maior;
+  return Math.min(ESCALA_MAX, Math.max(ESCALA_MIN, bruta));
+}
 
 // JPEG e não PNG: um scan A4 vira ~200 KB em vez de ~2 MB, e a diferença some no
 // OCR. 0.82 é o valor medido na skill do usuário.
@@ -347,7 +379,7 @@ async function temImagemNaPagina(pagina) {
 // `chrome.runtime.sendMessage` como `{}` vazio — base64 atravessa, ao preço de
 // +33%.
 async function rasterizar(pagina) {
-  const viewport = pagina.getViewport({ scale: ESCALA_RASTER });
+  const viewport = pagina.getViewport({ scale: escalaPara(pagina) });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.floor(viewport.width));
   canvas.height = Math.max(1, Math.floor(viewport.height));

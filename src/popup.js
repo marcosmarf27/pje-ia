@@ -10,11 +10,46 @@ const customEl = document.getElementById("customPrompt");
 // tocá-lo direto quebraria a outra página.
 const memoriaEl = document.getElementById("memoriaCaso");
 const limparMemBtn = document.getElementById("limparMemoria");
+// Exclusivos da página de opções: no popup eles não existem, e ler `.textContent`
+// de `null` quebraria a tela inteira. A regra vale para todo elemento que só
+// existe numa das duas telas servidas por este mesmo arquivo.
+const remedirOcrBtn = document.getElementById("remedirOcr");
+const ocrStatus = document.getElementById("ocrStatus");
 const memStatus = document.getElementById("memStatus");
 
 // Apagar TODA a memória. Em dois cliques, como toda exclusão da extensão —
 // nunca `confirm()` nativo. Diz QUANTOS processos foram apagados: "pronto"
 // sozinho não distingue "apagou 12" de "não havia nada".
+// Apaga a decisão de backend do OCR para que a próxima extração meça de novo.
+// NÃO é exclusão em dois cliques como a memória de caso: aqui não se perde
+// nada — o que se apaga é uma medição, e o pior caso de errar o clique é uma
+// primeira página mais lenta na extração seguinte.
+if (remedirOcrBtn) {
+  remedirOcrBtn.addEventListener("click", () => {
+    remedirOcrBtn.disabled = true;
+    chrome.storage.local.get("ocrBackend", (o) => {
+      void chrome.runtime.lastError;
+      const antes = o && o.ocrBackend;
+      chrome.storage.local.remove("ocrBackend", () => {
+        void chrome.runtime.lastError;
+        remedirOcrBtn.disabled = false;
+        if (!ocrStatus) return;
+        // Dizer o que estava valendo é o que torna o botão inteligível: sem
+        // isso ninguém sabe se havia o que refazer, nem o que mudou.
+        ocrStatus.textContent = antes
+          ? "Estava usando " + nomeBackendOcr(antes) + ". A próxima extração vai medir de novo."
+          : "Ainda não havia medição. A próxima extração vai medir.";
+      });
+    });
+  });
+}
+
+function nomeBackendOcr(d) {
+  const nome = d.escolha === "webgpu" ? "a placa de vídeo" : "o processador";
+  const ms = d.ms && (d.escolha === "webgpu" ? d.ms.webgpu : d.ms.wasm);
+  return nome + (ms ? " (" + (ms / 1000).toFixed(1) + " s por página na medição)" : "");
+}
+
 if (limparMemBtn) {
   let armado = false;
   limparMemBtn.addEventListener("click", () => {
