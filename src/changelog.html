@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>82 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>83 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,7 +103,27 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.48.0</span> A minuta passa a ser redigida pelo modelo certo — e a seguir os seus modelos</h2>
+        <h2><span class="v novo">v0.49.0</span> Baixar o texto do processo inteiro num arquivo só</h2>
+        <p>
+          No menu do <strong>&#8681; Baixar .zip</strong> há um item novo: <strong>&#8220;Extrair
+          o texto&#8230;&#8221;</strong>. Ele lê as pe&#231;as marcadas e devolve <strong>um
+          &#243;nico arquivo <code>.md</code></strong> com o processo inteiro, em ordem
+          cronol&#243;gica, uma se&#231;&#227;o por p&#225;gina &#8212; pronto para abrir no editor,
+          pesquisar, ou passar ao TecJusti&#231;a Sigilo para anonimizar.
+        </p>
+        <p>
+          O texto sai da <strong>camada de texto do pr&#243;prio PDF</strong>, no seu computador:
+          nada &#233; enviado a lugar nenhum, e <strong>o texto extra&#237;do n&#227;o entra na
+          conversa</strong> nem no que vai para a IA. O carimbo de assinatura eletr&#244;nica que
+          o PJe repete em toda folha &#233; removido, para o arquivo trazer o conte&#250;do e n&#227;o
+          o rodap&#233;. P&#225;gina digitalizada n&#227;o tem camada de texto: ela aparece
+          <strong>marcada</strong> como tal, em vez de sair vazia sem explica&#231;&#227;o &#8212; o
+          reconhecimento dessas p&#225;ginas vem na pr&#243;xima vers&#227;o.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.48.0</span> A minuta passa a ser redigida pelo modelo certo — e a seguir os seus modelos</h2>
         <p>
           Quem cadastrava peças-modelo e via a minuta sair ignorando a estrutura delas
           tinha razão, e a causa não era o assistente "não querer": havia uma
@@ -1699,6 +1719,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.49.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>Baixar o texto do processo inteiro num arquivo s&#243;.</strong> Novo item &#8220;Extrair o texto&#8230;&#8221; no menu do &#8681; Baixar .zip: l&#234; a camada de texto dos PDFs das pe&#231;as marcadas, no pr&#243;prio computador, e entrega um <code>.md</code> em ordem cronol&#243;gica com uma se&#231;&#227;o por p&#225;gina. O carimbo de assinatura eletr&#244;nica repetido em toda folha &#233; removido &#8212; sem isso uma folha 100% digitalizada &#8220;tem texto&#8221; e o arquivo sairia s&#243; com rodap&#233;. P&#225;gina sem camada de texto sai <em>marcada</em>, nunca vazia em sil&#234;ncio. O texto extra&#237;do <strong>n&#227;o entra na conversa</strong> nem no envio &#224; IA</td></tr>
             <tr class="marco"><td><span class="v">0.48.0</span></td><td>23/08/2026</td><td><span class="dot-marco"></span><strong>A minuta passa a seguir as suas peças-modelo e as suas instruções.</strong> As regras que ela herdava do chat mandavam se basear <em>somente</em> nos documentos anexados — e peça-modelo, sendo de outro processo, não é um documento anexado: havia uma instrução interna mandando ignorá-las. Agora o <strong>conteúdo</strong> sai só das peças deste processo e a <strong>forma</strong> vem dos seus modelos. O que você escreve no campo saiu do meio das regras fixas e vai <strong>por último e destacado</strong>, prevalecendo sobre as regras de forma (a tese continua sendo a última palavra). A minuta passou a ser redigida pelo modelo mais adequado a escrever do <strong>mesmo provedor</strong> — Luna→Terra, Haiku→Sonnet 5, Flash-Lite→3.7 Flash —, sem trocar o modelo do chat; custa mais, e a faixa da minuta diz qual vai redigir <strong>antes</strong> de gerar. Quem escolhia Claude caía no Haiku e a biblioteca de peças-modelo ficava desabilitada: a minuta saía sem modelo nenhum, calada. Novo campo <strong>"Modelo para minutas"</strong> nas opções</td></tr>
             <tr><td><span class="v">0.47.0</span></td><td>19/08/2026</td><td>A tela de configuração passa a dizer <strong>para que serve cada modelo</strong> — analisar os autos, redigir expedientes ou os dois —, e quem liga o modo minuta com um modelo de análise recebe a sugestão de qual usar, de preferência do mesmo provedor (sem exigir outra chave); é sugestão, nunca impedimento. A tabela do guia ganhou a coluna para os dez modelos. Além disso, atualizações com novidade de verdade passam a acender um selo <strong>"novo"</strong> no ícone da extensão, com uma linha no painel levando a estas notas — antes as melhorias chegavam em silêncio. E o pedido de avaliação na Chrome Web Store entrou nas telas de apoio</td></tr>
             <tr><td><span class="v">0.46.2</span></td><td>17/08/2026</td><td>Revisão das cinco versões da linha do tempo, sem recurso novo. A consulta oficial das datas <strong>desistia pelo resto da sessão</strong> na primeira espera estourada — e a versão anterior passou a fazê-la assim que o processo abre, o momento mais congestionado da aba, de modo que um soluço de rede ali degradava a sessão inteira para a leitura da tela (incompleta e sem hora), anunciando isso como se fosse limitação do tribunal; agora são precisas duas seguidas, e uma resposta boa zera a contagem. A lista das datas passou a fechar ao clicar na página do tribunal, e quando é encurtada diz <strong>entre que datas</strong>. Por dentro: cada pergunta deixou de varrer a linha do tempo da tela sem precisar, e o assistente passou a saber também no chat que data de publicação ou trânsito não tem peça nem folha</td></tr>

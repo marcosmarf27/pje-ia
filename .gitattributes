@@ -15,6 +15,15 @@
 # aponta para o fim de linha.
 *.sh text eol=lf
 
+# vendor/: byte a byte como veio do pacote oficial.
+#
+# O `vendor/LICENSES.md` AFIRMA que estes arquivos sao usados "sem qualquer
+# modificacao", e o procedimento de atualizacao e' baixar a mesma URL e comparar.
+# Com `core.autocrlf`, o `pdf.worker.min.mjs` (1,2 MB) sairia do clone em CRLF e
+# deixaria de bater com o arquivo do CDN — a afirmacao viraria falsa e a
+# conferencia, impossivel. `-text` desliga qualquer normalizacao.
+vendor/** -text
+
 # Binarios: nunca normalizar (um `\n` trocado corrompe o arquivo em silencio).
 *.png  binary
 *.jpg  binary

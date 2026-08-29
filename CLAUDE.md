@@ -1678,6 +1678,57 @@ Code, num script, num arquivo de caso. Regras que não podem quebrar:
   (~1,33× os bytes) e é materializado em Uint8Array ao zipar. Estourar mata a aba
   sem dizer por quê; a mensagem manda exportar em levas marcando parte das peças.
 
+## Extração de texto das peças (`ocr-offscreen.js` + pdf.js)
+
+Item **"Extrair o texto…"** no menu do split button `⬇ Baixar .zip`. Lê a camada de
+texto dos PDFs e entrega **um `.md`** com o processo inteiro — `# <peça>` /
+`## Página N`, o formato do `tjocr`, para alimentar o TecJustiça Sigilo e o Claude
+Code sem adaptação. Fatia 1 de um caminho que termina em PP-OCRv6 (guia técnico
+`pp-ocrv6-extensao-chrome-mv3.docx`).
+
+- **INVARIANTE: o texto extraído NUNCA entra no payload de um request.** A extração
+  da v0.21.0 foi removida (`6248c2c`) exatamente por isso: no Gemini, que cobra 258
+  tokens fixos por página de PDF e **não cobra o texto nativo**, mandar o texto
+  extraído levou o contexto de 59% para 153%. A aritmética não mudou. O destino aqui
+  é o disco do usuário; `montarBlocos` não conhece este caminho.
+- **Roda no DOCUMENTO OFFSCREEN**, não no content script (1,7 MB de pdf.js em toda
+  página `jus.br`, expostos ao tribunal) nem no service worker (sem `new Worker`, e
+  morto no meio). Permissão `offscreen` **não gera aviso de instalação**; a CSP
+  `extension_pages` ganhou `'wasm-unsafe-eval'` e `worker-src 'self'` (campo de
+  manifest, também sem aviso).
+- **`createDocument` resolve quando o DOCUMENTO existe, não quando o script está
+  pronto** — `ocr-offscreen.js` é ES module e ainda vai resolver o import do pdf.js.
+  Sem o handshake (`esperarOffscreenPronto`, ping com teto de 5 s) a PRIMEIRA
+  extração de toda sessão morre com "Receiving end does not exist", e some no
+  segundo clique: parece intermitência de rede e não é.
+- **PODAR ANTES DE CLASSIFICAR.** O carimbo do PJe/e-SAJ são ~250 caracteres
+  EXTRAÍVEIS por folha. Classificando o texto cru, toda página 100% digitalizada
+  passa por "texto nativo" e nunca chega ao OCR — e o usuário recebe um `.md` só com
+  rodapés. O limiar (`MIN_CHARS_UTEIS_POR_PAGINA` = 50) vale sobre o texto PODADO.
+- **`chaveLinha` mascara CÓDIGO ALFANUMÉRICO, e o sinal é a CAIXA.** O carimbo do
+  e-SAJ traz um código por folha (`MisnBHPj`, `2R8iZpra`): sem mascará-lo, nem o
+  critério literal nem o numérico pegam o carimbo. Nenhuma palavra portuguesa tem
+  maiúscula no meio; todo código gerado tem. Só de dígitos ou só de maiúsculas
+  (`ANTONIO`) **não** é código.
+- **O critério NUMÉRICO só vale nas 3 primeiras e 3 últimas linhas** (`naBorda`).
+  Apagar linha por "diferir só nos números" DESTRÓI informação quando o número É o
+  conteúdo — "Valor Total do lote: R$ 1.001,00" repetido num formulário casa o padrão
+  e é exatamente o dado procurado. O critério LITERAL não tem essa restrição: linha
+  idêntica em 80% das folhas não carrega informação nenhuma.
+- **A extração entra na fila JSF** (`ocupadoJsf`): ela baixa peça, e download de peça
+  mexe na sessão. Sem isso, envio, minuta, mapa, preview e prefetch rodariam em
+  paralelo e o PJe derrubaria a view da aba.
+- **A peça atravessa em base64** (`chrome.runtime.sendMessage` serializa como JSON —
+  um `ArrayBuffer` viraria `{}`). Custa +33% e uma cópia de string, daí uma peça por
+  vez e o teto `MAX_B64_EXTRACAO`.
+- **Página sem camada de texto sai MARCADA**, nunca vazia em silêncio, e "escaneada"
+  é distinguida de "em branco" pelo `getOperatorList` — que só roda nas páginas
+  candidatas, porque é a parte cara.
+- **LACUNA CONHECIDA (BUG-21): `page.render()` do pdf.js TRAVA em documento
+  offscreen.** Não afeta a Fatia 1 (só `getTextContent`), mas a rasterização do OCR
+  **não pode** nascer aqui. Vai para um iframe oculto de página de extensão — origem
+  `chrome-extension://`, então nem é a página do tribunal nem é offscreen.
+
 ## Seleção assistida por IA (`✨ Escolher com IA`)
 
 Camada 2 da seleção; a camada 1 (`classificarPeca`, por regex) continua sendo o

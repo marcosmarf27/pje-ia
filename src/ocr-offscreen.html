@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Extração de texto (TecJustiça PJe)</title>
+    <!--
+      Documento OFFSCREEN, sem interface. O service worker o cria sob demanda
+      (razão "WORKERS") para ter um contexto com DOM, canvas e `new Worker` de
+      verdade — nada disso existe no service worker MV3, e nada disso pode
+      entrar na página do tribunal (1,7 MB de pdf.js em toda página *.jus.br,
+      expostos a qualquer script do PJe).
+
+      Só `chrome.runtime` é garantido aqui — não usar outras APIs chrome.
+    -->
+  </head>
+  <body>
+    <script type="module" src="ocr-offscreen.js"></script>
+  </body>
+</html>

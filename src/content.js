@@ -1716,6 +1716,160 @@
   });
 
   // ---------------------------------------------------------------------------
+  // EXTRAÇÃO DE TEXTO DAS PEÇAS
+  //
+  // Lê a camada de texto dos PDFs (pdf.js, no documento offscreen) e devolve UM
+  // `.md` com o processo inteiro — `# <peça>` / `## Página N`, o mesmo formato
+  // do tjocr, para alimentar o TecJustiça Sigilo e o Claude Code sem adaptação.
+  //
+  // INVARIANTE: o texto extraído NÃO entra no payload de nenhum request de chat.
+  // A extração da v0.21.0 foi removida exatamente por isso — no Gemini, que
+  // cobra 258 tokens fixos por página de PDF e não cobra o texto nativo, mandar
+  // o texto levou o contexto de 59% para 153%. Aqui o destino é o disco do
+  // usuário, e `montarBlocos` nunca lê o resultado disto.
+  // ---------------------------------------------------------------------------
+  let extraindoTexto = false;
+
+  // Teto por peça no caminho content → worker → offscreen. ~36 MB de PDF; acima
+  // disso a serialização em JSON custa mais memória do que o resultado vale.
+  const MAX_B64_EXTRACAO = 48 * 1024 * 1024;
+
+  function rotuloEstado(e) {
+    if (e === "escaneada") return "_[página digitalizada — sem camada de texto]_";
+    if (e === "camada-ruim") return "_[camada de texto defeituosa]_";
+    if (e === "vazia") return "_[página em branco]_";
+    if (e === "falhou") return "_[não foi possível ler esta página]_";
+    return "";
+  }
+
+  panel.onExtrairTexto(async (docs, opcoes) => {
+    if (extraindoTexto) return;
+    if (busy) {
+      panel.setStatus("Aguarde a resposta atual terminar para extrair o texto.");
+      return;
+    }
+    if (ocupadoJsf()) return;
+    // Mesma guarda do `.zip`: sem `exportar.js` carregado não há como ordenar as
+    // peças, e um ReferenceError aqui derrubaria o handler inteiro em silêncio.
+    if (typeof PjeExport === "undefined") {
+      panel.setStatus("Extração indisponível: recarregue a página do processo.");
+      return;
+    }
+    if (!docs || !docs.length) {
+      panel.setStatus("A lista de peças está vazia — não há texto para extrair.");
+      return;
+    }
+    const todas = !!(opcoes && opcoes.todas);
+    extraindoTexto = true;
+    const sinal = { cancelado: false };
+    panel.setZipOcupado(true);
+    panel.startPrep(docs, {
+      titulo: todas
+        ? "Extraindo o texto das " + docs.length + " peças da lista…"
+        : "Extraindo o texto de " + docs.length + " peça(s)…",
+      fim: (total, feitas) =>
+        feitas === total
+          ? "Texto extraído de " + total + " peça(s)"
+          : "Texto extraído — " + feitas + " de " + total + " peça(s)",
+      onCancelar: () => {
+        sinal.cancelado = true;
+      },
+    });
+
+    const partes = [];
+    const falhas = [];
+    let comTexto = 0;
+    let pagsNativas = 0;
+    let pagsOcr = 0;
+    try {
+      const { docs: emOrdem, criterio } = PjeExport.ordenarCronologico(docs);
+      for (const d of emOrdem) {
+        if (sinal.cancelado) throw new Error("cancelado");
+        panel.setPrepState(d.id, "loading");
+        try {
+          // `{bytes:true}` é obrigatório: peça retomada da memória de caso tem
+          // `fileId` e ZERO bytes, e sem a flag ela sairia vazia — em silêncio.
+          const c = await garantirBaixada(d.id, { bytes: true });
+          if (!c) throw new Error("peça vazia");
+
+          if (c.kind === "text") {
+            // HTML e RTF do editor já são texto: não há PDF para abrir.
+            partes.push("# " + d.titulo + "\n\n" + (c.text || "").trim() + "\n");
+            comTexto++;
+          } else if (c.kind === "pdf" && c.b64) {
+            // `chrome.runtime.sendMessage` serializa como JSON: a peça atravessa
+            // como STRING, e uma peça enorme viraria uma cópia de dezenas de MB
+            // no worker e outra no offscreen. Recusar com o motivo é melhor que
+            // travar a aba — e a peça continua no `.zip`, que não tem esse
+            // caminho.
+            if (c.b64.length > MAX_B64_EXTRACAO) {
+              throw new Error(
+                "peça grande demais para a extração (" + fmtMB((c.b64.length * 3) / 4) + ")"
+              );
+            }
+            const r = await rpc({ type: "ocrExtrair", payload: { b64: c.b64 } });
+            if (!r || !r.resultado) throw new Error("a extração não devolveu resultado");
+            const folhas = r.resultado.folhas
+              .map((f) => "## Página " + f.p + "\n\n" + (f.texto || rotuloEstado(f.estado)))
+              .join("\n\n");
+            partes.push("# " + d.titulo + "\n\n" + folhas + "\n");
+            comTexto++;
+            pagsNativas += r.resultado.nativas;
+            pagsOcr += r.resultado.precisamOcr;
+          } else {
+            // Imagem anexada: não tem camada de texto para ler. Dizer o motivo
+            // vale mais que uma seção vazia (regra do projeto: conjunto vazio
+            // se explica, não desaparece).
+            partes.push("# " + d.titulo + "\n\n_[anexo em imagem — o texto depende do OCR]_\n");
+          }
+          panel.setPrepState(d.id, "done");
+        } catch (e) {
+          falhas.push({ id: d.id, titulo: d.titulo, motivo: (e && e.message) || String(e) });
+          panel.setPrepState(d.id, "erro");
+        }
+      }
+      if (sinal.cancelado) throw new Error("cancelado");
+      if (!comTexto) throw new Error("nenhuma peça devolveu texto");
+
+      const cnj = PJE.getNumeroProcesso() || "processo";
+      const cab =
+        "# Processo " + cnj + "\n\n" +
+        "> Texto extraído pela extensão TecJustiça PJe em " +
+        new Date().toLocaleString("pt-BR") + ".\n" +
+        "> Ordem das peças: " + criterio + ".\n" +
+        "> " + comTexto + " peça(s), " + pagsNativas + " página(s) com texto nativo" +
+        (pagsOcr ? ", " + pagsOcr + " digitalizada(s) ainda sem OCR" : "") + ".\n" +
+        (falhas.length
+          ? "> Não entraram: " +
+            falhas.map((f) => f.titulo + " (" + f.motivo + ")").join("; ") + ".\n"
+          : "") +
+        "> Confira sempre no documento original: assinaturas, carimbos e imagens não " +
+        "aparecem aqui.\n";
+
+      const md = cab + "\n---\n\n" + partes.join("\n---\n\n");
+      panel.endPrep();
+      baixarBlob("processo-" + cnj + ".md", new Blob([md], { type: "text/markdown" }));
+      panel.setStatus(
+        "✅ Texto de " + comTexto + " peça(s) baixado" +
+          (pagsOcr ? " — " + pagsOcr + " página(s) digitalizada(s) ficaram sem texto." : ".")
+      );
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      panel.endPrep(true);
+      panel.setStatus(
+        msg === "cancelado" ? "Extração cancelada." : "Não foi possível extrair o texto: " + msg
+      );
+      if (msg !== "cancelado") console.warn("[PJe IA] extrair texto:", e);
+    } finally {
+      extraindoTexto = false;
+      panel.setZipOcupado(false);
+      // Baixou dezenas de peças que a memória ainda não conhece — mesma razão
+      // do `.zip`.
+      salvarCasoAgora();
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // PACOTE DE CARTA PRECATÓRIA
   //
   // Duas coisas separam este fluxo do "Baixar .zip" comum:
@@ -4203,6 +4357,16 @@
   // acima. Recusa sem motivo vira "a extensão não fez nada".
   function ocupadoJsf() {
     if (bloqueadoPelaExportacao()) return true;
+    // A extração baixa peça, e download de peça mexe na sessão JSF — que é uma
+    // fila só. Sem esta linha, envio, minuta, mapa, preview e prefetch rodariam
+    // em paralelo com ela e o PJe derrubaria a view da aba.
+    if (extraindoTexto) {
+      panel.setStatus(
+        "Extraindo o texto das peças. O PJe não aceita duas operações ao mesmo tempo — " +
+          "isto volta assim que terminar, ou clique em Cancelar."
+      );
+      return true;
+    }
     if (carregandoTimeline) {
       panel.setStatus(
         "Lendo a lista oficial de documentos" + (progressoGrid ? " (" + progressoGrid + ")" : "") +

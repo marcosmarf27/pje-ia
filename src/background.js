@@ -670,6 +670,36 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  // ------------------------------------------------ extração de texto das peças
+  //
+  // O content script manda UMA peça por vez em base64; o worker garante o
+  // documento offscreen e repassa. O offscreen é quem tem DOM, canvas e
+  // `new Worker` — nada disso existe aqui, e o pdf.js não pode entrar na página
+  // do tribunal (ver o cabeçalho de src/ocr-offscreen.js).
+  //
+  // O texto que volta daqui NUNCA entra no payload de um request de chat. Foi
+  // exatamente isso que derrubou a extração da v0.21.0: no Gemini, que cobra 258
+  // tokens fixos por página de PDF e não cobra o texto nativo, mandar o texto
+  // extraído levou o contexto de 59% para 153%. O destino aqui é arquivo para o
+  // usuário.
+  if (msg.type === "ocrExtrair") {
+    (async () => {
+      try {
+        await garantirOffscreen();
+        const r = await chrome.runtime.sendMessage({
+          alvo: "ocrOffscreen",
+          tipo: "extrairPeca",
+          b64: msg.payload.b64,
+        });
+        if (!r || !r.ok) throw new Error((r && r.erro) || "extração não respondeu");
+        sendResponse({ ok: true, resultado: r.resultado });
+      } catch (e) {
+        sendResponse({ error: String((e && e.message) || e) });
+      }
+    })();
+    return true;
+  }
+
   // ------------------------------------------------ memória de caso (casodb.js)
   //
   // Cinco RPCs finos: quem sabe o que é um caso é o content script; quem sabe
@@ -833,6 +863,80 @@ chrome.runtime.onInstalled.addListener((detalhes) => {
 // Mantém no máximo MAX_MAPAS mapas na sessão (cada um é o markdown inteiro de
 // um processo; sem poda, uma tarde de uso encheria a cota de 10 MB).
 const MAX_MAPAS = 5;
+// --------------------------------------------------------------------------
+// Documento offscreen da extração de texto.
+//
+// O Chrome permite UM documento offscreen por perfil da extensão, e
+// `createDocument` lança se já houver um. Por isso a criação é idempotente E
+// protegida contra corrida: duas peças pedidas ao mesmo tempo chamariam
+// `createDocument` duas vezes e a segunda derrubaria o turno. A promessa em voo
+// é compartilhada (`criandoOffscreen`), como no exemplo 5 do guia PP-OCRv6.
+let criandoOffscreen = null;
+
+async function garantirOffscreen() {
+  // Chrome < 109 não tem a API. Degradação graciosa com motivo: o resto da
+  // extensão continua funcionando, e a mensagem diz o que fazer.
+  if (!chrome.offscreen) {
+    throw new Error(
+      "a extração de texto precisa do Chrome 109 ou mais novo — atualize o navegador"
+    );
+  }
+  const url = chrome.runtime.getURL("src/ocr-offscreen.html");
+  // `getContexts` só existe do Chrome 116 em diante; sem ele, o try/catch da
+  // criação faz o mesmo trabalho (documento já existente lança e nós seguimos).
+  if (chrome.runtime.getContexts) {
+    const existentes = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (existentes.length) return;
+  }
+  if (!criandoOffscreen) {
+    criandoOffscreen = chrome.offscreen
+      .createDocument({
+        url: "src/ocr-offscreen.html",
+        reasons: ["WORKERS"],
+        justification:
+          "Ler a camada de texto dos PDFs das peças e rasterizar as páginas digitalizadas, no próprio dispositivo.",
+      })
+      .catch((e) => {
+        // Corrida perdida para outra chamada: o documento existe, que é o que
+        // queríamos. Qualquer outro erro sobe.
+        if (!/single offscreen|already exists|Only a single/i.test(String(e && e.message))) throw e;
+      })
+      .finally(() => {
+        criandoOffscreen = null;
+      });
+  }
+  await criandoOffscreen;
+  await esperarOffscreenPronto();
+}
+
+// `createDocument` resolve quando o DOCUMENTO existe — não quando o script dele
+// está pronto. `ocr-offscreen.js` é um ES module que ainda vai resolver o import
+// do pdf.js (1,7 MB), e só então registra o `onMessage`. Mandar a peça nesse
+// intervalo devolve "Could not establish connection. Receiving end does not
+// exist" e derruba a PRIMEIRA extração de toda sessão — o pior tipo de falha,
+// porque some no segundo clique e parece intermitência de rede.
+//
+// É a mesma armadilha que o `extrator.js` da v0.21.0 resolvia com handshake; a
+// diferença é que lá o iframe avisava, e aqui somos nós que perguntamos.
+const OFFSCREEN_TENTATIVAS = 40;
+const OFFSCREEN_INTERVALO_MS = 125; // 40 × 125 ms = 5 s de teto
+
+async function esperarOffscreenPronto() {
+  for (let i = 0; i < OFFSCREEN_TENTATIVAS; i++) {
+    try {
+      const r = await chrome.runtime.sendMessage({ alvo: "ocrOffscreen", tipo: "ping" });
+      if (r && r.ok) return;
+    } catch {
+      // Ainda não há quem escute — é o caso esperado nas primeiras voltas.
+    }
+    await new Promise((r) => setTimeout(r, OFFSCREEN_INTERVALO_MS));
+  }
+  throw new Error("a extração de texto não iniciou a tempo — recarregue a página e tente de novo");
+}
+
 function podarMapas() {
   return new Promise((resolve) =>
     chrome.storage.session.get(null, (tudo) => {

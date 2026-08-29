@@ -2872,6 +2872,7 @@ var PjePanel = (function () {
     // -------------------------------------------------------------------------
     const tipZipMais = $(".tip-zip-mais");
     let precCb = null;
+    let textoCb = null;
     let zipmenu = null;
     function fecharZipMenu() {
       if (zipmenu) zipmenu.remove();
@@ -2913,8 +2914,31 @@ var PjePanel = (function () {
         fecharZipMenu();
         if (precCb) precCb();
       });
+      // Extrair texto: mesma família das outras duas (ação sobre a lista que
+      // termina num arquivo baixado), então entra aqui e não numa quarta pílula
+      // da `.docs-tip` — a fileira é `nowrap` e os rótulos já somam ~416 px numa
+      // coluna de 328 px.
+      const bTexto = document.createElement("button");
+      bTexto.type = "button";
+      bTexto.className = "sep";
+      bTexto.setAttribute("role", "menuitem");
+      bTexto.textContent = "Extrair o texto…";
+      bTexto.title =
+        "Lê o texto das peças marcadas e baixa um único .md com o processo inteiro, " +
+        "uma seção por página. O texto NÃO vai para a conversa.";
+      bTexto.addEventListener("click", () => {
+        fecharZipMenu();
+        if (!textoCb) return;
+        const alvo = marcadas.length ? marcadas : allDocs;
+        if (!alvo.length) {
+          statusEl.textContent = "A lista de peças está vazia — não há texto para extrair.";
+          return;
+        }
+        textoCb(alvo, { todas: !marcadas.length });
+      });
       zipmenu.appendChild(bPecas);
       zipmenu.appendChild(bPrec);
+      zipmenu.appendChild(bTexto);
       wrap.appendChild(zipmenu);
       const larg = zipmenu.offsetWidth || 210;
       zipmenu.style.left = Math.max(6, Math.min(r.right - larg, innerWidth - larg - 6)) + "px";
@@ -5850,6 +5874,12 @@ var PjePanel = (function () {
       // heurística — o painel não conhece `PjePrecatoria` nem a timeline.
       onPrecatorias(cb) {
         precCb = cb;
+      },
+      // Extração de texto das peças. Recebe `(docs, {todas})`, igual ao
+      // `onExportarZip` — o painel só nomeia o alvo; quem baixa, extrai e monta
+      // o `.md` é o content.js.
+      onExtrairTexto(cb) {
+        textoCb = cb;
       },
       // Abre a conferência. `onConfirmar(pacotesEscolhidos)` só é chamado se o
       // usuário confirmar — a UI nunca dispara download sozinha.
