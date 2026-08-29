@@ -273,7 +273,10 @@ async function rasterizar(pagina) {
 }
 
 // --- leitura de uma peça ----------------------------------------------------
+const dr = (...a) => console.log("[PJe IA OCR][pdf]", ...a);
+
 async function lerPeca(bytes, querImagens) {
+  dr("abrindo PDF de", bytes.length, "bytes");
   const tarefa = pdfjsLib.getDocument({
     data: bytes,
     // A CSP de páginas de extensão não permite `eval` — sem isto o pdf.js tenta
@@ -285,6 +288,7 @@ async function lerPeca(bytes, querImagens) {
   });
   const doc = await tarefa.promise;
   const paginas = doc.numPages;
+  dr("PDF aberto:", paginas, "página(s)");
   const objs = [];
   try {
     for (let n = 1; n <= paginas; n++) {
@@ -314,14 +318,23 @@ async function lerPeca(bytes, querImagens) {
 
     // Rasteriza SÓ o que vai ao OCR. É a diferença entre segundos e minutos:
     // num processo real, 4 de 41 páginas.
+    dr(
+      "classificado:",
+      folhas.filter((f) => f.estado === "nativo").length + " nativas,",
+      folhas.filter((f) => f.estado === "escaneada" || f.estado === "camada-ruim").length + " p/ OCR,",
+      folhas.filter((f) => f.estado === "vazia").length + " vazias"
+    );
     if (querImagens) {
       for (let i = 0; i < folhas.length; i++) {
         const f = folhas[i];
         if (f.estado !== "escaneada" && f.estado !== "camada-ruim") continue;
         try {
+          const t0 = Date.now();
           if (objs[i] && objs[i].pagina) f.img = await rasterizar(objs[i].pagina);
+          dr("raster fl." + f.p, "->", Date.now() - t0, "ms,", Math.round((f.img || "").length / 1024), "KB");
         } catch (e) {
           f.erroRaster = String((e && e.message) || e);
+          dr("ERRO ao rasterizar fl." + f.p, "->", f.erroRaster);
         }
       }
     }

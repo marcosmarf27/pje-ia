@@ -697,10 +697,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           tipo: "reconhecer",
           img: msg.payload.img,
         });
-        if (!r || !r.ok) throw new Error((r && r.erro) || "o OCR não respondeu");
+        if (!r || !r.ok) {
+          const e = new Error((r && r.erro) || "o OCR não respondeu");
+          e.diag = (r && r.diag) || [];
+          throw e;
+        }
         sendResponse({ ok: true, resultado: r });
       } catch (e) {
-        sendResponse({ error: String((e && e.message) || e) });
+        // O diagnóstico do offscreen sobe JUNTO do erro: sem isso o content
+        // script recebe "o OCR não respondeu" e o porquê fica num console que
+        // ninguém abre.
+        sendResponse({ error: String((e && e.message) || e), diag: (e && e.diag) || [] });
       } finally {
         parar();
       }

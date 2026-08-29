@@ -1134,6 +1134,10 @@
             // construção do Error. Quem re-tenta precisa dele.
             const err = new Error(resp.error);
             if (resp.retryable) err.retryable = true;
+            // Diagnóstico que o worker anexou (hoje, o do offscreen do OCR):
+            // sem carregá-lo no Error ele morre aqui, e o motivo real da falha
+            // fica num console que ninguém abre.
+            if (resp.diag) err.diag = resp.diag;
             return reject(err);
           }
           resolve(resp);
@@ -1734,6 +1738,36 @@
   // zero), então o teto aqui é de sanidade de memória, não de serialização.
   const MAX_B64_EXTRACAO = 96 * 1024 * 1024;
 
+  // TETO DE TEMPO DO OCR DE UMA PÁGINA.
+  //
+  // Sem isto, o `rpc` espera PARA SEMPRE: se o offscreen não responder — motor
+  // que não inicializa, documento derrubado, mensagem perdida — a extração fica
+  // parada na mesma peça, sem erro, sem fim e sem arquivo. Foi exatamente o que
+  // chegou ao usuário como "fica em loop e não termina".
+  //
+  // É a mesma regra que o `MOVS_TIMEOUT_MS` das movimentações e o `pje login` do
+  // CLI já registram, e que eu havia escrito no CLAUDE.md nesta mesma rodada
+  // antes de deixar esta chamada sem teto: rota que pendura precisa de
+  // ALTERNATIVA, não de paciência.
+  //
+  // Generoso de propósito: a PRIMEIRA página paga o warm-up do motor (carregar
+  // 6 MB de modelo e compilar o WASM), que em máquina lenta passa de meio minuto.
+  const OCR_TIMEOUT_1A_MS = 120000;
+  const OCR_TIMEOUT_MS = 60000;
+
+  function comTeto(promessa, ms, oQue) {
+    let t;
+    return Promise.race([
+      promessa.finally(() => clearTimeout(t)),
+      new Promise((_, rej) => {
+        t = setTimeout(
+          () => rej(new Error(oQue + " não respondeu em " + Math.round(ms / 1000) + "s")),
+          ms
+        );
+      }),
+    ]);
+  }
+
   // --- iframe de leitura de PDF ---------------------------------------------
   // Página de extensão embutida oculta. Não é o content script (nenhum bundle
   // entra em página de tribunal) nem o offscreen (`page.render()` trava lá, com
@@ -1813,6 +1847,15 @@
     });
   }
 
+  // O offscreen tem console próprio, alcançável só por chrome://extensions ->
+  // Inspecionar visualizações. Um relato de erro que exige três consoles não
+  // chega a ninguém: o diagnóstico volta junto da resposta e é impresso AQUI,
+  // no F12 da página do processo, que é onde o usuário já está.
+  function mostrarDiag(linhas) {
+    if (!linhas || !linhas.length) return;
+    for (const l of linhas) console.log("[PJe IA OCR][offscreen]", l);
+  }
+
   function rotuloEstado(e) {
     if (e === "escaneada") return "_[página digitalizada — não foi possível rasterizar]_";
     if (e === "camada-ruim") return "_[camada de texto defeituosa]_";
@@ -1859,6 +1902,12 @@
       },
     });
 
+    console.log(
+      "%c[PJe IA OCR] início",
+      "font-weight:bold",
+      "| versão " + (chrome.runtime.getManifest ? chrome.runtime.getManifest().version : "?"),
+      "|", docs.length, "peça(s)"
+    );
     const partes = [];
     const falhas = [];
     let comTexto = 0;
@@ -1866,6 +1915,7 @@
     let pagsOcr = 0;
     let pagsSemOcr = 0;
     let backendOcr = "";
+    const errosOcr = [];
     const t0Ocr = Date.now();
     // Hoje sempre com OCR. A flag existe para o dia em que houver um "só o texto
     // nativo" na interface — e para deixar explícito, no código, que a
@@ -1897,7 +1947,15 @@
                 "peça grande demais para a extração (" + fmtMB((c.b64.length * 3) / 4) + ")"
               );
             }
-            const res = await lerPdfNoFrame(c.b64, comOcr);
+            console.log("[PJe IA OCR] lendo", d.id, d.titulo);
+          const res = await comTeto(
+            lerPdfNoFrame(c.b64, comOcr),
+            180000,
+            "a leitura do PDF"
+          );
+          console.log(
+            "[PJe IA OCR]", d.id, "->", res.paginas, "pág,", res.precisamOcr, "p/ OCR"
+          );
             pagsNativas += res.nativas;
 
             // OCR das páginas sem camada de texto, UMA POR VEZ: o motor é único
@@ -1918,7 +1976,13 @@
                   " · " + d.titulo.slice(0, 32) + ", fl. " + f.p
               );
               try {
-                const o = await rpc({ type: "ocrReconhecer", payload: { img: f.img } });
+                const primeira = pagsOcr === 0;
+                const o = await comTeto(
+                  rpc({ type: "ocrReconhecer", payload: { img: f.img } }),
+                  primeira ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
+                  "o reconhecimento de texto"
+                );
+                mostrarDiag(o && o.resultado && o.resultado.diag);
                 const t = (o.resultado && o.resultado.texto) || "";
                 if (t) {
                   f.texto = t;
@@ -1932,6 +1996,9 @@
               } catch (e) {
                 f.estado = "ocr-falhou";
                 f.erroOcr = (e && e.message) || String(e);
+                errosOcr.push(f.erroOcr);
+                mostrarDiag(e && e.diag);
+                console.warn("[PJe IA OCR] falhou em", d.id, "fl." + f.p, "->", f.erroOcr);
               }
               delete f.img; // solta o data URL da página antes da próxima
             }
@@ -1942,7 +2009,11 @@
 
             const folhas = res.folhas
               .map((f) => {
-                const corpo = f.texto || rotuloEstado(f.estado);
+                const corpo =
+                  f.texto ||
+                  (f.estado === "ocr-falhou" && f.erroOcr
+                    ? "_[o reconhecimento de texto falhou nesta página: " + f.erroOcr + "]_"
+                    : rotuloEstado(f.estado));
                 const marca = f.ocr
                   ? "\n\n_[texto reconhecido por OCR" +
                     (typeof f.score === "number" ? " — confiança " + f.score.toFixed(0) + "%" : "") +
@@ -1968,6 +2039,9 @@
       if (sinal.cancelado) throw new Error("cancelado");
       if (!comTexto) throw new Error("nenhuma peça devolveu texto");
 
+      // Os motivos de falha do OCR vão AGRUPADOS no cabeçalho: espalhados pelas
+      // páginas, quem abre o arquivo teria de caçá-los folha a folha.
+      const motivosOcr = [...new Set(errosOcr)];
       const cnj = PJE.getNumeroProcesso() || "processo";
       const cab =
         "# Processo " + cnj + "\n\n" +
@@ -1983,6 +2057,10 @@
         (pagsOcr
           ? "> O texto reconhecido por OCR pode conter erros — confira no documento original.\n"
           : "") +
+        (motivosOcr.length
+          ? "> O reconhecimento falhou em " + errosOcr.length + " página(s). Motivo(s): " +
+            motivosOcr.join(" · ") + ".\n"
+          : "") +
         (falhas.length
           ? "> Não entraram: " +
             falhas.map((f) => f.titulo + " (" + f.motivo + ")").join("; ") + ".\n"
@@ -1991,6 +2069,12 @@
         "aparecem aqui.\n";
 
       const md = cab + "\n---\n\n" + partes.join("\n---\n\n");
+      console.log(
+        "%c[PJe IA OCR] fim",
+        "font-weight:bold",
+        "|", comTexto, "peça(s) |", pagsNativas, "nativas |", pagsOcr, "por OCR |",
+        errosOcr.length, "falhas de OCR |", falhas.length, "peças de fora"
+      );
       panel.endPrep();
       baixarBlob("processo-" + cnj + ".md", new Blob([md], { type: "text/markdown" }));
       panel.setStatus(
