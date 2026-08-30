@@ -9,9 +9,13 @@
       tem `new Worker` e é morto em tarefa longa, e o iframe da página do
       tribunal morre no primeiro F5.
 
-      Aqui NÃO entra pdf.js: `page.render()` trava em documento offscreen,
-      porque o rAF fica congelado em contexto oculto. Quem rasteriza é
-      src/ocr-render.js, no iframe.
+      Aqui NÃO entra pdf.js. `page.render()` pendura em qualquer contexto que
+      não PINTA — offscreen, display:none, iframe fora da viewport —, porque ele
+      cede por requestAnimationFrame e o rAF fica congelado nesses contextos. O
+      defeito é a propriedade "oculto", não o endereço "offscreen": trocar de
+      lugar sem trocar a propriedade só muda o sintoma de endereço, e foi o que
+      custou a v0.51.1. Quem rasteriza é src/ocr-render.js, no iframe, com um
+      shim de rAF.
 
       Só `chrome.runtime` é garantido no offscreen — não usar outras APIs chrome.
       O bundle vem ANTES do script da página (padrão de mapa.html).

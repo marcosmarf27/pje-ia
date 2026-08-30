@@ -1764,7 +1764,8 @@ Regras deste par:
   `extension_pages` ganhou `'wasm-unsafe-eval'` e `worker-src 'self'` (campo de
   manifest, também sem aviso).
 - **`createDocument` resolve quando o DOCUMENTO existe, não quando o script está
-  pronto** — `ocr-offscreen.js` é ES module e ainda vai resolver o import do pdf.js.
+  pronto** — `ocr-offscreen.js` ainda vai carregar o bundle do ORT (o pdf.js saiu
+  daqui na v0.51.2; quem rasteriza é o iframe de `ocr-render.js`).
   Sem o handshake (`esperarOffscreenPronto`, ping com teto de 5 s) a PRIMEIRA
   extração de toda sessão morre com "Receiving end does not exist", e some no
   segundo clique: parece intermitência de rede e não é.

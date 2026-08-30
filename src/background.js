@@ -953,7 +953,17 @@ async function gravarBackendOcr(decisao) {
   }
 }
 
-// Documento offscreen da extração de texto.
+// Documento offscreen do MOTOR DE OCR.
+//
+// O QUE MORA AQUI, e o que NÃO mora: o offscreen hospeda o motor (PP-OCRv6
+// sobre ONNX Runtime Web) e mais nada. O **pdf.js** — que lê a camada de texto
+// e rasteriza a folha — vive no IFRAME de `ocr-render.js` desde a v0.51.2, e a
+// `justification` abaixo continuou descrevendo o arranjo antigo até a v0.53.2.
+// Não quebrava nada em execução (é string informativa), mas é lida por quem
+// revisa a extensão e passou a contradizer a justificativa da Chrome Web Store.
+// É o MESMO defeito do rótulo "o texto depende do OCR" da v0.53.1: um texto que
+// era correto e ficou falso quando a coisa que ele descreve mudou de lugar.
+// **Ao mover código, procurar quem o DESCREVE, não só quem o chama.**
 //
 // O Chrome permite UM documento offscreen por perfil da extensão, e
 // `createDocument` lança se já houver um. Por isso a criação é idempotente E
@@ -986,7 +996,9 @@ async function garantirOffscreen() {
         url: "src/ocr-offscreen.html",
         reasons: ["WORKERS"],
         justification:
-          "Ler a camada de texto dos PDFs das peças e rasterizar as páginas digitalizadas, no próprio dispositivo.",
+          "Executar o motor de reconhecimento de texto (OCR) local sobre as páginas " +
+          "digitalizadas das peças, no próprio dispositivo. O motor precisa de Web Workers " +
+          "para as threads de WebAssembly, que o service worker do Manifest V3 não cria.",
       })
       .catch((e) => {
         // Corrida perdida para outra chamada: o documento existe, que é o que

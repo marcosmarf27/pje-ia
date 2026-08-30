@@ -75,7 +75,7 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 - **Minutar** ✍️ *(nos três provedores)* — peça ao modelo o texto de um ato (despacho, decisão, sentença, parecer…) e ele abre num **editor de texto** próprio, em nova aba, já com a formatação forense (A4, margens 3/2 cm, Times 12, entrelinha 1,5, parágrafos justificados). Do editor você **⎘ copia formatado** para colar no editor de minutas do PJe, **⬇ baixa em `.docx`** (Word, gerado no próprio navegador) ou **🖨 imprime/salva em PDF**. Toda afirmação leva a origem `(peça · id · fl.)` e o que faltar nas peças vira `[COMPLETAR: …]`. Toda resposta longa do chat também ganha um botão **Abrir no editor**. O rascunho fica guardado no computador (7 dias) para reabrir depois.
 - **Mapa mental** 🧠 *(nos três provedores)* — o modelo organiza as peças marcadas nos eixos da análise processual (partes, fatos, pedidos, teses, provas, audiências, decisões, prazos, situação) e a extensão abre um **mapa interativo** em nova aba (markmap): cada eixo com ícone e cor próprios, **tabelas** onde a informação é tabular, **pílulas** de folha, id da peça, data, valor e norma, e a origem (`peça · id · fl.`) em cada tópico. Nasce recolhido, com níveis de detalhe, zoom, tema escuro, impressão/PDF e download do texto em `.md`.
 - **Biblioteca de prompts** ✦ — salve instruções que você repete (título + texto) e insira-as digitando **`/`** no início do campo: o prompt vira um chip elegante acima da caixa de texto e é enviado antes da sua mensagem. Gerenciamento (criar/editar/excluir) no botão **✦ Prompts**, e os prompts acompanham você em outros navegadores pela sincronização da conta Google.
-- **OCR nativo** — peças digitalizadas (imagem) são lidas pelo próprio modelo, sem OCR externo.
+- **Peça digitalizada também é lida** — a peça que é imagem (documento escaneado, foto anexada, print) vai ao modelo **como imagem** e é lida por ele, sem OCR externo. E quando você **extrai o texto** para fora da extensão, entra um **OCR local** que roda no seu próprio computador — ver [Levar os autos para fora](#levar-os-autos-para-fora).
 
 ### Seleção de peças
 
@@ -90,6 +90,18 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 - **Preview no hover** — nos modos largos, passar o mouse numa peça abre a pré-visualização do PDF/texto; "Abrir documento" busca peças ainda não carregadas.
 - **Ver na timeline** — cada peça tem um botão que localiza e destaca o documento na linha do tempo do PJe.
 
+### Levar os autos para fora
+
+Nem todo trabalho acontece dentro do painel. Estas saídas existem para levar o
+processo inteiro para outra ferramenta — o Claude Code, um script, um arquivo de
+caso — sem depender da extensão para lê-lo depois.
+
+- **⬇ Baixar as peças em `.zip`** — o processo inteiro num pacote, uma peça por arquivo, nomeadas `NNN_Titulo_ID.ext`: o número é a **posição cronológica**, então a ordem alfabética da pasta é a ordem dos autos, e o **id fica no nome** porque é o único metadado que sobrevive a sair da ferramenta. Vem com `LEIA-ME.md`, `indice.txt` e `indice.json` — a ficha do processo, quem juntou cada peça, quantas páginas tem, e o formato de citação para usar depois.
+- **📄 Extrair só o texto** — o mesmo processo em **texto puro**, para alimentar outra ferramenta sem carregar PDF. Dois formatos, no menu do `⬇`: **um `.md` só** com o processo inteiro (`# peça` / `## Página N`), ou **um `.md` por peça** dentro de um `.zip`, com `indice.md` (tabela com link para cada arquivo), `indice.json` e identificação em cada peça — este último é o que permite pedir *"leia só a contestação"* em vez de carregar os autos completos. O pacote leva o arquivo único **junto**, então escolher um formato nunca custa o outro.
+- **OCR local nas páginas digitalizadas** — na extração, a folha que **não tem camada de texto** passa por um reconhecimento que roda **no seu computador** (PP-OCRv6 sobre ONNX Runtime; a extensão mede WebGPU e WebAssembly na primeira página e fica com o mais rápido). Anexo em foto ou print também passa. Nenhum byte vai para serviço de OCR nenhum. Cada página reconhecida vem **marcada no arquivo, com a confiança** — OCR erra, e quem assina precisa saber o que conferir.
+- **📦 Pacote de carta precatória** — para cada carta precatória **expedida**, uma pasta com a carta, a peça de **origem** da ação e a **decisão que a fundamenta**, no **PDF oficial** do tribunal (com timbre e assinatura), pronta para virar um envio de malote digital. A escolha é feita pelo **movimento processual** — vocabulário CNJ, controlado — e não pelo título da peça, que costuma ser o nome do arquivo que alguém subiu; e a extensão **mostra o que encontrou para você conferir** antes de gerar o pacote.
+- **`pje`, pela linha de comando** — para baixar autos em lote fora do navegador, passando números CNJ. Ver [`cli/README.md`](cli/README.md).
+
 ### Contexto, custo e confiabilidade
 
 - **Medidor de contexto dinâmico** — barra mostra quanto da janela do modelo (tokens e páginas de PDF) a conversa ocupa, atualizada ao marcar/desmarcar peças **antes mesmo do envio**, com alertas em 70% e 90%. Desmarcar uma peça **libera contexto de verdade** no request seguinte.
@@ -98,6 +110,8 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 - **Retry automático** — sobrecarga da API, limites momentâneos e quedas de conexão no meio do streaming são re-tentados sozinhos, sem duplicar texto na tela.
 - **PDF × HTML detectados automaticamente** — peças HTML viram texto puro (fração do custo de um PDF); a detecção confere o content-type **e** a assinatura `%PDF-` do binário.
 - **Erros amigáveis** — chave inválida, conta sem crédito, limites e sobrecarga explicados em português.
+- **Memória de processos** — reabrir um processo já analisado **retoma a conversa e não baixa as peças de novo**. Isso não é conveniência: o download do PJe é serializado, e num processo de 200 peças a diferença é de minutos. O banco é local e vive na origem da **extensão**, nunca na do tribunal; desligar a memória nas opções **apaga tudo na hora**.
+- **A linha do tempo do processo vai junto das peças** — publicação, intimação, decurso de prazo e trânsito em julgado quase nunca viram peça com texto: são **movimentos**. A extensão lê o registro oficial do PJe e envia os movimentos com data (e hora, quando existe) — sem isso, perguntar a data do trânsito devolvia *"não é possível determinar com segurança"*, e a resposta estava certa, porque o dado nunca havia sido enviado. Um selo no rodapé diz quantos movimentos foram e de que fonte, e **abre a lista** para você conferir.
 
 ### Interface
 
@@ -366,8 +380,14 @@ flowchart LR
 | `src/background.js` + `claude.js` / `gemini.js` / `openai.js` | Service worker que guarda as chaves e chama a API do provedor do modelo escolhido (Anthropic, Google ou OpenAI) com streaming. **As chaves nunca são expostas à página.** |
 | `src/casodb.js` + `caso.js` | **Memória de processos**: banco local (IndexedDB) que guarda o texto das peças, a conversa e a seleção de cada processo, para reabrir sem baixar tudo de novo. O banco vive no *service worker* — na origem da extensão, nunca na do tribunal —, e `caso.js` é o cliente que o content script usa. |
 | `src/mapa.html` + `mapa.js` / `mapa.css` | Página do **mapa mental**: converte o Markdown da resposta em árvore de nós (com ícones por eixo, tabelas e realces de fl./id) e desenha com markmap (d3), em aba própria da extensão. |
-| `vendor/` | `d3.min.js` e `markmap-view.js` oficiais, sem modificação, usados **só** pela página do mapa (nunca carregados nas páginas do PJe). Licenças em `vendor/LICENSES.md`. |
+| `vendor/` | Bibliotecas de terceiros oficiais, **sem modificação**: `d3` + `markmap-view` (mapa mental), `jodit` (editor de minutas), `docx` (geração do `.docx`), `pdf.js` (leitura das páginas na extração) e o runtime de OCR com o modelo PP-OCRv6. **Nenhuma delas é carregada nas páginas do tribunal** — todas vivem em páginas ou contextos internos da extensão. Licenças em `vendor/LICENSES.md`. |
 | `src/popup.html` | Configuração em 1 clique no ícone da barra (chave, modelo, guia de primeiros passos). |
+| `src/exportar.js` + `zip.js` | **Empacotamento**: monta o `.zip` das peças, o pacote de texto e os índices. `zip.js` é um escritor de ZIP próprio (~200 linhas, sem biblioteca de terceiros) e `exportar.js` é um módulo **puro** — não conhece o painel nem o PJe, o que o torna testável fora do navegador e reutilizável pelo `pje` da linha de comando. |
+| `src/ocr-render.js` + `ocr-offscreen.js` | **OCR local**. O `pdf.js` roda num iframe interno (`ocr-render.js`) e o motor de reconhecimento, num documento *offscreen* (`ocr-offscreen.js`) — a divisão não é estética: o `render()` do pdf.js trava em qualquer contexto que não pinta, e o *service worker* não cria Web Workers. |
+| `src/precatoria.js` | **Pacote de carta precatória**: identifica as cartas expedidas pelo **movimento processual** (vocabulário CNJ) e reúne a carta, a peça de origem e a decisão que a fundamenta. |
+| `src/editor.html` + `editor.js` / `editor-docx.js` / `minuta-md.js` | Página do **editor de minutas**: converte o Markdown do modelo em documento com formatação forense, e gera o `.docx` **no próprio navegador**. |
+| `src/modelos.js` + `modelos.html` / `docx-importar.js` | **Biblioteca de peças-modelo** e a importação em lote de `.docx`/`.rtf`, lidos dentro do navegador (sem enviar o arquivo a lugar nenhum). |
+| `src/tour.js` | Visita guiada de primeiro uso, desenhada **sobre o painel real** — os gestos são demonstrados num palco de exemplo, para a visita nunca marcar peças nem disparar downloads de verdade. |
 
 ## 🔒 Privacidade e segurança
 
@@ -375,6 +395,7 @@ flowchart LR
 - Os documentos marcados são enviados **diretamente à API do provedor do modelo escolhido** (Anthropic, Google ou OpenAI) — nenhum outro serviço intermedia.
 - A extensão só roda em sites da Justiça (`*.jus.br`), só injeta o painel em telas de autos do PJe e não coleta telemetria.
 - A **memória de processos** grava, neste computador, o texto das peças e a conversa de cada processo — **nunca os PDFs nem as imagens**. Apaga-se sozinha em 14 dias, tem um botão **Esquecer este processo** na própria conversa e pode ser desligada por completo na configuração.
+- O **OCR das páginas digitalizadas roda no seu computador**: o modelo vem dentro da extensão e a imagem da folha não é enviada a serviço nenhum — nem de OCR, nem de IA. Pela mesma razão, a **extração do texto** e o **`.zip` das peças** não passam por servidor algum: o único acessado é o do próprio tribunal, com a sua sessão.
 - Política completa em [PRIVACY.md](PRIVACY.md) — sem servidor próprio, sem analytics, o desenvolvedor nunca tem acesso a nenhum dado.
 
 > ⚠️ **Aviso legal:** autos judiciais podem conter dados pessoais e sigilosos. O uso da
@@ -414,10 +435,17 @@ em **Segredo de justiça: anonimizar antes de enviar**.
 - [x] Biblioteca de modelos de peças — a minuta segue a forma das **suas** peças
 - [x] Importar peças-modelo de `.docx` em lote, com a espécie reconhecida pelo conteúdo
 - [x] Memória de processos — reabrir um processo retoma a conversa sem baixar as peças de novo
-- [ ] Mais de uma conversa por processo
+- [x] Mais de uma conversa por processo — várias conversas guardadas e retomáveis no mesmo processo
+- [x] Exportar as peças em `.zip`, com índice e ficha do processo
+- [x] Extrair o texto dos autos — num arquivo só ou um `.md` por peça, com índice
+- [x] OCR local para as páginas digitalizadas — no seu computador, sem serviço externo
+- [x] Pacote de carta precatória — carta, origem e decisão em PDF oficial, pronto para o malote
+- [x] A linha do tempo do processo no contexto — as datas dos atos, não só as peças
+- [x] `pje`, linha de comando para baixar autos em lote
+- [ ] Conversas **simultâneas** no mesmo processo (várias janelas lado a lado)
 - [ ] Compaction para conversas muito longas
 - [ ] Limpeza de uploads antigos na Files API
-- [x] Publicação na Chrome Web Store — v0.9.9 **aprovada e publicada**; atualização **v0.14.0** (rebrand TecJustiça PJe, Gemini, editor de minutas, mapa mental) em publicação
+- [x] Publicação na Chrome Web Store — **publicada e atualizada continuamente**; o histórico de cada versão fica na própria extensão, em *Novidades*
 
 ## 🤝 Contribuindo — mesmo sem saber programar
 

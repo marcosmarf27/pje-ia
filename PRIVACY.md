@@ -25,6 +25,8 @@ são enviados diretamente do seu navegador à API do provedor de IA que você es
 | **Arquivos que você anexa no chat** (o clipe 📎: PDF, Word `.docx`, RTF, TXT e Markdown) | Analisar, junto das peças do processo ou sozinhos, um documento que não está nos autos | Ao provedor de IA que você escolheu, como as peças — e **a nada mais**. **Não são gravados neste computador**: existem apenas na memória da aba enquanto a conversa dura, e some tudo ao clicar em “Nova conversa”, ao remover o anexo no ✕ do chip ou ao fechar a aba. A memória de processos **não os guarda** (ao retomar uma conversa antiga eles não voltam, e a extensão avisa que você pode anexá-los de novo). Os arquivos `.docx` e `.rtf` são lidos **dentro do próprio navegador** — o texto é extraído aqui e só ele é enviado. **Atenção**: um arquivo anexado pode conter dados de outro processo ou de terceiros; vale para ele a mesma responsabilidade da seção 4. |
 | **Arquivos `.docx` ou `.rtf` que você importa** para a biblioteca de modelos | Cadastrar peças-modelo sem copiar e colar uma a uma | O arquivo é aberto e lido **dentro do seu próprio navegador** (a extensão descompacta o `.docx`, ou interpreta a marcação do `.rtf`, e extrai o texto localmente): ele **não é enviado a nenhum servidor**, nem ao desenvolvedor, nem ao provedor de IA. Só o texto extraído é gravado, e apenas nas fichas que você confirmar — o que ficar de fora da conferência é descartado ao fechar a tela. A partir daí vale exatamente a regra da linha acima. |
 | **Memória de processos** (o texto das peças que você marcou, os dados de cada peça — id, título, nº de páginas, tamanho —, a lista do que estava selecionado e a conversa daquele processo) | Retomar a análise ao reabrir um processo já trabalhado, sem baixar tudo do tribunal de novo | Um banco local (IndexedDB) **da própria extensão**, neste computador. Não sincroniza, não sai daqui e **não guarda os PDFs nem as imagens** das peças — só o texto e as referências. Apagada sozinha após **14 dias** (no máximo 20 processos); o botão **Esquecer este processo**, na faixa do topo da conversa, remove na hora, e desligar “Lembrar dos processos entre sessões” nas opções apaga tudo imediatamente. Junto vai um **resumo irreversível da sua chave de API** (8 dígitos de um hash SHA-256), usado só para detectar que você trocou de chave e invalidar os arquivos enviados na conta anterior — a chave em si nunca é gravada. |
+| **Texto extraído das peças** (a saída de “Extrair o texto”, num `.md` único ou num `.zip` com um arquivo por peça) e o **pacote de carta precatória** | Levar o processo para fora da extensão — outra ferramenta, um script, um arquivo de caso; ou montar um envio de malote digital | **A lugar nenhum**: o arquivo é montado dentro do seu navegador e entregue pelo download comum. Nesta operação o único servidor acessado é o **do próprio tribunal**, com a sua sessão. Nada vai ao desenvolvedor nem a provedor de IA. O arquivo resultante é salvo por **você**, onde você escolher, e a partir daí deixa de estar sob controle da extensão. |
+| **Reconhecimento de texto (OCR) das páginas digitalizadas** | Ler a folha escaneada, que não tem camada de texto, ao extrair o texto do processo | **A lugar nenhum — o reconhecimento é inteiramente local.** O modelo de OCR (PP-OCRv6) vem dentro do pacote da extensão e roda no seu computador, num documento interno dela (`offscreen`). Nenhuma imagem de página é enviada a serviço de OCR, ao desenvolvedor ou a qualquer provedor de IA. |
 | **Sessão do PJe** (cookies do tribunal) | Baixar as peças que você marcar, pelo mesmo mecanismo que o próprio PJe usa | Os cookies são gerenciados pelo navegador e **nunca são lidos, armazenados ou exportados pela extensão** — as requisições ao tribunal usam a sessão já aberta por você, e o conteúdo baixado fica em cache temporário na memória da aba. |
 
 Nenhum dado além dos listados acima é tratado. A coleta limita-se ao estritamente
@@ -44,6 +46,8 @@ Web Store.
   página `.jus.br` o script termina sem tocar no DOM.
 - **Não envia nada automaticamente**: nenhum documento sai do navegador sem uma ação
   explícita sua (marcar peças e enviar uma mensagem).
+- **Não usa serviço externo de OCR**: o reconhecimento das páginas digitalizadas é feito por um
+  modelo que acompanha a extensão e roda **no seu computador** — a imagem da folha não sai daqui.
 - **Não usa os dados para publicidade** nem para determinar crédito ou qualquer
   finalidade alheia ao propósito único.
 
@@ -142,6 +146,15 @@ própria licença e o próprio funcionamento — a política aqui descrita não 
   tramitar em **segredo de justiça**, o `LEIA-ME.md` e o `indice.txt` avisam disso logo
   no topo, mas o cuidado com o arquivo é seu. A extensão **não** pede a permissão
   `downloads` do Chrome: ela não enxerga nem gerencia a sua pasta de downloads.
+- **Extração do texto e pacote de carta precatória** seguem exatamente a mesma regra da
+  exportação em `.zip` acima: montados no navegador, entregues pelo download comum, sem passar
+  por servidor nosso nem por provedor de IA. Duas observações próprias. Primeira: o texto
+  extraído das páginas digitalizadas é produzido por um **OCR local** — o modelo vem no pacote
+  da extensão e roda num documento interno dela; a imagem da folha **não é enviada a lugar
+  nenhum**, e é por isso que a extração funciona até sem conexão com os provedores de IA.
+  Segunda: o texto extraído **não entra em nenhum pedido à IA** — o destino dele é o seu disco.
+  Como o `.zip` de peças, esses arquivos contêm **os autos**, com os dados pessoais que eles
+  trouxerem; o cuidado com o arquivo depois de salvo é seu.
 - A única exceção são os **prompts salvos**, gravados no `chrome.storage.sync` para
   acompanharem você em outros dispositivos: quem os replica é o próprio Chrome, pela
   sincronização da sua conta Google. Sem conta ou com a sincronização desligada, eles
