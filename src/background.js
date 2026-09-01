@@ -3,10 +3,10 @@
 // Também resolve sozinho as continuações de turno (stop_reason "pause_turn",
 // quando o loop de ferramentas do servidor atinge o teto de iterações) — o
 // content script enxerga um único turno lógico.
-// Três provedores: Anthropic (claude.js), Google Gemini (gemini.js) e OpenAI
-// (openai.js). O provedor é inferido do id do modelo (prefixos "gemini-" e
-// "gpt-") e os três clientes emitem o MESMO vocabulário de eventos — o resto
-// deste arquivo não distingue.
+// Quatro provedores: Anthropic (claude.js), Google Gemini (gemini.js), OpenAI
+// (openai.js) e OpenRouter (openrouter.js). O provedor é inferido do id do
+// modelo (prefixos "gemini-", "gpt-" e "or:") e os quatro clientes emitem o
+// MESMO vocabulário de eventos — o resto deste arquivo não distingue.
 import {
   streamClaude,
   uploadFile,
@@ -23,6 +23,13 @@ import {
   uploadFileOpenAI,
   countTokensOpenAI,
 } from "./openai.js";
+import {
+  streamOpenRouter,
+  slugOpenRouter,
+  capsDoCatalogoOpenRouter,
+  ENGINE_PDF_NATIVO,
+  ENGINE_PDF_CONVERSOR,
+} from "./openrouter.js";
 import {
   lerCaso,
   lerConversa,
@@ -220,8 +227,17 @@ const MODEL_CAPS = {
 
 // Provedor do modelo (prefixo do id — a lista de modelos vive nos <option>
 // do popup/options; ids desconhecidos caem no default Anthropic via capsDe).
+//
+// O OpenRouter entra por PREFIXO ("or:"), e não pela barra do slug dele
+// (`autor/modelo`). Os dois funcionariam hoje — nenhum id direto de Anthropic,
+// Google ou OpenAI tem barra —, mas o prefixo mantém esta função como o que ela
+// sempre foi (uma tabela de prefixos, lida de cima a baixo) e faz um id do
+// OpenRouter se identificar sozinho no storage, sem depender de uma propriedade
+// do formato de OUTRO fornecedor continuar valendo. Quem tira o prefixo é
+// `slugOpenRouter`, ponto único em openrouter.js.
 function providerDe(model) {
   if (!model) return "anthropic";
+  if (model.startsWith("or:")) return "openrouter";
   if (model.startsWith("gemini-")) return "gemini";
   if (model.startsWith("gpt-")) return "openai";
   return "anthropic";
@@ -242,6 +258,96 @@ const EFFORT_PARA_THINKING_LEVEL = { high: "high", medium: "medium", low: "low" 
 // subconjunto que também existe na Anthropic e no Gemini. "Alto" = high; expor
 // xhigh/max um dia é mudança de ponto único, aqui.
 const EFFORT_PARA_OPENAI = { high: "high", medium: "medium", low: "low" };
+
+// effort salvo → reasoning.effort do OpenRouter. A escala dele é a da OpenAI
+// (none|minimal|low|medium|high|xhigh|max) e é NORMALIZADA por ele para cada
+// provedor de destino — no Gemini vira thinkingLevel, na Anthropic vira
+// orçamento de tokens. Os três níveis da extensão caem no subconjunto comum.
+const EFFORT_PARA_OPENROUTER = { high: "high", medium: "medium", low: "low" };
+
+// ---------------------------------------------------------------------------
+// CAPACIDADES DOS MODELOS DO OPENROUTER
+//
+// Nenhum modelo do OpenRouter entra em MODEL_CAPS, e isso é decisão, não
+// omissão: são centenas de modelos de dezenas de fornecedores, e `janela`,
+// `preço` e `aceita PDF?` mudam sem aviso. Escrever esses números à mão aqui
+// criaria a pior espécie de dado — o que envelhece calado e faz a extensão
+// barrar um envio que caberia (ou deixar passar um que não cabe).
+//
+// Em vez disso as caps vêm do CATÁLOGO PÚBLICO do próprio OpenRouter
+// (`capsDoCatalogoOpenRouter`), sob demanda e cacheadas na SESSÃO do navegador:
+// `session` e não `local` porque o catálogo muda (preço, janela, modelo novo) e
+// uma sessão é a granularidade certa para reconsultar — a mesma disciplina da
+// memória do `safety_settings` do Gemini e da decisão de backend do OCR.
+//
+// Consequência boa: a lista de modelos do OpenRouter existe SÓ na UI (os
+// <option> das duas telas de configuração) e um slug colado à mão pelo usuário
+// funciona igual aos curados, sem release.
+const CHAVE_CAPS_OR = "orcaps:";
+// Muda quando o FORMATO das caps derivadas muda — invalida o cache de sessão
+// sem precisar que o usuário faça nada (irmã do VERSAO_DUELO do OCR).
+const VERSAO_CAPS_OR = 1;
+
+// Enquanto o catálogo não respondeu (primeiro turno de um modelo novo, ou rede
+// fora), vale este default CONSERVADOR. Cada campo erra para o lado que custa
+// menos: janela pequena barra cedo em vez de estourar na API; `aceitaPdf:false`
+// manda o PDF pelo conversor gratuito, que funciona em QUALQUER modelo (marcar
+// `true` num modelo que não lê arquivo é que daria erro); `effort:false` não
+// manda um parâmetro que o modelo pode recusar.
+const CAPS_OR_PADRAO = {
+  provider: "openrouter",
+  perfil: "ambos", // sem catálogo não há como afirmar para que ele serve
+  nome: null,
+  contextTokens: 128000,
+  maxPages: 100,
+  citacoesNativas: false,
+  filesApi: false,
+  contagemTokens: false,
+  aceitaPdf: false,
+  aceitaImagem: false,
+  thinking: null,
+  effort: false,
+  preco: { in: 0, out: 0 },
+};
+
+const capsOR = new Map(); // slug -> caps (memória do worker; morre com ele)
+
+// Garante as caps do modelo ANTES de qualquer decisão que dependa delas. É
+// assíncrona, e por isso é chamada no topo dos handlers que já eram async
+// (`caps`, `countTokens`, `executarTurno`) — assim `capsDe` continua SÍNCRONA
+// como sempre foi. Torná-la async espalharia `await` por `sugestaoRedacao` e
+// `modeloDoTurno`, que são puros e usados em vários pontos.
+//
+// Best-effort: falhar aqui nunca derruba um turno — cai no default conservador
+// e a próxima chamada tenta de novo (nada é gravado no cache em caso de erro).
+async function garantirCapsOR(model) {
+  if (providerDe(model) !== "openrouter") return;
+  const slug = slugOpenRouter(model);
+  if (!slug || capsOR.has(slug)) return;
+  try {
+    const cache = await sessGet(CHAVE_CAPS_OR + slug);
+    if (cache && cache.v === VERSAO_CAPS_OR && cache.caps) {
+      capsOR.set(slug, cache.caps);
+      return;
+    }
+  } catch {
+    /* sem storage de sessão: segue para a rede */
+  }
+  try {
+    const caps = await capsDoCatalogoOpenRouter(slug);
+    capsOR.set(slug, caps);
+    try {
+      await sessSet(CHAVE_CAPS_OR + slug, { v: VERSAO_CAPS_OR, caps });
+    } catch {
+      /* no pior caso, consulta de novo no próximo turno */
+    }
+  } catch (e) {
+    console.warn(
+      "[PJe IA] catálogo do OpenRouter indisponível para " + slug + ":",
+      (e && e.message) || e
+    );
+  }
+}
 
 // Custo estimado (US$) do usage de UM request físico, pela tabela do modelo.
 // A API não devolve valor monetário — só as contagens de tokens por categoria.
@@ -289,7 +395,22 @@ const FALLBACK_POR_PROVEDOR = {
   openai: "gpt-5.6-luna",
 };
 function capsDe(model) {
+  // OpenRouter não tem linha em MODEL_CAPS (ver a nota do catálogo acima): as
+  // caps saem do que `garantirCapsOR` já carregou, ou do default conservador.
+  if (providerDe(model) === "openrouter") {
+    return capsOR.get(slugOpenRouter(model)) || CAPS_OR_PADRAO;
+  }
   return MODEL_CAPS[model] || MODEL_CAPS[FALLBACK_POR_PROVEDOR[providerDe(model)]];
+}
+
+// Este id é um modelo que a extensão sabe usar? Para os três provedores diretos
+// a resposta é a tabela; para o OpenRouter é o FORMATO, porque não há tabela —
+// qualquer `or:<autor>/<modelo>` é candidato legítimo, e quem descobre se ele
+// existe de fato é o catálogo (e, no limite, o 404 da API com mensagem clara).
+function modeloConhecido(id) {
+  if (!id) return false;
+  if (providerDe(id) === "openrouter") return /^or:[^/\s]+\/[^\s]+$/.test(id);
+  return !!MODEL_CAPS[id];
 }
 
 // Qual modelo sugerir a quem está no modo minuta com um modelo de perfil
@@ -320,7 +441,7 @@ function sugestaoRedacao(model) {
 // aqueles predicados existem para evitar. Id fora da tabela cai no configurado,
 // em vez de virar um 404 da API.
 function modeloDoTurno(cfg, pedido) {
-  if (!pedido || !MODEL_CAPS[pedido]) return cfg.model;
+  if (!pedido || !modeloConhecido(pedido)) return cfg.model;
   if (providerDe(pedido) !== providerDe(cfg.model)) return cfg.model;
   return pedido;
 }
@@ -371,12 +492,21 @@ function modeloDaMinuta(cfg) {
 function getCfg() {
   return new Promise((resolve) =>
     chrome.storage.local.get(
-      ["apiKey", "geminiApiKey", "openaiApiKey", "model", "effort", "modeloMinuta"],
+      [
+        "apiKey",
+        "geminiApiKey",
+        "openaiApiKey",
+        "openrouterApiKey",
+        "model",
+        "effort",
+        "modeloMinuta",
+      ],
       (v) =>
         resolve({
           apiKey: v.apiKey,
           geminiApiKey: v.geminiApiKey,
           openaiApiKey: v.openaiApiKey,
+          openrouterApiKey: v.openrouterApiKey,
           model: v.model || "gpt-5.6-luna",
           effort: v.effort || "high",
           // "" = automático (ver modeloDaMinuta). Um id fixado aqui só vale
@@ -404,6 +534,14 @@ function chaveDe(cfg, provider) {
       );
     }
     return cfg.openaiApiKey;
+  }
+  if (provider === "openrouter") {
+    if (!cfg.openrouterApiKey) {
+      throw new Error(
+        "configure sua chave do OpenRouter nas opções da extensão (o modelo escolhido é do OpenRouter)"
+      );
+    }
+    return cfg.openrouterApiKey;
   }
   if (!cfg.apiKey) {
     throw new Error("configure sua ANTHROPIC_API_KEY nas opções da extensão");
@@ -455,10 +593,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return;
   }
 
-  // Valida a chave SEM custo: cada provedor tem um endpoint de LISTAGEM DE
-  // MODELOS que responde 200 com credencial boa e 401/403 com credencial ruim,
-  // e não consome token nenhum. Roda aqui, e não no popup, para a chave não
-  // atravessar mais um contexto do que precisa.
+  // Valida a chave SEM custo: cada provedor tem um endpoint que responde 200
+  // com credencial boa e 401/403 com credencial ruim, e não consome token
+  // nenhum. Roda aqui, e não no popup, para a chave não atravessar mais um
+  // contexto do que precisa.
+  //
+  // ARMADILHA DO OPENROUTER: nos três provedores diretos o endpoint é o de
+  // LISTAGEM DE MODELOS, que lá exige credencial. No OpenRouter a listagem é
+  // PÚBLICA — ela responde 200 para qualquer texto no header, inclusive nenhum.
+  // Copiar o padrão daria "Chave válida." para uma chave inventada, e o erro só
+  // apareceria no primeiro turno, disfarçado de falha da API. Por isso ali o
+  // endpoint é o `/key`, que descreve a própria credencial e devolve 401 quando
+  // ela não presta.
   if (msg.type === "testarChave") {
     const key = String(msg.key || "").trim();
     const p = msg.provider;
@@ -467,10 +613,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         ? ["https://generativelanguage.googleapis.com/v1beta/models", { "x-goog-api-key": key }]
         : p === "openai"
           ? ["https://api.openai.com/v1/models", { Authorization: "Bearer " + key }]
-          : [
-              "https://api.anthropic.com/v1/models",
-              { "x-api-key": key, "anthropic-version": "2023-06-01" },
-            ];
+          : p === "openrouter"
+            ? ["https://openrouter.ai/api/v1/key", { Authorization: "Bearer " + key }]
+            : [
+                "https://api.anthropic.com/v1/models",
+                { "x-api-key": key, "anthropic-version": "2023-06-01" },
+              ];
     fetch(req[0], { headers: req[1] })
       .then((r) =>
         r.ok
@@ -498,7 +646,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } catch {
         /* sem chave para este provedor: nada a invalidar */
       }
+      // As caps do OpenRouter vêm do catálogo, e é ESTE handler que alimenta a
+      // UI (selo do modelo, gauge, gate da biblioteca de peças-modelo). Sem o
+      // await aqui, a primeira pintura mostraria o default conservador — janela
+      // de 128k num modelo de 1M — e o usuário veria o medidor mentir.
+      await garantirCapsOR(cfg.model);
       const { model: mMin, fixado: minFixado } = modeloDaMinuta(cfg);
+      await garantirCapsOR(mMin);
       sendResponse({
         model: cfg.model,
         effort: cfg.effort,
@@ -533,6 +687,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // content script recebia um URI sem prazo — o que funcionava enquanto o
         // cache morria junto com a aba, e deixaria de funcionar agora.
         const chaveHash = await hashDaChave(apiKey);
+        // OpenRouter não tem Files API no fluxo de chat (ver o cabeçalho de
+        // openrouter.js): as peças vão inline em base64. Quem impede a chamada é
+        // a cap `filesApi:false` no content.js — esta recusa é a rede, e ela diz
+        // o motivo em vez de deixar o pedido cair no ramo Anthropic e mandar a
+        // chave do OpenRouter para api.anthropic.com.
+        if (provider === "openrouter") {
+          return sendResponse({
+            error:
+              "o provedor atual (OpenRouter) não recebe arquivos por referência — as peças vão junto do pedido",
+          });
+        }
         if (provider === "gemini") {
           // namespace próprio ("gfile:") e VALIDAÇÃO de expiração na leitura:
           // a File API do Google apaga os arquivos após 48 h — um URI vencido
@@ -612,6 +777,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // milhão, e a guarda de 90% barraria minutas que cabem com folga.
         const model = modeloDoTurno(cfg, msg.payload.model);
         const provider = providerDe(model);
+        // O OpenRouter não tem endpoint de contagem de tokens — nenhum análogo
+        // ao count_tokens da Anthropic ou ao /responses/input_tokens da OpenAI.
+        // Respondemos com a JANELA e sem número: é o content.js que, vendo
+        // `caps.contagemTokens === false`, aplica a guarda de 90% sobre a
+        // estimativa local. Devolver um erro aqui funcionaria (o chamador já
+        // tolera falha), mas encheria o console de ruído a cada turno e perderia
+        // a chance de dizer que a ausência é do PROVEDOR, não uma falha.
+        if (provider === "openrouter") {
+          await garantirCapsOR(model);
+          return sendResponse({
+            tokens: null,
+            semContagem: true,
+            contextTokens: capsDe(model).contextTokens,
+          });
+        }
         const apiKey = chaveDe(cfg, provider);
         let tokens;
         if (provider === "gemini") {
@@ -1097,6 +1277,9 @@ async function executarTurno(port, payload) {
   // `custoUsdDe` do fim, que assim cobra pela tabela do modelo que de fato
   // respondeu, sem nenhuma linha a mais.
   const model = modeloDoTurno(cfg, payload.model);
+  // Antes de QUALQUER decisão que dependa de caps (janela, effort, motor de
+  // PDF). No caminho comum já está em memória ou no cache de sessão.
+  await garantirCapsOR(model);
   // O effort é o da configuração, SALVO quando o turno pede outro. Turnos
   // utilitários — a triagem do "Escolher com IA" é o caso — são classificação
   // sobre metadados, não análise jurídica: com raciocínio alto o usuário espera
@@ -1116,7 +1299,9 @@ async function executarTurno(port, payload) {
       ? streamGemini
       : provider === "openai"
         ? streamOpenAI
-        : streamClaude;
+        : provider === "openrouter"
+          ? streamOpenRouter
+          : streamClaude;
 
   const baseReq = {
     apiKey,
@@ -1135,6 +1320,18 @@ async function executarTurno(port, payload) {
     if (caps.effort) {
       baseReq.effort = EFFORT_PARA_OPENAI[effort] || "medium";
     }
+  } else if (provider === "openrouter") {
+    // OpenRouter: o effort vira reasoning.effort (só se o catálogo disser que o
+    // modelo aceita — mandar `reasoning` a quem não raciocina é 400 em parte dos
+    // provedores).
+    if (caps.effort) {
+      baseReq.effort = EFFORT_PARA_OPENROUTER[effort] || "medium";
+    }
+    // Motor de leitura de PDF. `native` só quando o catálogo confirma que o
+    // modelo aceita entrada de arquivo; senão o conversor GRATUITO. O default do
+    // OpenRouter é o mistral-ocr, que é pago por página e roda de novo a cada
+    // turno — cobrar isso sem o usuário ter pedido é o que esta linha evita.
+    baseReq.pdfEngine = caps.aceitaPdf ? ENGINE_PDF_NATIVO : ENGINE_PDF_CONVERSOR;
   } else {
     if (payload.betas && payload.betas.length) baseReq.betas = payload.betas;
     if (caps.thinking) baseReq.thinking = caps.thinking;
@@ -1200,9 +1397,15 @@ async function executarTurno(port, payload) {
     if (final.usage) {
       for (const k of Object.keys(usoTotal)) usoTotal[k] += final.usage[k] || 0;
       usoUltimo = final.usage;
-      const c = custoUsdDe(final.usage, caps.preco);
-      if (c != null) custoTotal = (custoTotal || 0) + c;
     }
+    // Custo MEDIDO tem precedência sobre custo CALCULADO. O OpenRouter devolve
+    // no usage o valor que a conta foi debitada (`cost`), e é ele que chega aqui
+    // como `final.custoUsd`. Nos outros três provedores a API não devolve valor
+    // monetário nenhum e o número sai da tabela de preços do modelo — que é
+    // justamente o que não dá para manter para centenas de modelos de terceiros.
+    const c =
+      final.custoUsd != null ? final.custoUsd : custoUsdDe(final.usage, caps.preco);
+    if (c != null) custoTotal = (custoTotal || 0) + c;
     if (stopReason !== "pause_turn") break;
     // o servidor pausou o loop de ferramentas: reenvia com o turno parcial.
     // As citações NÃO voltam no reenvio: a API rejeita citações em conteúdo

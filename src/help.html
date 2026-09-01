@@ -91,10 +91,12 @@
       <h1 class="serif">Criar sua chave da API da Anthropic</h1>
       <p class="lead">
         A extensão funciona com os modelos <strong>Claude (Anthropic)</strong>,
-        <strong>Gemini (Google)</strong> e <strong>GPT (OpenAI)</strong> — basta ter a chave do
-        provedor do modelo escolhido. Esta seção cobre a Anthropic; a chave do Google está
-        <a class="link" href="#gemini">mais abaixo</a> e a da OpenAI
-        <a class="link" href="#openai">na sequência</a>. Você precisa de uma
+        <strong>Gemini (Google)</strong> e <strong>GPT (OpenAI)</strong>, e também pelo
+        <strong>OpenRouter</strong> — um intermediário em que uma única chave dá acesso a
+        modelos de vários fornecedores. Esta seção cobre a Anthropic; a chave do Google está
+        <a class="link" href="#gemini">mais abaixo</a>, a da OpenAI
+        <a class="link" href="#openai">na sequência</a> e a do
+        <a class="link" href="#openrouter">OpenRouter em seguida</a>. Você precisa de uma
         <strong>chave de API própria</strong> e de <strong>crédito</strong> na sua conta. Leva ~3 minutos.
       </p>
 
@@ -215,6 +217,84 @@
         mapa mental — funciona igual.</em></p>
       </div>
 
+      <h1 class="serif" id="openrouter">Usar o OpenRouter (uma chave, vários fornecedores)</h1>
+      <p class="lead">
+        O <strong>OpenRouter</strong> é um intermediário: você cria <strong>uma</strong> chave lá e
+        passa a alcançar centenas de modelos — Claude, Gemini, GPT, Grok e outros — sem abrir conta
+        em cada fornecedor. É o caminho para usar um modelo que não está nas três listas acima.
+      </p>
+
+      <div class="card">
+        <div class="head"><div class="num">1</div><h2>Crie a conta e adicione créditos</h2></div>
+        <p>O OpenRouter é pré-pago: você põe crédito e ele repassa aos fornecedores, cobrando o
+        preço de cada modelo. Sem crédito, o primeiro envio volta com aviso de saldo.</p>
+        <a class="gobtn" href="https://openrouter.ai/settings/credits" target="_blank" rel="noopener">Abrir openrouter.ai ↗</a>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">2</div><h2>Crie a chave e cole na extensão</h2></div>
+        <p>Em <strong>Keys → Create Key</strong>, gere a chave (começa com <code>sk-or-v1-...</code>).</p>
+        <ul>
+          <li>Clique no ícone <strong><img class="ic-in ic-marca" src="../icons/icon48.png" alt="" width="15" height="15">TecJustiça PJe</strong> na barra do Chrome.</li>
+          <li>Escolha o cartão <strong>OpenRouter</strong>, cole a chave, escolha um modelo e clique em <strong>Salvar</strong>.</li>
+        </ul>
+        <a class="gobtn" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">Abrir a página de chaves ↗</a>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">3</div><h2>Usar um modelo que não está na lista</h2></div>
+        <p>A extensão traz alguns modelos escolhidos, mas o OpenRouter tem centenas. Escolha
+        <strong>“Outro modelo — colar o identificador…”</strong> e cole o identificador do modelo
+        (o formato é <code>autor/modelo</code>, como <code>anthropic/claude-sonnet-4.6</code>) — pode
+        colar o endereço da página do modelo que a extensão entende.</p>
+        <p>Os que já vêm na lista têm todos <strong>1 milhão de tokens</strong> ou mais de
+        contexto — é o que faz caber um processo inteiro — e vêm em <strong>dois grupos</strong>,
+        separados por <em>como o PDF chega ao modelo</em>:</p>
+        <ul>
+          <li><strong>“Leem o PDF como documento”</strong> — o modelo recebe a página como
+          página: carimbo, assinatura, tabela e documento digitalizado inclusive. É o grupo a
+          usar quando você não sabe o que vem pela frente.</li>
+          <li><strong>“Mais baratos (o PDF é convertido em texto)”</strong> — o OpenRouter
+          converte o arquivo antes, de graça, e manda o texto. Custa de <strong>10 a 25 vezes
+          menos</strong> e serve muito bem para peças do editor do PJe e PDFs com texto. O que se
+          perde é a imagem da página: <strong>peça digitalizada sai vazia</strong> — para ela, use
+          antes a <a class="link" href="#texto">extração de texto com OCR</a>. Repare também no
+          aviso “não lê imagens” de alguns: com eles, anexo em foto não entra na análise (a
+          extensão avisa quais ficaram de fora).</li>
+        </ul>
+        <p>Dentro de cada grupo a ordem é do mais barato para o mais caro — na análise de autos
+        quem manda na conta é o preço de <em>entrada</em>. Todos são atendidos pelo próprio
+        fabricante ou por uma nuvem grande, o que é também o que torna improvável faltar
+        fornecedor sem retenção de dados.</p>
+        <p>A extensão descobre sozinha a janela de contexto, o preço e se o modelo lê PDF,
+        consultando o catálogo público do OpenRouter.</p>
+        <a class="gobtn" href="https://openrouter.ai/models" target="_blank" rel="noopener">Ver os modelos disponíveis ↗</a>
+      </div>
+
+      <div class="card">
+        <div class="head"><div class="num">4</div><h2>O que muda em relação aos outros três</h2></div>
+        <ul>
+          <li><strong>O custo mostrado é o real.</strong> Nos outros provedores a extensão calcula
+          o valor por uma tabela de preços; aqui o próprio OpenRouter informa quanto foi debitado,
+          então o número do rodapé é o que saiu da sua conta.</li>
+          <li><strong>As peças vão inteiras a cada mensagem.</strong> Os outros três guardam os
+          documentos e a extensão só os referencia; o OpenRouter não tem esse caminho para o chat,
+          então cada pergunta reenvia os PDFs marcados. Na prática: prefira menos peças por
+          conversa, e conte com envios mais demorados em processos grandes. Acima de ~15 MB de
+          documentos a extensão avisa antes de enviar.</li>
+          <li><strong>Privacidade:</strong> quem escolhe qual empresa vai atender o pedido é o
+          OpenRouter. Como aqui trafegam autos, a extensão exige, em todo envio, que ele use
+          <strong>apenas fornecedores que não guardam os dados</strong> para treinar modelos. Se
+          nenhum estiver disponível para o modelo escolhido, o envio falha com esse aviso — troque
+          de modelo.</li>
+          <li><strong>Citações:</strong> como no Gemini e no GPT, a peça e a folha aparecem no
+          próprio texto da resposta (sem os marcadores [n] clicáveis).</li>
+          <li><strong>Modelos que não leem PDF</strong> recebem as peças convertidas em texto, de
+          graça — sem a imagem da página. Para documento digitalizado, use antes a
+          <a class="link" href="#texto">extração de texto com OCR</a>.</li>
+        </ul>
+      </div>
+
       <h1 class="serif" id="marcar">Seis maneiras de marcar as peças</h1>
       <div class="card">
         <div class="head"><div class="num"><svg class="ic-in" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></div><h2>Marcar uma a uma é sempre a maneira mais lenta</h2></div>
@@ -269,7 +349,7 @@
         </p>
         <p>
           O <strong>PDF</strong> é lido pelo modelo como as peças, com texto <em>e</em> imagem
-          das páginas. O <strong>Word</strong> nenhum dos três provedores lê, então a extensão
+          das páginas. O <strong>Word</strong> nenhum dos provedores lê, então a extensão
           extrai o texto <strong>aqui no seu navegador</strong> e envia só ele — o arquivo em
           si não sai daqui.
         </p>
@@ -549,6 +629,7 @@
           <tr><td><strong>GPT-5.6 Luna</strong> (padrão)</td><td>1,05M tokens</td><td>0,20 / 1,20</td><td>Analisar</td><td>O mais barato dos modelos de janela grande e o melhor ponto de partida. Citações no texto, e é um dos que permitem <strong>restringir a busca aos sites oficiais</strong>.</td></tr>
           <tr><td><strong>GPT-5.6 Terra</strong></td><td>1,05M tokens</td><td>2 / 12</td><td>Analisar e redigir</td><td>GPT equilibrado entre custo e capacidade. Citações no texto.</td></tr>
           <tr><td><strong>GPT-5.6 (Sol)</strong></td><td>1,05M tokens</td><td>5 / 30</td><td>Analisar e redigir</td><td>O GPT mais capaz — para análises delicadas. Citações no texto.</td></tr>
+          <tr><td><strong>Pelo <a class="link" href="#openrouter">OpenRouter</a></strong></td><td>depende do modelo</td><td>o do modelo</td><td>—</td><td>Não é um modelo: é o caminho para usar <strong>centenas deles</strong> com uma chave só, inclusive os que não estão nesta tabela. O custo mostrado passa a ser o <strong>real</strong>, informado pelo próprio OpenRouter. Em troca, as peças são reenviadas a cada mensagem.</td></tr>
         </table>
         <p style="margin-top:10px"><em>Regra prática: GPT-5.6 Luna (o padrão) para o dia a
         dia e para autos volumosos — é o de melhor custo entre os de janela grande; Gemini 3.7
@@ -629,7 +710,7 @@
           copia para o PJe, baixa em Word (.docx) ou imprime; e <strong><svg class="ic-in" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 9V5"/><path d="M14.5 13.5l3 2.5"/><path d="M9.5 13.5l-3 2.5"/></svg>Mapa mental</strong>
           para ver a estrutura do feito — partes, fatos, pedidos, teses, provas, decisões e
           situação atual — num mapa interativo. Minutar e o mapa funcionam em <strong>qualquer
-          modelo</strong>, Claude, Gemini ou GPT, sempre com a peça, o <em>id</em> e a folha de origem.</li>
+          modelo</strong> — Claude, Gemini, GPT ou os do OpenRouter —, sempre com a peça, o <em>id</em> e a folha de origem.</li>
           <li>Siga a conversa: <strong>adicionar</strong> peças no meio é barato; para
           <strong>remover</strong> várias ou mudar de assunto, prefira <svg class="ic-in" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H9l-4 3v-4H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg>Nova conversa.</li>
           <li><strong>Personalize o assistente</strong>: nas opções, o campo

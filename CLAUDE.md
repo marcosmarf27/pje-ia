@@ -8,8 +8,9 @@
 Extensão Chrome (Manifest V3, JavaScript puro, **sem build step**) que adiciona um painel
 de chat com IA à tela de autos digitais do PJe. O usuário seleciona peças do
 processo e conversa sobre elas; os PDFs são enviados diretamente à API do provedor do
-modelo escolhido — **Anthropic (Claude)**, **Google (Gemini)** ou **OpenAI (GPT)**, ver as
-seções "Provedor Gemini" e "Provedor OpenAI".
+modelo escolhido — **Anthropic (Claude)**, **Google (Gemini)**, **OpenAI (GPT)** ou
+**OpenRouter** (agregador: uma chave, centenas de modelos), ver as seções
+"Provedor Gemini", "Provedor OpenAI" e "Provedor OpenRouter".
 
 ## Arquitetura
 
@@ -345,7 +346,249 @@ Regras que NÃO podem quebrar:
   `{input_tokens}` — endpoint dedicado e exato (conta arquivos/imagens/tools), análogo ao
   count_tokens da Anthropic. A guarda de 90% fica precisa.
 
-## Prioridade das fontes na busca web (os três provedores)
+## Provedor OpenRouter (Chat Completions) — o agregador
+
+`src/openrouter.js` é o QUARTO irmão de `claude.js`, `gemini.js` e `openai.js`
+(os três INTOCADOS): emite o MESMO vocabulário de eventos a partir do SSE da
+**Chat Completions API** (`POST https://openrouter.ai/api/v1/chat/completions`,
+header `Authorization: Bearer`, formato OpenAI-compatible). `background.js`
+despacha por `providerDe(model)` (prefixo **`or:`**); `content.js` e `panel.js`
+só condicionam por **caps**, nunca por nome de modelo.
+
+O OpenRouter não é um provedor de modelo: é um **agregador** — uma chave dá
+acesso a centenas de modelos de dezenas de fornecedores. É isso que muda o
+desenho, e as diferenças abaixo não são detalhes de implementação.
+
+- **NÃO HÁ FILES API NO FLUXO DE CHAT, e este é o fato estruturante.** A Files
+  API do OpenRouter existe (beta, ids `or_file_…`), mas os arquivos do workspace
+  são consumidos por **containers/sandbox** e pela *files server tool*; a página
+  **PDF Inputs** — a autoridade sobre entrada de PDF numa chat completion —
+  documenta só `file_data` (URL pública ou data URL). **Conferido em
+  01/09/2026.** As peças do PJe também não podem ir por URL: exigem cookie de
+  sessão. Logo, **todo PDF viaja INLINE em base64, em TODO turno** (a API é
+  stateless). Consequências, todas por CAP e nenhuma por nome de provedor:
+  - cap **`filesApi: false`** → `precisaUpload` (content.js) sai na primeira
+    linha, `montarBlocos` cai sozinho no ramo base64 (o `fileProvider` nunca
+    casa) e `podeAnexar` passa a exigir bytes. Peça vinda da memória de caso só
+    com `fileId` é **re-baixada**, que é o comportamento correto.
+  - o handler `upload` do worker RECUSA com motivo — rede de segurança para a
+    chave do OpenRouter nunca sair num request para `api.anthropic.com`.
+  - **`MAX_TOTAL_B64_CHARS_OPENROUTER` (20 MB) não é teto de fallback, é o teto
+    do caminho NORMAL.** Conservador porque quem recebe o request no fim é o
+    provedor upstream que o OpenRouter escolher, e esse limite ele não publica.
+  - **Se um dia o content part aceitar `file_id`, o ponto de mudança é ÚNICO**:
+    `montarBlocos` já prefere `d.fileId` quando `d.fileProvider` casa — basta a
+    cap deixar de ser `false`. A nota existe para essa porta ficar aberta sem
+    que ninguém precise redescobrir o caminho.
+- **NÃO HÁ CONTAGEM DE TOKENS.** Nenhum análogo ao `count_tokens` da Anthropic
+  ou ao `/responses/input_tokens` da OpenAI. Cap **`contagemTokens: false`**, e
+  o worker responde `{tokens: null, semContagem: true, contextTokens}` em vez de
+  erro — devolver erro funcionaria (o chamador já tolera falha) mas encheria o
+  console de ruído a cada turno e perderia a chance de dizer que a ausência é do
+  PROVEDOR. A guarda de 90% **continua existindo**, por
+  `guardaPorEstimativa` (content.js): mesmo limiar, calculado sobre
+  `max(ultimoTotalExato, estimativaLocalTokens(ids))` — a MESMA conta do
+  `podePularPreVoo`. Do 2º turno em diante o número é exato, porque o `usage`
+  do turno anterior é exato e vem de graça. **A mensagem de erro diz que é
+  estimativa**: afirmar "94% do contexto" sobre um chute seria dar precisão que
+  o número não tem, e é com base nessa frase que o usuário decide o que
+  desmarcar. Os QUATRO chamadores passam `opts.ids` — o mesmo conjunto do
+  `guardaPaginas` daquele caminho.
+- **O CUSTO VEM MEDIDO, não calculado.** `usage.cost` é o valor real debitado
+  em créditos (US$) e vem em toda resposta, sem precisar pedir. `executarTurno`
+  prefere `final.custoUsd` quando o cliente o traz e só cai em `custoUsdDe` para
+  os outros três. É isso que torna sustentável oferecer centenas de modelos:
+  **não há tabela de preços a manter**.
+- **`aceitaImagem` era uma cap ESCRITA E NUNCA LIDA, e passou a valer.** Ela
+  existia em `background.js` e em `openrouter.js` e nenhum consumidor a
+  consultava — inofensiva enquanto todo modelo ofertado era multimodal, e um
+  defeito no instante em que a lista ganhou um modelo de **texto puro** (os mais
+  baratos do catálogo são assim). O anexo em imagem é PROVA de primeira classe
+  aqui (foto do BO, print de conversa), e mandá-lo a quem não o lê dá 400 — ou,
+  pior, o silêncio de um provedor que descarta a parte que não entende, e o
+  modelo responde sobre uma prova que nunca viu. Hoje `montarBlocos` barra
+  quando `modelCaps.aceitaImagem === false` (só o `false` EXPLÍCITO: `undefined`
+  — os três provedores diretos — segue passando byte a byte). Duas regras:
+  - **O par rótulo+imagem é indivisível.** O `continue` acontece ANTES de os
+    dois blocos entrarem, senão sobraria "[Peça anexada como imagem: …]"
+    anunciando ao modelo um anexo que não foi — o oposto do que aquele rótulo
+    existe para fazer.
+  - **Canal PRÓPRIO de aviso (`semSuporte`), não o `semConteudo`.** Aquele diz
+    "o envio anterior expirou · envie de novo", e as duas metades seriam falsas:
+    reenviar falharia igual, e o que resolve é trocar de modelo. Mesma razão que
+    separou `semConteudo` das falhas de download.
+- **SMOKE TEST REAL, 01/09/2026 (chave de teste do usuário).** O que só um turno
+  de verdade responde, e três coisas surpreenderam:
+  - **`data_collection:"deny"` NÃO deixou nenhum modelo sem provedor.** Era o
+    risco em aberto, e ele não se materializou: responderam Luna, Grok 4.20,
+    **DeepSeek V4 Flash (17 provedores, quase todos terceiros)** e **GLM 5.3
+    Flash (22)**. A mensagem do 503 continua valendo como rede, mas o cenário é
+    menos provável do que a contagem de provedores sugeria.
+  - **O `usage` da OpenAI via OpenRouter NÃO conta os tokens do arquivo.**
+    `prompt_tokens: 3` para um PDF de 12 páginas que o modelo LEU (acertou uma
+    linha com número aleatório de dentro dele). O **custo vem correto** — 2p→12p
+    multiplicou por 5,1, exatamente como no Gemini, cujo usage é fiel. Por isso
+    `atualizarGaugePosTurno` passou a usar `max(usage, estimativaLocal)` quando
+    `contagemTokens === false`: tratar aquele 3 como medição exata faria o
+    medidor cair para ~0% logo depois de um turno com centenas de folhas e
+    gravaria um `ultimoTotalExato` ridículo. Onde o usage é fiel os dois
+    coincidem (6408 medidos contra 6384 estimados em 12 folhas).
+  - **PDF: os SEIS modelos testados leram**, nos dois grupos — inclusive
+    DeepSeek e GLM pela engine gratuita `cloudflare-ai`. O caminho de PDF da
+    extensão (bloco `document` → `traduzirHistorico` → `file_data`) funciona de
+    ponta a ponta.
+  - **A armadilha do `testarChave` confirmada empiricamente**: com uma chave
+    INVENTADA, `/api/v1/key` devolve **401** e `/api/v1/models` devolve **200**.
+  - Busca web: a tool disparou, a citação voltou e a fonte ficou DENTRO da
+    allowlist (`processo.stj.jus.br`). Custa ~US$ 0,012 por turno (o catálogo
+    publica `pricing.web_search`), a mesma ordem dos outros provedores.
+  - Round-trip do raciocínio: o `x-openrouter-item` volta e o 2º turno responde
+    certo; **trocar de modelo dentro do OpenRouter no meio da conversa também
+    funciona** (o guard omite o `reasoning_details` e o texto viaja) — a decisão
+    de não usar `conversaProvider` aqui está validada.
+- **`tokensPagina` é a ÚNICA cap que NÃO vem do catálogo, e ela existe por causa
+  da ausência de count_tokens.** O catálogo publica preço e janela, mas não diz
+  quantos tokens uma página de PDF consome — e esse número varia 8× entre
+  famílias (Anthropic ≈ 2000, Google = 258). Nos outros três provedores errar
+  ali é inofensivo: o `count_tokens` corrige antes da guarda. Aqui a guarda roda
+  sobre `max(ultimoTotalExato, estimativaLocal)`, e **o `max()` faz um chute alto
+  nunca ser desmentido — nem pelo usage exato do turno anterior**. Com os
+  2000/página do padrão, um `or:google/gemini-3.7-flash` (1M) seria barrado em
+  ~450 folhas que ocupam **12%** da janela real: recusa antecipada em cima do
+  caso de uso principal do produto. `TOKENS_PAGINA_POR_AUTOR` (openrouter.js)
+  resolve por autor do slug, e a regra para mexer nela é dura: **só entra número
+  com FONTE**. O 258 do Google é o mesmo que `MODEL_CAPS` já usa no Gemini
+  direto — não é dado novo, é o mesmo modelo por outro caminho. Sem fonte, o
+  campo fica AUSENTE (`undefined`) e vale o padrão do content.js, que erra para
+  o lado seguro. Um campo presente com valor errado é pior que ausente.
+  **E a FONTE pode ser a medição, não a doc**: o valor do Google aqui é **532**,
+  medido três vezes com chave real e PDFs de densidade diferente (não muda com o
+  conteúdo — o Gemini cobra a PÁGINA). A documentação diz 258, e é o que
+  `MODEL_CAPS` usa no caminho DIRETO; pela rota do OpenRouter é o dobro. Não
+  ajustar um pelo outro: são caminhos distintos, medidos separadamente.
+- **NENHUM modelo do OpenRouter entra em `MODEL_CAPS`, e isso é decisão.** As
+  caps vêm do **catálogo público** (`GET /api/v1/model/{autor}/{slug}`, sem
+  chave), sob demanda, cacheadas em `chrome.storage.session` (`orcaps:<slug>` +
+  `VERSAO_CAPS_OR`). Escrever janela/preço/“aceita PDF?” à mão para modelos de
+  terceiros criaria a pior espécie de dado — o que envelhece calado e faz a
+  extensão barrar um envio que caberia. Regras:
+  - `garantirCapsOR(model)` é chamada no TOPO dos handlers que já eram async
+    (`caps`, `countTokens`, `executarTurno`), o que deixa **`capsDe` síncrona**
+    como sempre foi. Torná-la async espalharia `await` por `sugestaoRedacao` e
+    `modeloDoTurno`, que são puros.
+  - Falha do catálogo é **best-effort**: cai no `CAPS_OR_PADRAO` conservador e
+    **não é cacheada** (a próxima tentativa reconsulta). Cada campo do default
+    erra para o lado barato: janela pequena barra cedo; `aceitaPdf:false` manda
+    o PDF pelo conversor gratuito, que funciona em qualquer modelo; `effort:false`
+    não manda um parâmetro que o modelo pode recusar.
+  - `session` e não `local`: o catálogo muda (preço, janela, modelo novo) e uma
+    sessão do navegador é a granularidade certa para reconsultar — mesma
+    disciplina da memória do `safety_settings` do Gemini.
+  - A lista curada de modelos existe **só na UI** (os `<option>`), e o
+    `<option value="or:*">` abre o campo livre. `modeloConhecido(id)` responde
+    pelo FORMATO (`^or:[^/]+/…$`), não por tabela.
+  - **A lista curada tem TRÊS GRUPOS (`data-pdf` no `<optgroup>`), e a fronteira
+    entre os dois primeiros é COMO O PDF CHEGA ao modelo.** `nativo`: o modelo lê
+    o arquivo (`input_modalities` tem `file`) e recebe a página como PÁGINA.
+    `conversor`: o modelo é de texto e o OpenRouter converte antes, de graça
+    (`ENGINE_PDF_CONVERSOR`) — custa 10× a 25× menos e **perde a imagem da
+    página**, então peça digitalizada sai vazia (o caminho dela é o OCR local).
+    `livre`: só o marcador `or:*`, que não afirma nada.
+    - **Exigir PDF nativo de TODA a lista foi a primeira versão, e era exigir
+      demais**: os modelos mais baratos do catálogo (DeepSeek V4 Flash a US$
+      0,079/0,159, GLM 5.3 Flash a 0,075/0,250, os dois com 1M+) são de texto, e
+      o próprio provedor resolve o PDF por eles. O que muda não é "funciona ou
+      não", é a qualidade do que chega — e isso é escolha do usuário, desde que
+      o rótulo diga. Por isso o grupo do conversor promete sobre IMAGEM no
+      rótulo ("lê imagens" / "NÃO lê imagens"): é a diferença que se sente, e o
+      teste confere a promessa contra o catálogo.
+    - Comum aos dois: **janela ≥ 1M** e **servido pelo fabricante ou por nuvem
+      grande**. O segundo não é preciosismo: com `data_collection:"deny"` em
+      todo request, modelo servido só por terceiros pode ficar **sem provedor
+      elegível** (o 503).
+    - **O critério virou teste porque já falhou**: a v0.54.0 nasceu com
+      `x-ai/grok-4.6` rotulado "1M tokens" tendo **500 mil** — eu verifiquei que
+      o slug EXISTIA, não o tamanho. `t-curadoria.mjs` lê os `<option>` do HTML
+      real e revalida tudo contra a API pública, inclusive que nenhum rótulo
+      promete mais janela do que o modelo tem.
+- **O prefixo `or:` no id, e não a barra do slug.** Os dois funcionariam hoje —
+  nenhum id direto de Anthropic, Google ou OpenAI tem barra —, mas o prefixo
+  mantém `providerDe` como o que ela sempre foi (uma tabela de prefixos) e faz
+  um id do OpenRouter se identificar sozinho no storage, sem depender de uma
+  propriedade do formato de OUTRO fornecedor continuar valendo. `slugOpenRouter`
+  é o ponto ÚNICO da tradução.
+- **Trocar de modelo DENTRO do OpenRouter é permitido — e é a razão de o bloco
+  de raciocínio carregar o `model`.** `conversaProvider` seria grosso demais
+  aqui: um agregador hospeda Claude, Gemini e GPT sob o mesmo nome de provedor,
+  então trocar de modelo lá dentro trocaria o formato do raciocínio sem que a
+  guarda percebesse. O cliente grava `{type:"x-openrouter-item", model, raw}` e
+  **só devolve `reasoning_details` quando o modelo do turno é o mesmo que os
+  produziu** — o TEXTO do histórico é portável entre modelos, o raciocínio não.
+  O `model` gravado é o que a RESPOSTA reportou (com fallback de modelo o
+  OpenRouter pode ter atendido por outro). Omitir o `reasoning_details` do
+  reenvio é SEMPRE seguro: nada quebra, perde-se contexto de raciocínio — é a
+  saída de emergência se algum provedor passar a recusar o formato.
+- **`provider: {data_collection: "deny"}` em TODO request.** Quem escolhe o
+  provedor final é o OpenRouter, e parte deles armazena os prompts para treino.
+  Aqui trafegam AUTOS. É este campo que mantém verdadeira a promessa da caixa de
+  privacidade e o que o art. 19 da Res. CNJ 615 cobra de quem usa IA externa.
+  O preço: pode não sobrar provedor elegível para um modelo, e aí a API responde
+  **503** — por isso a mensagem daquele status **cita a política pelo nome**,
+  senão o usuário vê "sem provedor" num modelo que a página do OpenRouter mostra
+  disponível e não tem como ligar a causa ao efeito.
+- **Compressão de contexto DESLIGADA explicitamente**
+  (`plugins:[{id:"context-compression", enabled:false}]`). O OpenRouter só a liga
+  por padrão em endpoints de ≤ 8k de contexto — nenhum que interesse aqui —, mas
+  o que ela faz é DESCARTAR o meio do prompt quando não cabe: num pacote de autos
+  isso é perder peças em silêncio. Uma linha para nunca depender do default.
+- **Motor de PDF escolhido pela CAP, nunca pelo default**
+  (`plugins:[{id:"file-parser", pdf:{engine}}]`): `native` quando o catálogo diz
+  que o modelo aceita arquivo, `cloudflare-ai` (gratuito) quando não. **O padrão
+  do OpenRouter é o `mistral-ocr`, que é PAGO** (US$ 2 por 1.000 páginas) e
+  reparseia a CADA turno — num processo de 300 folhas seriam US$ 0,60 por
+  mensagem, cobrados sem ninguém ter pedido. As constantes `ENGINE_PDF_NATIVO`/
+  `ENGINE_PDF_CONVERSOR` são EXPORTADAS pelo cliente: quem decide é o worker
+  (tem as caps), quem sabe o nome que a API espera é o cliente.
+- **SEM `max_tokens`, e isto INVERTE a regra dos clientes Gemini e OpenAI** (que
+  o mandam sempre explícito). Aqui ele não protege: o roteador só encaminha a
+  provedores capazes de devolver o tamanho pedido, então um teto generoso
+  **restringe o roteamento** — pode sobrar menos provedor, ou nenhum. Resposta
+  cortada continua sinalizada por `finish_reason:"length"` → `{kind:"trunc"}`.
+- **ERRO NO MEIO DO STREAM CHEGA COM HTTP 200** (os headers já foram enviados):
+  `{"error":{...},"choices":[{"finish_reason":"error"}]}`. Um 200 que só traz
+  erro é FALHA — tratá-lo como sucesso entregaria uma bolha em branco. E as
+  linhas de comentário SSE `: OPENROUTER PROCESSING` (keep-alive) precisam ser
+  puladas antes do `JSON.parse`: sem isso o stream morre no primeiro keep-alive
+  de um turno longo, que é justamente o caso dos autos grandes.
+- **`testarChave` usa `GET /api/v1/key`, NUNCA a listagem de modelos.** Nos três
+  provedores diretos o endpoint de validação é o de listagem, que lá exige
+  credencial. **No OpenRouter a listagem é PÚBLICA** — responde 200 para
+  qualquer coisa no header, inclusive nada. Copiar o padrão daria "Chave
+  válida." para uma chave inventada, e o erro só apareceria no primeiro turno,
+  disfarçado de falha da API.
+- **Busca**: o toggle Jurisprudência declara o MESMO shape da OpenAI em
+  `toolsBusca` (`{type:"web_search", filters:{allowed_domains}}`) e a tradução
+  para o dialeto do provedor (um `plugin` de id `"web"`, não uma tool) mora no
+  cliente. A allowlist aqui é garantia **MOLE**: a doc diz que o suporte a
+  `include_domains` "varia por engine", e quem escolhe a engine é o OpenRouter —
+  mesma situação do `google_search` do Gemini.
+- **Sem citações por página** (`citacoesNativas:false`, como Gemini e OpenAI): o
+  `SYSTEM_PROMPT_CIT_TEXTUAL` manda citar peça e folha no próprio texto e a UI
+  mostra o `ⓘ`. As annotations `url_citation` viram citações web normais, ao
+  vivo; as annotations do tipo `file` (resultado do file-parser, que poderia ser
+  reenviado para não re-parsear) são ignoradas nesta versão.
+- **O selo do modelo lê `caps.nome`** (`Anthropic: Claude Sonnet 4.5`, publicado
+  pelo catálogo) antes da tabela `NOMES_MODELO` do painel — são centenas de
+  modelos de terceiros, e sem isso o selo mostraria `or:anthropic/claude-sonnet-4.5`
+  cru num elemento cujo trabalho é dizer, na língua do usuário, quem respondeu.
+- **Config**: chave em `chrome.storage.local.openrouterApiKey`; o modelo continua
+  no campo `model` (o campo livre **não cria estado novo**). O `Salvar` recusa o
+  marcador `or:*` sem identificador e **não grava nada** nesse caso — a tela fica
+  como está e nada do que o usuário digitou se perde. Ele aceita o slug puro, com
+  prefixo, ou a URL da página do modelo, e devolve o campo normalizado.
+  `manifest.json` inclui `https://openrouter.ai/*`.
+
+## Prioridade das fontes na busca web (os quatro provedores)
 
 As fontes da busca vivem em **três degraus** (`content.js`): `FONTES_SUPERIORES`
 (STF, STJ) → `FONTES_TRIBUNAL` (o tribunal deste processo, derivado da URL) →
@@ -366,7 +609,9 @@ e até a v0.23 as dez fontes eram tratadas como equivalentes.
   é do TJCE. Num processo do TRF5, jurisprudência do TJCE é ruído.
 - **A garantia é desigual por provedor, e isso é estrutural**: Anthropic e OpenAI
   aplicam a allowlist no servidor (garantia dura); o Gemini não tem o recurso e
-  depende só da instrução (garantia mole). Medido em smoke test real: com o
+  depende só da instrução (garantia mole); no OpenRouter o filtro existe
+  (`include_domains`) mas o suporte **varia por engine**, e quem escolhe a
+  engine é ele — garantia mole também. Medido em smoke test real: com o
   `PROMPT_BUSCA` em degraus o Gemini passou a emitir queries com `site stj jus br`,
   mas ainda citou `tjro.jus.br` num processo do TJCE. **Não tentar "consertar" isso
   na API** — não há como; o que existe é tornar o vazamento VISÍVEL na bolha.

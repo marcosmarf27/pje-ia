@@ -26,7 +26,7 @@
         <img src="../icons/icon48.png" alt="" />
         <div>
           <div class="t">TecJustiça PJe</div>
-          <div class="s">Análise de autos com IA — Claude, Gemini ou GPT</div>
+          <div class="s">Análise de autos com IA — Claude, Gemini, GPT ou OpenRouter</div>
         </div>
       </div>
 
@@ -61,6 +61,15 @@
             <span class="prov-n">Gemini</span>
             <span class="kstate" id="kstateG">não configurada</span>
           </button>
+          <!-- OpenRouter por ÚLTIMO: é um agregador (uma chave, centenas de
+               modelos de vários fornecedores), não um provedor de modelo
+               próprio. Quem chega para configurar deve ver antes os três
+               caminhos diretos. -->
+          <button class="prov" type="button" id="provR" data-prov="openrouter" role="tab" aria-selected="false">
+            <span class="prov-i pr">R</span>
+            <span class="prov-n">OpenRouter</span>
+            <span class="kstate" id="kstateR">não configurada</span>
+          </button>
         </div>
         <p class="prov-nota">
           Você só precisa da chave do provedor que for usar. Dá para cadastrar as
@@ -69,8 +78,8 @@
           <b>nova conversa</b>.
         </p>
 
-        <!-- Os TRÊS inputs de chave seguem no DOM (só o do provedor ativo fica
-             visível), então "Salvar" continua lendo os três. -->
+        <!-- Os QUATRO inputs de chave seguem no DOM (só o do provedor ativo
+             fica visível), então "Salvar" continua lendo os quatro. -->
         <div class="provcard">
           <div class="pc-sec" id="keyA" data-prov="anthropic">
             <div class="pc-head">
@@ -123,6 +132,22 @@
             <span class="hint">Em platform.openai.com — o provedor do modelo padrão; precisa de crédito na conta. <a href="help.html#openai" target="_blank">Passo a passo →</a></span>
           </div>
 
+          <div class="pc-sec" id="keyR" data-prov="openrouter" hidden>
+            <div class="pc-head">
+              <label for="openrouterApiKey">Chave da API — OpenRouter</label>
+              <span class="pc-acts">
+                <a class="pc-obter" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">Obter chave ↗</a>
+                <button type="button" class="pc-trocar" data-alvo="openrouterApiKey" hidden>Trocar</button>
+              </span>
+            </div>
+            <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
+            <div class="pw-row">
+              <input id="openrouterApiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off" aria-label="Chave da API do OpenRouter" />
+              <button class="toggle-pw" id="togglePwR" type="button">mostrar</button>
+            </div>
+            <span class="hint">Uma chave para modelos de vários fornecedores — inclusive os que não estão nas outras três listas. Nele a extensão exige provedores que <b>não guardem</b> o que é enviado. <a href="help.html#openrouter" target="_blank">Passo a passo →</a></span>
+          </div>
+
           <label class="field" for="model">Modelo</label>
           <!-- O PRIMEIRO <option> é o modelo PADRÃO (gpt-5.6-luna) de
                propósito: `select.value` com um id que não existe mais deixa o
@@ -145,7 +170,60 @@
               <option value="gemini-3.6-flash">Gemini 3.6 Flash (1M tokens, até 1000 págs., rápido)</option>
               <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (1M tokens — o mais barato)</option>
             </optgroup>
-          </select>
+        <!-- OPENROUTER. Esta lista é uma SELEÇÃO, não a oferta: o provedor tem
+             centenas de modelos e o último item permite usar qualquer um deles
+             pelo identificador. Os ids seguem o formato `autor/modelo` do
+             OpenRouter e levam o prefixo `or:` no storage — é ele que diz à
+             extensão qual cliente usar (ver providerDe em background.js).
+             As CAPACIDADES (janela, preço, se lê PDF) não são escritas aqui:
+             vêm do catálogo público do próprio OpenRouter, a cada sessão.
+
+             SÃO TRÊS GRUPOS, e a fronteira entre os dois primeiros é COMO O PDF
+             CHEGA ao modelo (conferido no catálogo em 01/09/2026; o teste de
+             curadoria revalida cada item contra a API pública):
+
+              - `data-pdf="nativo"`: o modelo lê o arquivo (input_modalities tem
+                "file"). A página vai como PÁGINA — carimbo, assinatura, tabela
+                e documento digitalizado inclusive.
+              - `data-pdf="conversor"`: o modelo é de TEXTO. O OpenRouter
+                converte o PDF antes, de graça (plugin file-parser, engine
+                cloudflare-ai — ver ENGINE_PDF_CONVERSOR; o padrão DELE é o
+                mistral-ocr, que é pago por página). Custa 10× a 25× menos e
+                perde a imagem da página: peça digitalizada sai vazia, e para
+                ela o caminho é o OCR local (⬇ → Extrair o texto).
+              - `data-pdf="livre"`: o campo do identificador. Não afirma nada —
+                quem descobre as capacidades é o catálogo.
+
+             Todos, dos dois primeiros grupos, têm 1M de tokens ou mais e são
+             servidos pelo fabricante ou por nuvem grande. Este último não é
+             preciosismo: a extensão manda `data_collection: "deny"` em todo
+             request, e modelo servido só por terceiros pode ficar SEM provedor
+             elegível (o 503). Dentro de cada grupo, do mais barato ao mais caro. -->
+        <optgroup label="OpenRouter — leem o PDF como documento" data-prov="openrouter" data-pdf="nativo">
+          <option value="or:openai/gpt-5.6-luna">GPT-5.6 Luna (1M tokens — o mais barato do grupo)</option>
+          <option value="or:google/gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (1M tokens — muito barato)</option>
+          <option value="or:google/gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (1M tokens — barato)</option>
+          <option value="or:google/gemini-3.7-flash">Gemini 3.7 Flash (1M tokens — rápido, o mais novo do Google)</option>
+          <option value="or:x-ai/grok-4.3">Grok 4.3 (1M tokens — resposta longa mais barata)</option>
+          <option value="or:x-ai/grok-4.20">Grok 4.20 (2M tokens — a maior janela)</option>
+          <option value="or:openai/gpt-5.6-terra">GPT-5.6 Terra (1M tokens — equilibrado)</option>
+          <option value="or:anthropic/claude-sonnet-5">Claude Sonnet 5 (1M tokens — bom para redigir)</option>
+          <option value="or:anthropic/claude-opus-5">Claude Opus 5 (1M tokens — o mais capaz)</option>
+        </optgroup>
+        <optgroup label="OpenRouter — mais baratos (o PDF é convertido em texto)" data-prov="openrouter" data-pdf="conversor">
+          <option value="or:z-ai/glm-5.3-flash">GLM 5.3 Flash (1,3M tokens — barato e lê imagens)</option>
+          <option value="or:deepseek/deepseek-v4-flash">DeepSeek V4 Flash (1M tokens — o mais barato; NÃO lê imagens)</option>
+        </optgroup>
+        <optgroup label="OpenRouter — qualquer outro" data-prov="openrouter" data-pdf="livre">
+          <option value="or:*">Outro modelo — colar o identificador…</option>
+        </optgroup>
+      </select>
+          <!-- Só aparece com a opção "Outro" escolhida (popup.js). Aceita o
+               identificador colado da página do modelo, com ou sem a URL. -->
+          <div class="orslug-row" id="orSlugRow" hidden>
+            <input id="orSlug" type="text" placeholder="autor/modelo — ex.: anthropic/claude-sonnet-4.6" autocomplete="off" spellcheck="false" aria-label="Identificador do modelo no OpenRouter" />
+            <span class="hint">Copie o identificador em <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>. Modelo que não lê PDF recebe as peças convertidas em texto — sem a imagem da página.</span>
+          </div>
           <!-- Indicação de uso do modelo, preenchida por popup.js (pintarPerfil).
                É AJUDA, não regra: nenhum modelo é impedido de nada. O texto sai do
                campo `perfil` espelhado do MODEL_CAPS, e só o Luna e o Gemini 3.7

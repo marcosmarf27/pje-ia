@@ -447,18 +447,32 @@ input:focus, select:focus, textarea:focus {
 }
 .eyebrow-n { font-size: var(--fs-micro); color: var(--muted-3); }
 
-.prov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2b); }
+/* QUATRO cartões, não três: o `auto-fit` com piso é o que evita reescrever
+   este número a cada provedor novo, e o piso de 88px é o que ainda cabe em uma
+   linha nos 460px do popup do Chrome (4 x 88 + 3 x 8 = 376 de 420 úteis).
+   Abaixo disso a fileira quebra sozinha em duas linhas, que é degradação
+   aceitável — o cartão cortado, não. */
+.prov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: var(--sp-2b);
+}
 .prov {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
   border: 1px solid var(--line-input); border-radius: var(--r-lg);
-  background: #fff; padding: var(--sp-3b) var(--sp-3); cursor: pointer;
+  /* Padding horizontal ENXUTO (--sp-2, não --sp-3): com quatro cartões em 460px
+     cada um fica com 99px, e "não configurada" quebrava em duas linhas — o que
+     crescia a fileira inteira em 14px e deixava metade dos cartões com o texto
+     desalinhado dos outros. Medido em Chrome headless: 87px de conteúdo contra
+     os 77px que o texto pede. */
+  background: #fff; padding: var(--sp-3b) var(--sp-2); cursor: pointer;
   font-family: inherit; transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .prov:hover { border-color: var(--line-strong); }
 .prov[aria-selected="true"] {
   border: 1.5px solid var(--btn-de); background: var(--hover-2); box-shadow: var(--ring);
-  padding: 11.5px var(--sp-3); /* compensa a borda de 1.5px: sem isto o cartão
-                                  ativo cresce 1px e a linha inteira dança */
+  padding: 11.5px calc(var(--sp-2) - 0.5px); /* compensa a borda de 1.5px: sem
+                                  isto o cartão ativo cresce 1px e a linha dança */
 }
 /* A inicial em serif dá a cada provedor um sinal próprio sem precisar de logo
    de terceiro no pacote (que exigiria licença de marca). */
@@ -470,7 +484,17 @@ input:focus, select:focus, textarea:focus {
 .prov-i.pa { background: #f1eef9; color: var(--cat-peticao); }
 .prov-i.pg { background: #e3f0f4; color: var(--pje); }
 .prov-i.po { background: var(--ok-bg); color: #2f7a5b; }
+/* OpenRouter: a quarta cor precisa ser distinguível das outras três de relance
+   (roxo, azul, verde). Magenta é a que sobra na paleta de categorias sem cair
+   no âmbar, que nesta interface é a cor de AVISO — um selo de identidade não
+   pode ser lido como estado. */
+.prov-i.pr { background: #f9eaf1; color: var(--cat-prova); }
 .prov-n { font-size: var(--fs-meta); font-weight: 600; color: var(--text-2); }
+/* Identificador livre do OpenRouter: nasce oculto e só aparece com a opção
+   "Outro modelo" escolhida. Herda o estilo global de `input`; o que muda aqui é
+   só o respiro e a dica em bloco. */
+.orslug-row { margin-top: var(--sp-2b); }
+.orslug-row .hint { display: block; margin-top: var(--sp-1); }
 .prov[aria-selected="true"] .prov-n { color: var(--ink); }
 .prov .kstate { font-size: var(--fs-nano); font-weight: 400; }
 /* Nota sob os cartões — só na página de opções, que é a versão com as

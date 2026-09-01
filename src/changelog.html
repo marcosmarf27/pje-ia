@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>89 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>90 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,7 +103,52 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.53.0</span> O texto das peças agora pode sair <strong>um arquivo por documento</strong>, com índice</h2>
+        <h2><span class="v novo">v0.54.0</span> <strong>OpenRouter</strong>: uma chave, centenas de modelos</h2>
+        <p>
+          Até aqui, usar um modelo novo significava abrir conta no fornecedor dele e colar mais
+          uma chave. O <strong>OpenRouter</strong> é um intermediário que resolve isso: você cria
+          <strong>uma</strong> chave e alcança modelos da Anthropic, Google, OpenAI, SpaceXAI e
+          dezenas de outros — inclusive os que a extensão não lista.
+        </p>
+        <p>
+          Escolha o cartão <strong>OpenRouter</strong> na configuração, cole a chave e pegue um
+          dos modelos sugeridos — ou <strong>“Outro modelo”</strong> e cole o identificador de
+          qualquer um do catálogo. A extensão descobre sozinha a janela de contexto, o preço e
+          se ele lê PDF; <strong>nada precisa ser atualizado</strong> quando sai um modelo novo.
+        </p>
+        <p>
+          Os <strong>onze sugeridos</strong> foram escolhidos para este trabalho — todos com
+          <strong>1 milhão de tokens</strong> ou mais de contexto —, em dois grupos. Os que
+          <strong>leem o PDF como documento</strong> recebem a página como página (carimbo,
+          assinatura, digitalizado inclusive); entre eles o <strong>Grok 4.20</strong>, com
+          <strong>2 milhões</strong> de tokens, a maior janela que a extensão alcança. E os
+          <strong>mais baratos</strong>, em que o OpenRouter converte o PDF em texto de graça:
+          custam de <strong>10 a 25 vezes menos</strong> e servem bem para peças do editor e PDFs
+          com texto, mas não veem a imagem da página — para documento digitalizado, use antes a
+          extração com OCR local.
+        </p>
+        <p>
+          Duas diferenças que valem saber. O <strong>custo no rodapé passa a ser o real</strong>
+          — nos outros provedores ele é calculado por uma tabela de preços; aqui é o valor que
+          saiu da sua conta, informado pelo próprio OpenRouter. E as <strong>peças são
+          reenviadas a cada mensagem</strong> (ele não guarda os documentos entre as perguntas),
+          então em processos grandes vale marcar menos peças por conversa.
+        </p>
+        <p>
+          Como aqui trafegam <strong>autos</strong>, a extensão exige em <strong>todo envio</strong>
+          que o OpenRouter use apenas fornecedores que <strong>não guardam os dados</strong> para
+          treinar modelos — não é uma opção a lembrar de ligar, vai sempre. Se nenhum estiver
+          disponível para o modelo escolhido, o envio falha dizendo isso, em vez de seguir por um
+          caminho menos protegido. <a class="link" href="help.html#openrouter">Como configurar →</a>
+        </p>
+        <p>
+          <strong>Nada mudou para quem usa Claude, Gemini ou GPT direto:</strong> os três
+          continuam exatamente como estavam.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.53.0</span> O texto das peças agora pode sair <strong>um arquivo por documento</strong>, com índice</h2>
         <p>
           A extração de texto entregava <strong>um <code>.md</code> só</strong>, com o processo
           inteiro dentro. Num processo de 66 peças esse arquivo é grande e
@@ -1810,7 +1855,7 @@
 
       <h1 class="serif" id="historico">Histórico completo</h1>
       <p class="lead">
-        As 71 versões, da mais recente à primeira. As marcadas com
+        As 72 versões, da mais recente à primeira. As marcadas com
         <span class="dot-marco"></span> mudaram o produto de forma visível.
       </p>
 
@@ -1820,6 +1865,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.54.0</span> <span class="dot-marco"></span></td><td>01/09/2026</td><td><strong>OpenRouter como quarto provedor.</strong> Uma chave passa a dar acesso a centenas de modelos de vários fornecedores, incluindo os que a extensão não lista — basta colar o identificador. As capacidades de cada modelo (janela, preço, se lê PDF) vêm do catálogo público do próprio OpenRouter, então modelo novo não exige atualização da extensão. O <strong>custo do rodapé passa a ser medido</strong>, não calculado por tabela: é o valor debitado da conta. Em todo envio a extensão exige fornecedores que <strong>não retenham os dados</strong> para treino — autos não podem virar material de treinamento. Como ele não recebe arquivos por referência, as peças são reenviadas a cada mensagem, e há um teto de ~15 MB por conversa avisado antes do envio. Claude, Gemini e GPT diretos seguem intocados</td></tr>
             <tr><td><span class="v">0.53.1</span></td><td>29/08/2026</td><td><strong>Anexo em foto ou print agora passa pelo OCR.</strong> O mesmo documento fotografado tinha sorte diferente conforme tivesse chegado ao processo: como PDF, era lido; como JPEG ou PNG, saía do arquivo de texto com a linha <em>“anexo em imagem — o texto depende do OCR”</em> e <strong>ninguém tinha chamado o motor</strong>. O rótulo foi escrito quando a extensão ainda não tinha OCR, e virou promessa quando ele entrou — quem lia entendia que o reconhecimento havia falhado. Agora a imagem vai ao mesmo motor das páginas digitalizadas, com a confiança marcada; quando ela realmente não tem texto legível (a foto de uma estrada, por exemplo), o arquivo diz isso, que é diferente de dizer que não tentou</td></tr>
             <tr class="marco"><td><span class="v">0.53.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O texto das peças pode sair um arquivo por documento, com índice.</strong> A extração entregava um <code>.md</code> só, com o processo inteiro dentro — indivisível: para trabalhar uma peça era preciso carregar todas, uma busca não dizia de qual documento veio o resultado e não dava para pedir a uma ferramenta de IA “leia só a contestação”. O menu do ⬇ Baixar .zip ganhou <strong>“Extrair o texto (um .md por peça)…”</strong>: um <code>.zip</code> com um arquivo por peça, numerado na ordem do processo e com o id no nome, e um <strong><code>indice.md</code></strong> com link para cada uma, quantas páginas tem e quantas o OCR leu. Cada arquivo traz os dados da peça no topo, então se explica sozinho fora da pasta. <strong>Nada foi tirado</strong>: o arquivo único continua no mesmo lugar e ainda vai junto, dentro do pacote</td></tr>
             <tr><td><span class="v">0.52.1</span></td><td>29/08/2026</td><td>Revis&#227;o da v0.52.0, com <strong>cinco corre&#231;&#245;es</strong>. A escolha do motor de OCR passou a comparar tamb&#233;m o <strong>texto lido</strong>, e n&#227;o s&#243; o tempo: um motor que perde opera&#231;&#245;es para o processador pode ler menos E terminar antes, e vencer assim seria trocar leitura por rapidez — com a troca guardada para sempre. O bot&#227;o &#8220;Medir de novo&#8221; passou a <strong>fechar o motor em mem&#243;ria</strong>: apagar a medi&#231;&#227;o n&#227;o bastava, porque o motor j&#225; criado continuava em uso e a promessa ficava falsa. A rasteriza&#231;&#227;o de p&#225;ginas GRANDES (plantas, mapas) deixou de gerar 4&#215; mais pixels que o necess&#225;rio. O tempo m&#233;dio e o nome do motor passam a contar tamb&#233;m as p&#225;ginas em que o OCR n&#227;o achou texto — sem isso, num processo s&#243; de fotos ileg&#237;veis o arquivo saía sem dizer qual motor rodou. E cancelar a extra&#231;&#227;o para tamb&#233;m a folha que j&#225; estava sendo preparada</td></tr>

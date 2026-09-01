@@ -7034,7 +7034,12 @@ var PjePanel = (function () {
           return;
         }
         const EFFORTS = { high: "alto", medium: "médio", low: "baixo" };
-        let txt = NOMES_MODELO[info.model] || info.model;
+        // `info.nome` vem das CAPS (hoje, do catálogo do OpenRouter) e tem
+        // precedência sobre a tabela local: são centenas de modelos de
+        // terceiros, e sem ele o selo mostraria "or:anthropic/claude-sonnet-4.5"
+        // cru — num elemento cujo trabalho é dizer, na língua do usuário, qual
+        // modelo respondeu. A tabela continua mandando nos modelos diretos.
+        let txt = NOMES_MODELO[info.model] || info.nome || info.model;
         // modelos sem suporte a effort (Haiku) não mostram o nível — exibir
         // um valor que a API não recebe seria mentira
         if (info.comEffort && EFFORTS[info.effort]) {

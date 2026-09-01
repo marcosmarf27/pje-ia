@@ -1,7 +1,12 @@
 const apiKeyEl = document.getElementById("apiKey");
 const geminiKeyEl = document.getElementById("geminiApiKey");
 const openaiKeyEl = document.getElementById("openaiApiKey");
+const openrouterKeyEl = document.getElementById("openrouterApiKey");
 const modelEl = document.getElementById("model");
+// Campo do identificador livre do OpenRouter (só existe quando a opção "Outro"
+// está escolhida). Como todo elemento que pode faltar, é acessado sob `if`.
+const orSlugEl = document.getElementById("orSlug");
+const orSlugRow = document.getElementById("orSlugRow");
 const modeloMinutaEl = document.getElementById("modeloMinuta");
 const effortEl = document.getElementById("effort");
 const customEl = document.getElementById("customPrompt");
@@ -103,11 +108,13 @@ const chipText = document.getElementById("chipText");
 const togglePw = document.getElementById("togglePw");
 const togglePwG = document.getElementById("togglePwG");
 const togglePwO = document.getElementById("togglePwO");
+const togglePwR = document.getElementById("togglePwR");
 // Elementos só do layout novo — este script é COMPARTILHADO por popup.html e
 // options.html, então tudo o que uma página tem e a outra não é opcional.
 const kstateA = document.getElementById("kstateA");
 const kstateG = document.getElementById("kstateG");
 const kstateO = document.getElementById("kstateO");
+const kstateR = document.getElementById("kstateR");
 const firstRun = document.getElementById("firstRun");
 // Só existe no popup (a página de opções tem a caixa `.apoio` completa, sempre
 // visível): como todo elemento exclusivo de uma das duas telas, é opcional.
@@ -128,11 +135,36 @@ const provs = [...document.querySelectorAll(".prov")];
 const keySecs = [...document.querySelectorAll(".pc-sec[data-prov]")];
 const personas = [...document.querySelectorAll(".persona")];
 
-const PROVS = ["anthropic", "gemini", "openai"];
-const NOME_PROVEDOR = { anthropic: "Anthropic", gemini: "Google", openai: "OpenAI" };
+const PROVS = ["anthropic", "gemini", "openai", "openrouter"];
+const NOME_PROVEDOR = {
+  anthropic: "Anthropic",
+  gemini: "Google",
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+};
 // Primeiro modelo de cada provedor = o recomendado. Clicar num cartão troca
 // para ele; o provedor NÃO é gravado no storage — continua derivado do `model`.
-const PADRAO = { anthropic: "claude-haiku-4-5", gemini: "gemini-3.7-flash", openai: "gpt-5.6-luna" };
+const PADRAO = {
+  anthropic: "claude-haiku-4-5",
+  gemini: "gemini-3.7-flash",
+  openai: "gpt-5.6-luna",
+  openrouter: "or:openai/gpt-5.6-luna",
+};
+
+// O identificador que o usuário cola no campo livre do OpenRouter. Aceita o que
+// ele tem à mão: o slug puro, o slug com o prefixo interno, ou a URL da página
+// do modelo (que é como ele chega ao identificador na prática).
+const RE_SLUG_OR = /^[^\s/]+\/[^\s/]+$/;
+function normalizarSlugOr(v) {
+  return String(v || "")
+    .trim()
+    .replace(/^https?:\/\/openrouter\.ai\/(models\/)?/i, "")
+    .replace(/^or:/, "")
+    .replace(/\/+$/, "");
+}
+// Marcador do <option> "Outro modelo": nunca é gravado no storage — o Salvar o
+// troca pelo slug digitado, ou recusa quando não há um válido.
+const OR_LIVRE = "or:*";
 // Modelo usado quando NADA foi salvo ainda. Precisa ser byte a byte o default
 // do `getCfg` em background.js: sem `model` no storage o worker chama o
 // GPT-5.6 Luna, e enquanto o <select> mostrava o PRIMEIRO <option> do HTML (o
@@ -215,8 +247,19 @@ function montarModeloMinuta() {
     // seria falsa: o padrão daqui é o "Automático" do topo. Mesmo corte de
     // `nomeDoModelo()`, no primeiro " (".
     for (const op of c.querySelectorAll("option")) {
+      // "Outro modelo — colar o identificador…" é um MARCADOR do <select> de
+      // cima, não um modelo: clonado aqui viraria uma escolha de minuta que o
+      // worker recusa (o id `or:*` não é um modelo).
+      if (op.value === OR_LIVRE) {
+        op.remove();
+        continue;
+      }
       op.textContent = op.textContent.split(" (")[0].trim();
     }
+    // Grupo que ficou VAZIO não entra: o do campo livre tem o marcador `or:*`
+    // como único item, e um <optgroup> sem <option> aparece no dropdown como um
+    // cabeçalho solto, prometendo uma escolha que não existe.
+    if (!c.querySelector("option")) continue;
     modeloMinutaEl.appendChild(c);
   }
   // Id que não está entre os <option> — porque saiu da tabela OU porque é de
@@ -233,7 +276,9 @@ function pintarAutoMinuta() {
   const sug = sugestaoDeRedacao();
   auto.textContent = sug
     ? "Automático — " + sug
-    : "Automático — o mesmo do chat (" + nomeDoModelo() + ")";
+    : nomeDoModelo()
+      ? "Automático — o mesmo do chat (" + nomeDoModelo() + ")"
+      : "Automático — o mesmo do chat";
 }
 
 // A linha de indicação abaixo do <select>. É AJUDA, não regra: nenhum modelo é
@@ -269,16 +314,30 @@ function pintarPerfil() {
 // provedor sai do prefixo do id (mesma regra do background.js/content.js).
 function provedorDoModelo() {
   const m = String(modelEl.value || "");
+  if (m.startsWith("or:")) return "openrouter";
   if (m.startsWith("gemini-")) return "gemini";
   if (m.startsWith("gpt-")) return "openai";
   return "anthropic";
 }
 function campoDoProvedor(p) {
-  return p === "gemini" ? geminiKeyEl : p === "openai" ? openaiKeyEl : apiKeyEl;
+  if (p === "gemini") return geminiKeyEl;
+  if (p === "openai") return openaiKeyEl;
+  if (p === "openrouter") return openrouterKeyEl;
+  return apiKeyEl;
 }
 // Nome curto do modelo escolhido ("Claude Haiku 4.5"), tirado do próprio
 // <option> — sem duplicar aqui a tabela de nomes que já está no HTML.
 function nomeDoModelo() {
+  // "Outro modelo — colar o identificador…" é um MARCADOR, não um modelo: o
+  // nome real está no campo livre. Sem esta saída o chip anunciava "Pronto para
+  // usar — Outro modelo — colar o identificador…", afirmando prontidão
+  // justamente no único estado da tela em que ainda falta escolher o modelo (e
+  // em que o Salvar recusa). Devolve "" enquanto não houver identificador
+  // válido — os dois chamadores tratam o vazio.
+  if (modelEl.value === OR_LIVRE) {
+    const slug = normalizarSlugOr(orSlugEl && orSlugEl.value);
+    return RE_SLUG_OR.test(slug) ? slug : "";
+  }
   const op = modelEl.selectedOptions && modelEl.selectedOptions[0];
   return op ? op.textContent.split(" (")[0].trim() : modelEl.value;
 }
@@ -307,18 +366,28 @@ const EFFORT_TXT = {
 function setChip() {
   const prov = provedorDoModelo();
   const temChave = temChaveDigitada(campoDoProvedor(prov));
-  chip.className = "status-chip " + (temChave ? "ok" : "warn");
-  chipText.textContent = temChave
-    ? "Pronto para usar — " + nomeDoModelo()
-    : "Falta a chave da " + NOME_PROVEDOR[prov] + " para este modelo";
+  // Duas condições, não uma: ter a chave e ter um MODELO. A segunda só falha
+  // no campo livre do OpenRouter ainda vazio, e é exatamente o estado em que
+  // dizer "pronto para usar" seria falso — o Salvar recusa esse envio.
+  const nome = nomeDoModelo();
+  const pronto = temChave && !!nome;
+  chip.className = "status-chip " + (pronto ? "ok" : "warn");
+  chipText.textContent = pronto
+    ? "Pronto para usar — " + nome
+    : !temChave
+      ? "Falta a chave da " + NOME_PROVEDOR[prov] + " para este modelo"
+      : "Falta o identificador do modelo (ex.: anthropic/claude-sonnet-4.6)";
   // estado de cada chave, independente do modelo ativo
   marcarChave(kstateA, apiKeyEl.value);
   marcarChave(kstateG, geminiKeyEl.value);
   marcarChave(kstateO, openaiKeyEl && openaiKeyEl.value);
+  marcarChave(kstateR, openrouterKeyEl && openrouterKeyEl.value);
   if (provCount) {
     const n = PROVS.filter((p) => temChaveDigitada(campoDoProvedor(p))).length;
-    provCount.textContent = n + " de 3 configurados";
+    provCount.textContent = n + " de " + PROVS.length + " configurados";
   }
+  // O campo do identificador livre acompanha a opção escolhida.
+  if (orSlugRow) orSlugRow.hidden = modelEl.value !== OR_LIVRE;
   if (effortHint) effortHint.textContent = EFFORT_TXT[getEffort()] || "";
   pintarPerfil();
   pintarProvedores(prov);
@@ -367,6 +436,7 @@ function pintarMascaras() {
   pintarMascara(document.getElementById("keyA"), apiKeyEl.value);
   pintarMascara(document.getElementById("keyG"), geminiKeyEl.value);
   pintarMascara(document.getElementById("keyO"), openaiKeyEl && openaiKeyEl.value);
+  pintarMascara(document.getElementById("keyR"), openrouterKeyEl && openrouterKeyEl.value);
 }
 
 // A função `abrirChaveQueFalta` foi removida com o layout de acordeão: ela abria
@@ -380,6 +450,7 @@ chrome.storage.local.get(
     "apiKey",
     "geminiApiKey",
     "openaiApiKey",
+    "openrouterApiKey",
     "model",
     "effort",
     "customPrompt",
@@ -390,7 +461,17 @@ chrome.storage.local.get(
     if (v.apiKey) apiKeyEl.value = v.apiKey;
     if (v.geminiApiKey) geminiKeyEl.value = v.geminiApiKey;
     if (openaiKeyEl && v.openaiApiKey) openaiKeyEl.value = v.openaiApiKey;
+    if (openrouterKeyEl && v.openrouterApiKey) openrouterKeyEl.value = v.openrouterApiKey;
     modelEl.value = v.model || MODELO_PADRAO;
+    // Modelo do OpenRouter que não está entre os <option> — porque o usuário o
+    // colou à mão. Sem este ramo ele cairia no fallback do `select` (campo
+    // vazio → MODELO_PADRAO) e a tela mostraria um modelo diferente do que a
+    // extensão está usando: a mesma classe de bug da v0.25, agora com o
+    // agravante de o usuário ter escolhido aquele modelo de propósito.
+    if (!modelEl.value && String(v.model || "").startsWith("or:")) {
+      modelEl.value = OR_LIVRE;
+      if (orSlugEl) orSlugEl.value = normalizarSlugOr(v.model);
+    }
     // `select.value` com um id que não existe entre os <option> deixa o campo
     // SEM seleção (value vira ""), e daí o chip cairia no provedor errado e um
     // "Salvar" gravaria modelo vazio. Acontece com config de uma versão que
@@ -411,8 +492,9 @@ chrome.storage.local.get(
     // quando eles servem, e é o que faz o popup caber sem rolagem depois.
     // O critério é o que está SALVO (não o que está sendo digitado) — sumir no
     // meio da digitação seria um salto de layout no meio da tarefa.
-    if (firstRun && (v.apiKey || v.geminiApiKey || v.openaiApiKey)) firstRun.hidden = true;
-    mostrarApoio(!!(v.apiKey || v.geminiApiKey || v.openaiApiKey));
+    if (firstRun && (v.apiKey || v.geminiApiKey || v.openaiApiKey || v.openrouterApiKey))
+      firstRun.hidden = true;
+    mostrarApoio(!!(v.apiKey || v.geminiApiKey || v.openaiApiKey || v.openrouterApiKey));
   }
 );
 
@@ -427,6 +509,7 @@ function ligarToggle(btn, input) {
 ligarToggle(togglePw, apiKeyEl);
 ligarToggle(togglePwG, geminiKeyEl);
 ligarToggle(togglePwO, openaiKeyEl);
+ligarToggle(togglePwR, openrouterKeyEl);
 
 // Clicar num cartão de provedor troca o modelo para o recomendado dele. Não
 // grava nada: o provedor segue derivado do `model` no próximo carregamento.
@@ -469,6 +552,11 @@ modelEl.addEventListener("change", () => {
 apiKeyEl.addEventListener("input", setChip);
 geminiKeyEl.addEventListener("input", setChip);
 if (openaiKeyEl) openaiKeyEl.addEventListener("input", setChip);
+if (openrouterKeyEl) openrouterKeyEl.addEventListener("input", setChip);
+// O identificador livre também: sem isto, digitar o slug não muda nada na tela
+// — o chip continuaria dizendo que falta o modelo depois de ele ter sido
+// escrito, e o único jeito de saber que a tela aceitou seria clicar em Salvar.
+if (orSlugEl) orSlugEl.addEventListener("input", setChip);
 if (effortEl) effortEl.addEventListener("change", setChip);
 
 // "Testar chave": lista os modelos do provedor (GET), que valida a credencial
@@ -553,10 +641,28 @@ document.querySelectorAll(".pc-trocar").forEach((b) => b.addEventListener("click
 personas.forEach((b) => b.addEventListener("click", marcarPendente));
 
 saveBtn.addEventListener("click", () => {
+  // "Outro modelo" precisa virar um id real ANTES de qualquer gravação. Se o
+  // campo estiver vazio ou malformado, nada é salvo e a tela fica como está: o
+  // usuário corrige e clica de novo, sem perder a chave que acabou de digitar.
+  // Gravar `or:*` seria pior que não gravar — o worker mandaria "*" como nome
+  // de modelo e o erro só apareceria no primeiro turno.
+  let modelo = modelEl.value;
+  if (modelo === OR_LIVRE) {
+    const slug = normalizarSlugOr(orSlugEl && orSlugEl.value);
+    if (!RE_SLUG_OR.test(slug)) {
+      saveStatus.textContent = "Informe o identificador do modelo (ex.: anthropic/claude-sonnet-4.6).";
+      if (orSlugEl) orSlugEl.focus();
+      setTimeout(() => (saveStatus.textContent = ""), 4000);
+      return;
+    }
+    modelo = "or:" + slug;
+    if (orSlugEl) orSlugEl.value = slug; // devolve normalizado (URL colada vira slug)
+  }
   const apiKey = apiKeyEl.value.trim();
   const geminiApiKey = geminiKeyEl.value.trim();
   const openaiApiKey = openaiKeyEl ? openaiKeyEl.value.trim() : "";
-  const cfg = { apiKey, geminiApiKey, openaiApiKey, model: modelEl.value };
+  const openrouterApiKey = openrouterKeyEl ? openrouterKeyEl.value.trim() : "";
+  const cfg = { apiKey, geminiApiKey, openaiApiKey, openrouterApiKey, model: modelo };
   // "" = automático. Gravado SEMPRE que o campo existe, para desfazer uma
   // escolha anterior ser possível voltando ao automático.
   if (modeloMinutaEl) cfg.modeloMinuta = modeloMinutaEl.value;
@@ -580,8 +686,9 @@ saveBtn.addEventListener("click", () => {
     // DEPOIS dele é o que mantém a ordem à prova disso.
     limparPendente();
     // salvou a primeira chave: os passos de primeiro uso cumpriram seu papel
-    if (firstRun && (apiKey || geminiApiKey || openaiApiKey)) firstRun.hidden = true;
-    mostrarApoio(!!(apiKey || geminiApiKey || openaiApiKey));
+    if (firstRun && (apiKey || geminiApiKey || openaiApiKey || openrouterApiKey))
+      firstRun.hidden = true;
+    mostrarApoio(!!(apiKey || geminiApiKey || openaiApiKey || openrouterApiKey));
     const temChaveDoModelo = temChaveDigitada(campoDoProvedor(provedorDoModelo()));
     saveStatus.textContent = temChaveDoModelo
       ? "Configuração salva ✓"

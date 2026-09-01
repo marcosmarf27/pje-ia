@@ -463,6 +463,14 @@
   // OpenAI aceita 50 MB (arquivo e somados por request); 40 MB de base64 (~30 MB
   // decodificados) fica com folga confortável sob o limite.
   const MAX_TOTAL_B64_CHARS_OPENAI = 40 * 1024 * 1024;
+  // OpenRouter: aqui o teto NÃO é o do fallback — é o do caminho NORMAL, porque
+  // não há Files API no fluxo de chat e as peças vão inline em TODO turno. O
+  // número é conservador de propósito: quem recebe o request no fim é o provedor
+  // upstream que o OpenRouter escolher, e esse limite ele não publica. 20 MB de
+  // base64 (~15 MB de PDF) fica entre o teto do Gemini e o da OpenAI, e uma
+  // recusa explicada antes do envio é melhor que um 413 depois de o usuário
+  // esperar a subida inteira.
+  const MAX_TOTAL_B64_CHARS_OPENROUTER = 20 * 1024 * 1024;
 
   // Chars por token — heurística única do projeto, usada pela estimativa local
   // e pelo teto de texto abaixo. Declarada AQUI, no topo, e não junto do
@@ -590,7 +598,14 @@
     // tem o recurso. Sem ela a busca de jurisprudência varreria a web inteira
     // e devolveria blog no lugar de fonte oficial: num uso jurídico isso não é
     // detalhe, e deixaria o GPT pior que o Claude sem motivo técnico.
-    if (c.provider === "openai") {
+    // OpenRouter usa o MESMO shape da OpenAI de propósito: a tradução para o
+    // formato dele (um `plugin` de id "web", não uma tool) mora no cliente, que
+    // é quem conhece o dialeto do provedor. Aqui a allowlist é garantia MOLE —
+    // a doc diz que o suporte a filtro de domínio "varia por engine", e quem
+    // escolhe a engine é o OpenRouter. É a mesma situação do Gemini: quem
+    // expressa a PRIORIDADE das fontes é o PROMPT_BUSCA, e o vazamento fica
+    // visível no rodapé da bolha (nivelFonte).
+    if (c.provider === "openai" || c.provider === "openrouter") {
       return [{ type: "web_search", filters: { allowed_domains: DOMINIOS_JURIDICOS } }];
     }
     return [
@@ -699,7 +714,9 @@
           ? "Google"
           : modelCaps && modelCaps.provider === "openai"
             ? "OpenAI"
-            : "Anthropic",
+            : modelCaps && modelCaps.provider === "openrouter"
+              ? "OpenRouter"
+              : "Anthropic",
     });
   }
   // Peças cujos blocos document JÁ estão no histórico desta conversa. Anexamos
@@ -724,10 +741,18 @@
   // (mesmo com o toggle desligado) — remover trocaria o conjunto de tools,
   // invalidando o cache de prefixo e arriscando rejeição do histórico.
   let buscaNaConversa = false;
-  // Provedor (anthropic|gemini|openai) do PRIMEIRO turno da conversa: o
-  // histórico de um provedor não é traduzível para o outro (thinking assinado
+  // Provedor (anthropic|gemini|openai|openrouter) do PRIMEIRO turno da conversa:
+  // o histórico de um provedor não é traduzível para o outro (thinking assinado
   // da Anthropic vs. thought signatures do Gemini vs. reasoning criptografado
   // da OpenAI) — trocar no meio exige "Nova conversa".
+  //
+  // O OpenRouter é o caso em que esta guarda seria GROSSA DEMAIS se olhasse só o
+  // provedor: um agregador hospeda Claude, Gemini e GPT sob o mesmo nome, então
+  // trocar de modelo lá dentro trocaria o formato do raciocínio sem que nada
+  // aqui percebesse. Quem resolve isso é o cliente (openrouter.js), que carimba
+  // o modelo no bloco de raciocínio e só o devolve à API quando ele bate — o
+  // TEXTO do histórico é portável entre modelos, e por isso a troca ali é
+  // permitida de propósito.
   let conversaProvider = null;
   let alertaTrocaLigado = false; // o alerta atual é o de troca de provedor
   let busy = false;
@@ -749,9 +774,10 @@
     "Novas mensagens não serão aceitas — desmarque peças na lista para liberar espaço " +
     "(elas saem do contexto na hora) ou comece uma nova conversa.";
   const ALERTA_TROCA_PROVEDOR =
-    "Você trocou de provedor de IA no meio da conversa (entre Claude, Gemini e OpenAI) — o " +
-    "histórico de um não é compatível com o outro (raciocínio assinado pelo provedor). Clique " +
-    "em ⟲ Nova conversa para usar o novo modelo, ou volte ao modelo anterior nas opções.";
+    "Você trocou de provedor de IA no meio da conversa (entre Claude, Gemini, OpenAI e " +
+    "OpenRouter) — o histórico de um não é compatível com o outro (raciocínio assinado pelo " +
+    "provedor). Clique em ⟲ Nova conversa para usar o novo modelo, ou volte ao modelo " +
+    "anterior nas opções.";
 
   const panel = PjePanel.mount();
 
@@ -828,6 +854,13 @@
   // Peças que a última montagem de blocos deixou de fora por não ter conteúdo
   // anexável — preenchida por `montarBlocos`, relatada pelo envio.
   let semConteudo = [];
+  // Peças que o MODELO ESCOLHIDO não sabe ler (hoje: anexo em imagem num modelo
+  // de texto puro). Lista SEPARADA de `semConteudo` pela mesma razão que aquela
+  // foi separada das falhas de download: a causa e a saída são outras. Ali o
+  // conserto é reenviar; aqui reenviar não muda nada — o que resolve é trocar
+  // de modelo, e dizer "envie de novo" mandaria o usuário repetir um gesto que
+  // vai falhar igual.
+  let semSuporte = [];
 
   // Seleção EFETIVA: os checkboxes marcados mais as peças restauradas da
   // memória cuja row a timeline lazy do PJe ainda não criou. Ponto único, usado
@@ -1188,6 +1221,10 @@
         model: modelInfo.model,
         effort: modelInfo.effort,
         comEffort: modelCaps.effort !== false,
+        // Nome de exibição vindo das caps (o catálogo do OpenRouter o publica).
+        // Sem ele o selo cairia no id cru dos modelos que não estão na tabela
+        // de nomes do painel.
+        nome: modelCaps.nome || null,
       }
     );
     panel.setModoCitacoes(modelCaps.citacoesNativas === false ? "textual" : "nativa");
@@ -1266,15 +1303,17 @@
       // ou OpenAI) — o provedor sai do prefixo do id, sem esperar o caps
       // chegar. customPrompt pega carona na mesma leitura (evita um get a mais).
       chrome.storage.local.get(
-        ["apiKey", "geminiApiKey", "openaiApiKey", "model", "customPrompt"],
+        ["apiKey", "geminiApiKey", "openaiApiKey", "openrouterApiKey", "model", "customPrompt"],
         (v) => {
           customPrompt = (v.customPrompt || "").trim();
           const m = String(v.model || "");
-          const configurado = m.startsWith("gemini-")
-            ? !!v.geminiApiKey
-            : m.startsWith("gpt-")
-              ? !!v.openaiApiKey
-              : !!v.apiKey;
+          const configurado = m.startsWith("or:")
+            ? !!v.openrouterApiKey
+            : m.startsWith("gemini-")
+              ? !!v.geminiApiKey
+              : m.startsWith("gpt-")
+                ? !!v.openaiApiKey
+                : !!v.apiKey;
           panel.setConfigured(configurado);
         }
       );
@@ -1291,7 +1330,10 @@
   }
   refreshKey();
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === "local" && (ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.model))
+    if (
+      area === "local" &&
+      (ch.apiKey || ch.geminiApiKey || ch.openaiApiKey || ch.openrouterApiKey || ch.model)
+    )
       refreshKey();
     // effort entra aqui por causa do selo do modelo (mostra o nível ativo);
     // modeloMinuta, por causa do anúncio na barra de minuta e do gate da
@@ -1302,6 +1344,7 @@
         ch.apiKey ||
         ch.geminiApiKey ||
         ch.openaiApiKey ||
+        ch.openrouterApiKey ||
         ch.effort ||
         ch.modeloMinuta)
     )
@@ -3003,6 +3046,11 @@
   // fase pela frente. Duplicar isso garantiria divergência — `fileProvider` já
   // é sutil o bastante.
   function precisaUpload(id) {
+    // Provedor SEM Files API no fluxo de chat (OpenRouter): não há o que subir —
+    // a peça viaja inline no próprio request. Por CAP e não por nome de
+    // provedor, como todo o resto: no dia em que ele aceitar arquivo por
+    // referência, muda a cap e este caminho volta a valer sem mais nada.
+    if (modelCaps && modelCaps.filesApi === false) return false;
     const d = docsCache.get(id);
     if (!d || d.kind !== "pdf") return false;
     // Sem bytes não há o que subir. Acontece com peça HIDRATADA da memória de
@@ -3381,6 +3429,16 @@
   // histórico contém blocos de ferramenta e o count_tokens sem as tools
   // declaradas seria rejeitado (o medidor e a guarda de 90% morreriam mudos).
   async function estimarContexto(messages, opts) {
+    // PROVEDOR SEM CONTAGEM DE TOKENS (OpenRouter). Deixar de guardar seria
+    // trocar uma recusa explicada por um erro da API — e ali o erro chega DEPOIS
+    // de o navegador ter subido dezenas de MB de peças, porque naquele provedor
+    // os PDFs vão inline a cada turno. A base é a MESMA conta do
+    // `podePularPreVoo`: o maior entre a última medição EXATA (o usage do turno
+    // anterior, que vem de graça e é exato) e a estimativa local. No 1º turno é
+    // só estimativa; do 2º em diante o número é confiável.
+    if (modelCaps && modelCaps.contagemTokens === false) {
+      return guardaPorEstimativa(opts);
+    }
     let r = null;
     try {
       const payload = {
@@ -3415,6 +3473,30 @@
       throw err;
     }
     return { tokens: r.tokens, ctxTokens: r.contextTokens, pct };
+  }
+
+  // A guarda de 90% quando o provedor não tem contagem exata. Mesmo limiar e
+  // mesmo formato de retorno de `estimarContexto` — o que muda é a FONTE do
+  // número e, por isso, o texto do erro: afirmar "a conversa ocupa 94%" sobre
+  // uma estimativa seria dar precisão que ela não tem, e o usuário decide o que
+  // desmarcar com base nessa frase.
+  function guardaPorEstimativa(opts) {
+    const ctx = (modelCaps && modelCaps.contextTokens) || 0;
+    if (!ctx) return null;
+    const ids = (opts && opts.ids) || [];
+    const tokens = Math.max(ultimoTotalExato, estimativaLocalTokens(ids));
+    const pct = Math.round((tokens / ctx) * 100);
+    if (tokens > ctx * 0.9) {
+      const err = new Error(
+        "pela estimativa, a conversa ocupa ~" + pct + "% do contexto da IA (" +
+          Math.round(tokens / 1000) + " mil tokens) — não sobra espaço para a análise. " +
+          "Desmarque peças na lista (elas saem do contexto na hora) ou clique em ⟲ (Nova conversa)."
+      );
+      err.ctxCheio = true;
+      err.pct = pct;
+      throw err;
+    }
+    return { tokens, ctxTokens: ctx, pct, estimado: true };
   }
 
   // A API rejeita citações reenviadas no histórico do assistant: além de
@@ -4061,6 +4143,7 @@
     // `montarBlocos` é chamada de quatro lugares e mudar a assinatura obrigaria
     // os quatro a lidar com um segundo valor que só um deles reporta.
     semConteudo = [];
+    semSuporte = [];
     // fileId só vale se o upload foi feito para o provedor ATUAL — um URI da
     // File API do Google num request Anthropic (ou o inverso) daria 400
     const provAtual = (modelCaps && modelCaps.provider) || "anthropic";
@@ -4122,6 +4205,24 @@
         //
         // Os dois levam `__pecaId`: desmarcar a peça tem de remover o par
         // inteiro, senão sobra um rótulo anunciando um anexo que não foi.
+        //
+        // MAS SÓ SE O MODELO ENXERGAR. `aceitaImagem` era uma cap escrita e
+        // nunca lida — inofensiva enquanto todo modelo ofertado era multimodal,
+        // e um erro de API no dia em que a lista ganhou um modelo de TEXTO PURO
+        // (o catálogo do OpenRouter tem vários, e são os mais baratos). Mandar
+        // assim mesmo daria 400 do provedor, ou — pior — o silêncio de um
+        // provedor que descarta a parte que não entende, e aí o modelo
+        // responderia sobre uma prova que nunca viu. Só barra quando a cap diz
+        // NÃO explicitamente: `undefined` (os três provedores diretos, que
+        // sempre leram imagem) segue passando byte a byte como antes.
+        if (modelCaps && modelCaps.aceitaImagem === false) {
+          semSuporte.push({
+            id,
+            titulo: metaDe(id).titulo,
+            erro: "o modelo escolhido não lê imagens",
+          });
+          continue;
+        }
         totalB64 += d.b64.length;
         blocks.push({
           type: "text",
@@ -4157,7 +4258,9 @@
         ? MAX_TOTAL_B64_CHARS_GEMINI
         : provAtual === "openai"
           ? MAX_TOTAL_B64_CHARS_OPENAI
-          : MAX_TOTAL_B64_CHARS;
+          : provAtual === "openrouter"
+            ? MAX_TOTAL_B64_CHARS_OPENROUTER
+            : MAX_TOTAL_B64_CHARS;
     if (totalB64 > tetoB64) {
       const mb = Math.round(totalB64 / 1024 / 1024);
       throw new Error(
@@ -4632,11 +4735,26 @@
       (u.cache_read_input_tokens || 0) +
       (u.output_tokens || 0);
     if (!tokens) return;
+    // PROVEDOR SEM CONTAGEM EXATA: o `usage` pode não contar tudo, e aí ele NÃO
+    // é medição. MEDIDO em 01/09/2026 com chave real no OpenRouter: os modelos
+    // OpenAI reportam `prompt_tokens: 3` para um PDF de 12 páginas que o modelo
+    // LEU de fato (acertou uma linha com número aleatório dentro do arquivo) —
+    // o CUSTO vem correto, os tokens do arquivo é que não entram no campo. O
+    // Gemini, no mesmo caminho, reporta tudo. Tratar os dois como exatos faria
+    // o medidor cair para ~0% logo depois de um turno com centenas de folhas,
+    // que é o oposto do que ele existe para dizer, e gravaria um
+    // `ultimoTotalExato` ridículo. O maior entre medição e estimativa é a mesma
+    // disciplina de `guardaPorEstimativa` — e onde o usage é fiel os dois
+    // praticamente coincidem (medido: 6408 contra 6384 estimados em 12 folhas).
+    const total =
+      modelCaps.contagemTokens === false
+        ? Math.max(tokens, estimativaLocalTokens(ids))
+        : tokens;
     // Medição EXATA e de graça deste estado. Além do medidor, é o que permite
     // dispensar o count_tokens do próximo turno quando a folga é larga.
-    ultimoTotalExato = tokens;
+    ultimoTotalExato = total;
     panel.setContexto({
-      tokens,
+      tokens: total,
       ctxTokens: modelCaps.contextTokens,
       paginas: paginasDe(ids),
       maxPaginas: modelCaps.maxPages,
@@ -4860,7 +4978,14 @@
         return;
       }
 
-      const est = await estimarContexto(msgs, optsDoTurno());
+      // `ids` só é lido por `guardaPorEstimativa` (provedor sem contagem
+      // exata); nos demais o pré-voo mede o request de verdade e o campo é
+      // ignorado. Vai nos QUATRO chamadores para a guarda não depender de qual
+      // caminho pediu a medição.
+      const est = await estimarContexto(
+        msgs,
+        Object.assign(optsDoTurno(), { ids: idsMedidos })
+      );
       if (seq !== estSeq || busy) return;
       panel.setStatus("");
       if (est) {
@@ -5074,6 +5199,9 @@
       // web com code_execution no mesmo request (as versões _20260209 já
       // embutem execução para filtragem dinâmica).
       const opts = optsDoTurno();
+      // Conjunto que vai ao modelo — o mesmo de `guardaPaginas`. Lido só pela
+      // guarda por estimativa (provedor sem count_tokens).
+      opts.ids = [...selectedIds, ...anexos.keys()];
 
       // O request de fato: histórico + turno novo, SEM os blocos das peças
       // desmarcadas (prepararEnvio filtra por __pecaId) e sem campos internos.
@@ -5157,6 +5285,17 @@
         panel.mostrarFalhasPecas(semConteudo, {
           titulo: "peça(s) não entraram: o envio anterior expirou",
           dica: "Envie a mensagem de novo — elas serão baixadas e reenviadas.",
+        });
+      }
+      // Peças que o modelo não sabe ler. Canal próprio: a saída é trocar de
+      // modelo, não reenviar — e a nota nomeia o que ficou de fora, porque uma
+      // foto que não chegou é prova que não entrou na análise.
+      if (semSuporte.length) {
+        panel.mostrarFalhasPecas(semSuporte, {
+          titulo: "peça(s) não entraram: o modelo atual não lê imagens",
+          dica:
+            "Troque para um modelo que aceite imagens nas opções da extensão " +
+            "(ou extraia o texto com o OCR local, em ⬇ → Extrair o texto).",
         });
       }
       // Peças (e anexos de texto) que entraram CORTADAS. Só os deste turno: os
@@ -6274,6 +6413,7 @@
       // A bolha do assistente nasce DEPOIS daqui de propósito: um turno barrado
       // pelo pré-voo não deve deixar bolha vazia na conversa. (O catch ainda
       // remove `assistantEl` se ele existir — a falha pode vir do stream.)
+      optsMinuta.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
       await estimarContexto(messages, optsMinuta);
       assistantEl = panel.addMessage("assistant", "");
 
@@ -6613,6 +6753,7 @@
       // assistente nasce só depois do pré-voo, para um turno barrado não
       // deixar bolha vazia na conversa.
       const optsMapa = optsDoTurno();
+      optsMapa.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
       await estimarContexto(messages, optsMapa);
       assistantEl = panel.addMessage("assistant", "");
 

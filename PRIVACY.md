@@ -10,14 +10,14 @@ descreve, de forma completa, quais dados a extensão trata, para onde eles vão 
 **Resumo em uma frase:** a extensão não tem servidor próprio, não coleta telemetria e o
 desenvolvedor **nunca tem acesso a nenhum dado seu** — os documentos que você selecionar
 são enviados diretamente do seu navegador à API do provedor de IA que você escolheu
-(Anthropic, Google ou OpenAI), autenticados pela **sua própria chave de API**.
+(Anthropic, Google, OpenAI ou OpenRouter), autenticados pela **sua própria chave de API**.
 
 ## 1. Dados tratados e finalidade
 
 | Dado | Finalidade | Para onde vai |
 |---|---|---|
-| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — é o propósito único da extensão | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`), **Google** (`generativelanguage.googleapis.com`) ou **OpenAI** (`api.openai.com`). Nenhum outro serviço intermedia. |
-| **Chaves de API** (Anthropic, Google e/ou OpenAI) fornecidas por você | Autenticar as chamadas à API do respectivo provedor | Armazenadas **somente** no `chrome.storage.local` do seu navegador (não sincronizam entre dispositivos). Enviadas exclusivamente ao provedor correspondente, como cabeçalho de autenticação. Nunca chegam ao contexto da página do PJe. |
+| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — é o propósito único da extensão | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`), **Google** (`generativelanguage.googleapis.com`), **OpenAI** (`api.openai.com`) ou **OpenRouter** (`openrouter.ai`). Nos três primeiros nenhum outro serviço intermedia; o OpenRouter é, por definição, um **intermediário** — ver a seção 6. |
+| **Chaves de API** (Anthropic, Google, OpenAI e/ou OpenRouter) fornecidas por você | Autenticar as chamadas à API do respectivo provedor | Armazenadas **somente** no `chrome.storage.local` do seu navegador (não sincronizam entre dispositivos). Enviadas exclusivamente ao provedor correspondente, como cabeçalho de autenticação. Nunca chegam ao contexto da página do PJe. |
 | **Preferências** (modelo, nível de raciocínio, instruções personalizadas, modo de layout) | Funcionamento da interface | Somente `chrome.storage.local`. As instruções personalizadas são anexadas ao prompt enviado ao provedor escolhido. |
 | **Prompts salvos** (título e texto que você escreve na biblioteca de prompts) | Reaproveitar instruções suas nas conversas | `chrome.storage.sync`: ficam no seu navegador e, se você usar o Chrome com uma conta Google e a sincronização ligada, o próprio Chrome os replica nos seus outros dispositivos (o desenvolvedor não tem acesso). O texto do prompt vai ao provedor de IA junto da mensagem quando você o usa. |
 | **Rascunhos de minuta** (o texto que o modelo gera ao usar “Minutar” ou “Abrir no editor”, com o que você editar) | Permitir reabrir e continuar a minuta depois, inclusive noutro dia | `chrome.storage.local` — **ficam gravados neste computador**, não sincronizam e não saem dele. São apagados automaticamente após 7 dias (mantidos no máximo os 10 mais recentes); o botão **Descartar**, no editor, remove um rascunho na hora. |
@@ -71,9 +71,26 @@ modelo que **você** escolheu e configurou:
   vigente, a OpenAI não treina modelos com os dados enviados pela API por padrão. Arquivos
   enviados à Files API permanecem na **sua** conta OpenAI (você pode excluí-los pelo painel
   ou pela API).
+- **OpenRouter** — [política de privacidade](https://openrouter.ai/privacy) e
+  [termos](https://openrouter.ai/terms). Este é o único provedor que **é um
+  intermediário**: ele recebe o pedido e o encaminha à empresa que hospeda o modelo
+  escolhido, e é ela quem processa as peças. Duas consequências, e as duas importam num
+  processo judicial:
+  - **A extensão exige, em TODO envio, que o OpenRouter use apenas fornecedores que não
+    retêm os dados para treinamento** (parâmetro `data_collection: "deny"`). Não é uma
+    configuração que você precise lembrar de ligar: vai no pedido, sempre. Se nenhum
+    fornecedor elegível estiver disponível para o modelo escolhido, o envio **falha** com
+    esse aviso — em vez de seguir por um caminho menos protegido.
+  - Mesmo assim, **há um intermediário a mais na cadeia** em relação aos outros três, e a
+    escolha do fornecedor final é dele. Para material sob segredo de justiça, considere a
+    anonimização na origem (ver a seção do TecJustiça Sigilo no guia) ou um dos provedores
+    diretos.
+  - O OpenRouter **não recebe arquivos por referência** no fluxo de chat: cada mensagem
+    reenvia as peças marcadas. Nada fica guardado numa "conta de arquivos" dele — em
+    compensação, o mesmo conteúdo trafega a cada pergunta.
 
-Não há nenhum outro terceiro: as peças vão ao provedor de chat que você escolheu, e a
-mais ninguém.
+Não há nenhum outro terceiro além do provedor de chat que você escolheu (e, no caso do
+OpenRouter, do fornecedor que ele acionar para atender o pedido).
 
 A relação contratual com o provedor de IA é **sua** (a chave de API é sua); a extensão é
 apenas o cliente técnico dessa comunicação.
