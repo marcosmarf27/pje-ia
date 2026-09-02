@@ -3336,10 +3336,17 @@
   // tela dele e sem ver o valor não há como decidir. `reenviar` (opcional) é
   // chamado depois de liberar, para o chat repetir o envio sozinho.
   // Devolve true quando o erro era um bloqueio e foi tratado.
+  // Rótulo do último bloqueio vindo do WORKER (não da conferência local). O
+  // reenvio já remascara tudo o que é reescrevível; se o worker bloquear DE
+  // NOVO pelo mesmo rótulo, "Mascarar e reenviar" viraria um laço — o valor
+  // está onde a remáscara não chega, e a saída é a conversa nova.
+  let ultimoBloqueioWorker = null;
   function tratarBloqueioSigilo(e, textoDigitado, reenviar, bolhaUsuario) {
     if (!e || !e.vazamento) return false;
     const rotulo = e.rotulo || null;
     const valor = rotulo && mapaSigilo ? mapaSigilo.paraValor(rotulo) : null;
+    const repetido = !e.local && !!rotulo && rotulo === ultimoBloqueioWorker;
+    ultimoBloqueioWorker = e.local ? null : rotulo;
     // O turno bloqueado já ganhou uma bolha antes de a rede começar. Como ele
     // será restaurado no campo — e pode ser reenviado depois da liberação —,
     // a bolha precisa sair TAMBÉM do transcript visual. Sem isto o reenvio
@@ -3352,6 +3359,17 @@
       valor,
       mensagem: (e && e.message) || String(e),
       reenvia: !!reenviar,
+      // ONDE o valor estava (só a conferência local sabe) e se dá para
+      // reescrever. Sem `onde`, o bloqueio veio do worker: a remáscara do
+      // histórico já roda em todo envio, então "Mascarar e reenviar" é a
+      // tentativa certa — e, se bloquear de novo, a bolha volta com o canal.
+      onde: e.onde || null,
+      editavel: e.editavel !== false,
+      repetido,
+      // As saídas que PRESERVAM o nome: reenviar com a máscara refeita (chat)
+      // ou começar uma conversa nova (as peças mascaradas e o mapa continuam).
+      onMascarar: reenviar && e.editavel !== false && !repetido ? () => reenviar() : null,
+      onNovaConversa: () => panel.novaConversa(),
       onLiberar: rotulo
         ? async () => {
             const v = await liberarRotulo(rotulo);
@@ -3669,9 +3687,25 @@
   // autos, que precisa saber qual peça está olhando) e o texto exatamente como
   // sairia — o mesmo objeto que `montarBlocos` vai ler.
   function fichaAprovacao(id) {
-    const d = sigiloCache.get(id) || {};
+    const d = textoSigiloAtual(id) || {};
     const texto = typeof d.text === "string" ? d.text : "";
     return { id, titulo: metaDe(id).titulo, texto, chars: texto.length };
+  }
+  // O TEXTO DO CACHE ACOMPANHA O MAPA. O que sai no request é remascarado por
+  // `prepararEnvio`, mas a caixa de conferência e a auditoria leem o
+  // `sigiloCache` — e mostrariam o nome em claro num texto cuja cópia enviada
+  // já levava o rótulo: o usuário aprovaria uma coisa e sairia outra. Regrava
+  // a entrada com a máscara do mapa atual, uma vez por versão do mapa
+  // (`versaoMascara`), para não varrer todas as peças a cada repintura.
+  function textoSigiloAtual(id) {
+    const d = sigiloCache.get(id);
+    if (!d || typeof d.text !== "string" || !mapaSigilo) return d;
+    const v = versaoMapaSigilo();
+    if (d.versaoMascara === v) return d;
+    const t = mascararCurto(d.text);
+    const novo = Object.assign({}, d, { text: t, versaoMascara: v });
+    sigiloCache.set(id, novo);
+    return novo;
   }
   async function confirmarEnvioSigiloso(ids) {
     if (!modoSigiloso || !mapaSigilo) return;
@@ -3864,6 +3898,7 @@
       // foi cancelado na caixa) não saiu, e listá-la aqui seria a prova
       // afirmando o que não aconteceu.
       if (sigiloAguardando.has(id)) continue;
+      const atual = textoSigiloAtual(id) || d;
       pecas.push({
         id,
         // DOIS títulos, e a distinção é o que torna o relatório compartilhável.
@@ -3877,8 +3912,8 @@
         // modelo, então o relatório continua descrevendo o que saiu.
         titulo: metaDe(id).titulo,
         tituloEnviado: tituloParaEnvio(id),
-        chars: (d.text || "").length,
-        texto: d.text || "",
+        chars: (atual.text || "").length,
+        texto: atual.text || "",
       });
     }
     return { itens, pecas };
@@ -5595,6 +5630,7 @@
   // Custo aceito: mudar a seleção invalida o cache de prefixo daquele ponto em
   // diante (mesma regra já aceita para o toggle de busca/troca de modelo).
   function prepararEnvio(msgs, ativos) {
+    const remascarar = modoSigiloso && mapaSigilo ? remascaradorDeSaida() : null;
     return msgs.map((t) => {
       if (!Array.isArray(t.content)) return t;
       const content = [];
@@ -5603,13 +5639,140 @@
           if (ativos && !ativos.has(b.__pecaId)) continue; // peça desmarcada: fora do request
           const limpo = Object.assign({}, b);
           delete limpo.__pecaId;
-          content.push(limpo);
+          content.push(remascarar ? remascarar(b, limpo) : limpo);
         } else {
-          content.push(b);
+          content.push(remascarar ? remascarar(b, b) : b);
         }
       }
       return { role: t.role, content };
     });
+  }
+
+  // O HISTÓRICO É REMASCARADO COM O MAPA ATUAL a cada envio (modo sigiloso).
+  //
+  // O mapa CRESCE ao longo da conversa: um nome que o NER só encontra na
+  // terceira peça já viajou EM CLARO na primeira — a pós-condição daquela peça
+  // conferiu contra o mapa daquele momento, e passou. Como a API é stateless e
+  // cada turno remonta a conversa inteira, o request seguinte carrega o nome em
+  // claro num bloco antigo (texto da peça, ou a resposta em que o modelo o
+  // repetiu), e a guarda de saída bloqueia — para sempre, com "Liberar" como
+  // única saída, que é exatamente a saída que quem quer manter o nome
+  // protegido não pode aceitar. Caso real: "Antônio José Correia", [PESSOA_9].
+  //
+  // A correção é remascarar a CÓPIA que sai (`prepararEnvio` já devolve uma),
+  // nunca `conversation`: o que está gravado é o que foi visto. Só texto é
+  // tocado — blocos de texto (usuário e assistente) e `document` de texto
+  // (`source.type:"text"`, com o `title`). O que carrega assinatura ou é opaco
+  // (`thinking`, `x-gemini-item`, `x-openai-item`, `x-openrouter-item`, imagem,
+  // `file`) fica intacto: para esses, quem decide é `conferirSaidaSigilo`.
+  //
+  // Custo: `mascararCurto` sobre o histórico inteiro a cada envio seria caro
+  // com dezenas de peças; o resultado é memoizado por bloco (WeakMap sobre o
+  // objeto do histórico, que é estável) e invalidado pela VERSÃO do mapa
+  // (quantos rótulos + quantos liberados). Durante a MEDIÇÃO (`medindoSemGravar`)
+  // a máscara roda num mapa efêmero e o resultado NÃO entra no memo — um rótulo
+  // que não existe no mapa real não pode ser reaproveitado num envio.
+  const remascaraMemo = new WeakMap();
+  function versaoMapaSigilo() {
+    return mapaSigilo ? mapaSigilo.tabela().length + "/" + liberadosSigilo.size : "";
+  }
+  function remascaradorDeSaida() {
+    const versao = versaoMapaSigilo();
+    const memo = !medindoSemGravar;
+    return (original, bloco) => {
+      if (!bloco || typeof bloco !== "object") return bloco;
+      if (memo) {
+        const m = remascaraMemo.get(original);
+        if (m && m.versao === versao) return m.bloco;
+      }
+      let saida = bloco;
+      if (bloco.type === "text" && typeof bloco.text === "string") {
+        const t = mascararCurto(bloco.text);
+        if (t !== bloco.text) saida = Object.assign({}, bloco, { text: t });
+      } else if (
+        bloco.type === "document" &&
+        bloco.source &&
+        bloco.source.type === "text" &&
+        typeof bloco.source.data === "string"
+      ) {
+        const d = mascararCurto(bloco.source.data);
+        const ti = typeof bloco.title === "string" ? mascararCurto(bloco.title) : bloco.title;
+        if (d !== bloco.source.data || ti !== bloco.title) {
+          saida = Object.assign({}, bloco, { source: Object.assign({}, bloco.source, { data: d }) });
+          if (ti !== bloco.title) saida.title = ti;
+        }
+      }
+      if (memo) remascaraMemo.set(original, { versao, bloco: saida });
+      return saida;
+    };
+  }
+
+  // CONFERÊNCIA LOCAL DO QUE VAI SAIR, bloco a bloco — a mesma regra da guarda
+  // do worker (`PSEUD.conferir`: valores do mapa, fronteira de palavra), só que
+  // AQUI ela sabe dizer ONDE o valor está, e é isso que muda a saída oferecida
+  // ao usuário. A guarda do worker vê um corpo serializado e devolve uma
+  // posição; esta vê a conversa e devolve "numa resposta anterior da IA" ou
+  // "no raciocínio guardado do modelo". Roda ANTES do pré-voo: nada vai à rede.
+  // O system NÃO é conferido aqui (a guarda do worker o cobre, com as regiões
+  // isentas das constantes do programa).
+  //
+  // Lança um erro com a MESMA forma do bloqueio do worker (`vazamento`, `tipo`,
+  // `rotulo`) mais `onde` e `editavel`: false quando o valor está num bloco que
+  // não pode ser reescrito (raciocínio assinado/criptografado) — aí a única
+  // saída que preserva o nome é uma conversa nova.
+  function conferirSaidaSigilo(msgs) {
+    if (!modoSigiloso || !mapaSigilo || !Array.isArray(msgs)) return;
+    const ultimo = msgs.length - 1;
+    for (let i = 0; i < msgs.length; i++) {
+      const t = msgs[i];
+      if (!t || !Array.isArray(t.content)) continue;
+      for (const b of t.content) {
+        if (!b || typeof b !== "object") continue;
+        let texto = null;
+        let onde = null;
+        let editavel = true;
+        if (b.type === "text" && typeof b.text === "string") {
+          texto = b.text;
+          onde =
+            t.role === "assistant"
+              ? "numa resposta anterior da IA"
+              : i === ultimo
+                ? "na sua pergunta deste envio"
+                : "numa pergunta anterior desta conversa";
+        } else if (b.type === "document" && b.source && b.source.type === "text") {
+          texto = String(b.source.data || "") + "\n" + String(b.title || "");
+          onde =
+            "no texto da peça " +
+            (b.title ? "«" + String(b.title).slice(0, 60) + "»" : "anexada") +
+            (i === ultimo ? "" : ", enviada num turno anterior");
+        } else if (typeof b.type === "string" && b.type.startsWith("x-")) {
+          try {
+            texto = JSON.stringify(b.raw || b);
+          } catch {
+            texto = null;
+          }
+          onde =
+            "no raciocínio guardado do modelo, de um turno anterior — uma parte da " +
+            "conversa que não pode ser reescrita";
+          editavel = false;
+        }
+        if (texto == null) continue;
+        const conf = PSEUD.conferir(texto, mapaSigilo);
+        if (conf.ok) continue;
+        const e = new Error(
+          "um valor do tipo " + conf.tipo + (conf.rotulo ? " (" + conf.rotulo + ")" : "") +
+            " apareceria " + onde + "; nada foi enviado"
+        );
+        e.vazamento = true;
+        e.tipo = conf.tipo;
+        e.rotulo = conf.rotulo || null;
+        e.onde = onde;
+        e.editavel = editavel;
+        e.local = true;
+        e.retryable = false;
+        throw e;
+      }
+    }
   }
 
   // Acrescenta o inventário de peças não anexadas ao ÚLTIMO bloco de texto do
@@ -5699,6 +5862,41 @@
   // sozinhos, até 2 vezes: o prefixo já está no cache de prompt e a
   // repetição custa uma fração. handlers.onReinicio(n) zera a UI do turno
   // (o novo envio re-streama tudo desde o início).
+  // ESPERA PELO MODELO, COM RELÓGIO. Entre o Enter e o primeiro token pode
+  // haver dezenas de segundos (raciocínio longo, modelo lento no OpenRouter) e
+  // a tela mostrava uma bolha vazia com três pontos e o status em branco — o
+  // usuário não sabia se a mensagem estava sendo processada (relato real). O
+  // status passa a contar os segundos: um número que anda é o que distingue
+  // "esperando" de "travou". `rotularEspera` troca o texto sem zerar o relógio
+  // (o raciocínio começa, a busca começa — a espera é a mesma); `pararEspera`
+  // no primeiro token e no fim do turno.
+  let esperaTimer = null;
+  let esperaT0 = 0;
+  let esperaRotulo = "";
+  let esperaIcone = undefined;
+  function pintarEspera() {
+    const seg = Math.round((Date.now() - esperaT0) / 1000);
+    panel.setStatus(esperaRotulo + (seg >= 3 ? " — " + seg + " s" : ""), true, esperaIcone);
+  }
+  function comecarEspera(rotulo, icone) {
+    pararEspera();
+    esperaT0 = Date.now();
+    esperaRotulo = rotulo;
+    esperaIcone = icone;
+    pintarEspera();
+    esperaTimer = setInterval(pintarEspera, 1000);
+  }
+  function rotularEspera(rotulo, icone) {
+    if (!esperaTimer) return comecarEspera(rotulo, icone);
+    esperaRotulo = rotulo;
+    esperaIcone = icone;
+    pintarEspera();
+  }
+  function pararEspera() {
+    if (esperaTimer) clearInterval(esperaTimer);
+    esperaTimer = null;
+  }
+
   function stream(messages, handlers, opts, tipo) {
     // PORTÃO DURO do modo sigiloso: peça mascarada que o usuário ainda não
     // aprovou não sai por aqui (ver `confirmarEnvioSigiloso`). Lança SÍNCRONO,
@@ -6320,7 +6518,16 @@
           content: [...montarBlocos(novas), { type: "text", text: "…" }],
         });
       }
-      const msgs = prepararEnvio(rascunho, ativos);
+      // `medindoSemGravar` também aqui: `prepararEnvio` remascara o histórico
+      // com o mapa (ver `remascaradorDeSaida`), e a medição não pode gravar
+      // rótulo novo — a mesma regra do system, logo abaixo.
+      let msgs;
+      medindoSemGravar = true;
+      try {
+        msgs = prepararEnvio(rascunho, ativos);
+      } finally {
+        medindoSemGravar = false;
+      }
       if (!msgs.length) {
         panel.setStatus("");
         panel.setContexto(null);
@@ -6667,6 +6874,9 @@
         ),
         selectedIds
       );
+      // Modo sigiloso: confere o que vai sair ANTES de qualquer rede, e com o
+      // canal nomeado (ver `conferirSaidaSigilo`). Lança como a guarda do worker.
+      conferirSaidaSigilo(msgsEnvio);
 
       // PRÉ-VOO CONDICIONAL. O count_tokens custa uma ida e volta à API e, num
       // turno sem peça nova (a pergunta de acompanhamento), é o ÚNICO bloqueio
@@ -6778,7 +6988,7 @@
         conversaProvider = (modelCaps && modelCaps.provider) || "anthropic";
       }
 
-      panel.setStatus("Analisando…" + infoCtx, true);
+      comecarEspera("Analisando…" + infoCtx);
       assistantEl = panel.addMessage("assistant", "");
       // Citações deste turno: marcadores [n] entram no texto via placeholders
       // (área de uso privado do Unicode — sobrevivem intactos ao escape do
@@ -6790,9 +7000,11 @@
       let ckpt = null; // estado da UI no início do request físico corrente
       const fim = await stream(msgsEnvio, {
         onDelta(delta) {
-          // limpa o status inicial e também o de ferramenta (a busca acabou
-          // quando o texto volta a fluir)
+          // Delta VAZIO não é o primeiro token: limpar o status e a bolha por
+          // ele deixava a tela em branco pelo resto do raciocínio.
+          if (!delta) return;
           if (!acc || statusFerramenta) {
+            pararEspera();
             panel.setStatus("");
             statusFerramenta = false;
           }
@@ -6804,7 +7016,7 @@
             thinkAcc += t;
             panel.setThinking(assistantEl, thinkAcc);
           }
-          if (!acc) panel.setStatus("Raciocinando sobre as peças…", true);
+          if (!acc) rotularEspera("Raciocinando sobre as peças…");
         },
         onCitation(c) {
           const k = chaveCitacao(c);
@@ -6823,11 +7035,12 @@
         // O QUE está sendo pesquisado/lido.
         onTool(name, input) {
           statusFerramenta = true;
+          // A ferramenta roda no meio da espera: o relógio segue, o rótulo muda.
+          pararEspera();
           if (name === "web_search") {
             const q = input && input.query;
-            panel.setStatus(
+            rotularEspera(
               q ? "Pesquisando jurisprudência: “" + q + "”…" : "Pesquisando jurisprudência na web…",
-              true,
               "busca"
             );
           } else if (name === "web_fetch") {
@@ -7036,6 +7249,7 @@
       if (!conversation.length) conversaProvider = null;
       if (!conversation.length) conversaSigilosa = null;
     } finally {
+      pararEspera();
       busy = false;
       panel.lockInput(false);
       // Um ponto só para os QUATRO caminhos que mexem em `pecasNaConversa`
@@ -7904,16 +8118,23 @@
       // pelo pré-voo não deve deixar bolha vazia na conversa. (O catch ainda
       // remove `assistantEl` se ele existir — a falha pode vir do stream.)
       optsMinuta.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
+      conferirSaidaSigilo(messages);
       await estimarContexto(messages, optsMinuta);
       assistantEl = panel.addMessage("assistant", "");
 
+      comecarEspera("Gerando a minuta…");
       const fimMinuta = await stream(messages, {
         onDelta(delta) {
+          if (!delta) return;
+          if (!acc) {
+            pararEspera();
+            panel.setStatus("Redigindo a minuta…", true);
+          }
           acc += delta;
           panel.updateAssistant(assistantEl, acc);
         },
         onThinking() {
-          if (!acc) panel.setStatus("Planejando a estrutura do ato…", true);
+          if (!acc) rotularEspera("Planejando a estrutura do ato…");
         },
         onTool() {},
         onTrunc() {},
@@ -7973,8 +8194,10 @@
       panel.setStatus("");
     } catch (e) {
       panel.endPrep(true);
-      // Cancelado na conferência do modo sigiloso: decisão, não erro.
+      // Cancelado na conferência do modo sigiloso: decisão, não erro. Bloqueio
+      // da guarda: a bolha com as saídas, como no chat (sem campo a restaurar).
       if (e && e.cancelado) panel.setStatus(e.message);
+      else if (tratarBloqueioSigilo(e, null, null)) panel.setStatus("");
       else panel.setStatus("Erro: " + (e && e.message ? e.message : e));
       // contexto cheio: o pré-voo agora existe também aqui, e o usuário precisa
       // AGIR (desmarcar peças, mandar menos modelos ou recomeçar)
@@ -7984,6 +8207,7 @@
       }
       if (assistantEl && !acc) panel.removeMessage(assistantEl);
     } finally {
+      pararEspera();
       busy = false;
       panel.lockInput(false);
       // A minuta É um registro da conversa: o card fica na tela e o markdown
@@ -8257,16 +8481,23 @@
       // deixar bolha vazia na conversa.
       const optsMapa = optsDoTurno();
       optsMapa.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
+      conferirSaidaSigilo(messages);
       await estimarContexto(messages, optsMapa);
       assistantEl = panel.addMessage("assistant", "");
 
+      comecarEspera("Gerando o mapa mental…");
       const fimMapa = await stream(messages, {
         onDelta(delta) {
+          if (!delta) return;
+          if (!acc) {
+            pararEspera();
+            panel.setStatus("Desenhando o mapa…", true);
+          }
           acc += delta;
           panel.updateAssistant(assistantEl, acc);
         },
         onThinking() {
-          if (!acc) panel.setStatus("Organizando os eixos do mapa…", true);
+          if (!acc) rotularEspera("Organizando os eixos do mapa…");
         },
         onTool() {},
         onTrunc() {},
@@ -8322,8 +8553,10 @@
       panel.setStatus("");
     } catch (e) {
       panel.endPrep(true);
-      // Cancelado na conferência do modo sigiloso: decisão, não erro.
+      // Cancelado na conferência do modo sigiloso: decisão, não erro. Bloqueio
+      // da guarda: a bolha com as saídas, como no chat.
       if (e && e.cancelado) panel.setStatus(e.message);
+      else if (tratarBloqueioSigilo(e, null, null)) panel.setStatus("");
       else panel.setStatus("Erro: " + (e && e.message ? e.message : e));
       if (e && e.ctxCheio) {
         ultimaChaveEst = "";
@@ -8331,6 +8564,7 @@
       }
       if (assistantEl && !acc) panel.removeMessage(assistantEl);
     } finally {
+      pararEspera();
       busy = false;
       panel.lockInput(false);
       // Mesma razão da minuta: o card do mapa é parte do registro da conversa,
@@ -8668,6 +8902,7 @@
       sigiloPendentes.clear();
       sigiloAguardando.clear();
       liberadosSigilo.clear();
+      ultimoBloqueioWorker = null;
       conversaSigilosa = null;
       panel.setSigiloso(false, 0, { itens: [], pecas: [] });
       // A segunda frase não é enfeite: `memoriaMorta` desliga a gravação até o

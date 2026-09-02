@@ -103,7 +103,34 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.56.0</span> <strong>Modo sigiloso</strong> que funciona, se vê e deixa você decidir</h2>
+        <h2><span class="v novo">v0.56.1</span> <strong>Bloqueio com saída</strong> que preserva o nome, e a espera que se vê</h2>
+        <p>
+          <strong>Você não precisa mais liberar um nome para conseguir enviar.</strong> Quando a
+          proteção bloqueava um envio, a bolha só oferecia “Liberar neste processo” — e quem
+          queria manter o nome protegido ficava sem opção (relato real, com “Antônio José
+          Correia”). A causa era estrutural: o mapa de rótulos cresce ao longo da conversa, e um
+          nome que o reconhecedor só encontra na terceira peça já tinha ido em claro na primeira;
+          como cada mensagem reenvia a conversa inteira, a barreira bloqueava para sempre.
+        </p>
+        <p>
+          Agora <strong>toda a conversa é remascarada com o mapa atual a cada envio</strong> (só o
+          que vai ao provedor; o que está gravado não muda), a conferência roda antes de qualquer
+          rede e diz <strong>onde</strong> o valor estava, e a bolha oferece primeiro o que
+          preserva o nome: <strong>Mascarar e reenviar</strong>, ou <strong>Nova conversa</strong>
+          mantendo as peças anonimizadas — a única saída quando o valor está numa parte da
+          conversa que não pode ser reescrita (o raciocínio guardado do modelo). Liberar continua
+          existindo, dito como o que é. Minuta e mapa mental também mostram a bolha.
+        </p>
+        <p>
+          <strong>Dá para ver que está processando.</strong> Entre o Enter e a primeira palavra
+          da resposta, o status passa a contar os segundos (“Analisando… — 12 s”) e a bolha mantém
+          o indicador até haver texto — antes, uma bolha vazia e um status em branco não diziam se
+          a mensagem estava sendo processada.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.56.0</span> <strong>Modo sigiloso</strong> que funciona, se vê e deixa você decidir</h2>
         <p>
           A v0.55.0 trouxe a <strong>anonimização local</strong>: com o botão <strong>Sigiloso</strong>
           ligado, as peças deixam de ir como arquivo e vão como texto com nomes, CPF, OAB e o
@@ -1941,6 +1968,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.56.1</span></td><td>02/09/2026</td><td><strong>Bloqueio da proteção com saída que preserva o nome.</strong> A conversa inteira é remascarada com o mapa atual a cada envio (um nome descoberto tarde não volta em claro num bloco antigo); a conferência roda antes de qualquer rede e diz onde o valor estava; a bolha oferece “Mascarar e reenviar” e “Nova conversa (mantém as peças)” antes de “Liberar”, também na minuta e no mapa. A espera pelo modelo conta os segundos no status e a bolha mantém o indicador até haver texto</td></tr>
             <tr><td><span class="v">0.56.0</span> <span class="dot-marco"></span></td><td>02/09/2026</td><td><strong>Modo sigiloso corrigido, visível e negociável.</strong> A lista de termos nunca mascarados não carregava (faltava no manifesto); o que o reconhecedor achava numa peça não era aplicado na ficha, nos títulos e na pergunta, e a última barreira bloqueava o envio por um órgão público. Agora tudo o que já foi mascarado vale em todos os canais, órgãos públicos saem em claro por prefixo, e um bloqueio vira decisão na conversa: “Liberar neste processo” devolve a pergunta ao campo e reenvia. Peça que não pôde ser anonimizada diz isso; o card não conta além do total. Os nomes voltam na tela (a resposta chega com rótulos e é reidentificada pela tabela local, marcada) e no editor de minutas (“Restaurar nomes”); formas diferentes do mesmo nome recebem um rótulo só. O painel inteiro muda de cor com o modo ligado (cabeçalho verde, tarja com a contagem, botão Enviar). Abrir, fechar, trocar de modo e recolher a lista ganharam animações perceptíveis. OpenRouter: modelo que não lê PDF (DeepSeek, GLM) recebe o texto extraído no computador do usuário, com OCR local — o processo de 120 folhas que batia em “~22 MB” passa; DeepSeek atualizado para o V4 Flash 0731 (1,3M); teto de tamanho por fabricante nos modelos que leem PDF; liberar um nome libera todas as formas dele. E o envio passou a pedir aprovação: uma caixa mostra o texto anonimizado exatamente como vai sair, peça por peça, com editar/mascarar/liberar, antes de qualquer coisa ir ao provedor (chat, minuta e mapa; desligável nas Configurações)</td></tr>
             <tr><td><span class="v">0.55.0</span></td><td>01/09/2026</td><td><strong>Anonimização local antes do envio (modo sigiloso).</strong> Com o botão Sigiloso ligado, as peças vão como texto com nomes, CPF, CNPJ, OAB, e-mail, telefone e o número do processo substituídos por rótulos estáveis, reconhecidos no próprio computador por regras com dígito verificador, pela ficha do processo e por um modelo de entidades em português; o PDF não sai da máquina. Uma guarda no serviço da extensão confere cada requisição antes de sair. Caixa de auditoria mostra o texto exatamente como foi enviado e a tabela de reidentificação, que fica só na tela; relatório de conferência para baixar sem a tabela</td></tr>
             <tr><td><span class="v">0.54.0</span> <span class="dot-marco"></span></td><td>01/09/2026</td><td><strong>OpenRouter como quarto provedor.</strong> Uma chave passa a dar acesso a centenas de modelos de vários fornecedores, incluindo os que a extensão não lista — basta colar o identificador. As capacidades de cada modelo (janela, preço, se lê PDF) vêm do catálogo público do próprio OpenRouter, então modelo novo não exige atualização da extensão. O <strong>custo do rodapé passa a ser medido</strong>, não calculado por tabela: é o valor debitado da conta. Em todo envio a extensão exige fornecedores que <strong>não retenham os dados</strong> para treino — autos não podem virar material de treinamento. Como ele não recebe arquivos por referência, as peças são reenviadas a cada mensagem, e há um teto de ~15 MB por conversa avisado antes do envio. Claude, Gemini e GPT diretos seguem intocados</td></tr>

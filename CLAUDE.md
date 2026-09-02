@@ -2826,6 +2826,66 @@ palavra da extensão — e a palavra da extensão não é auditoria. O sinal de 
 peça faltava estava no próprio código: `PSEUD.tabela()` existe com o comentário
 "a tabela que a caixa de auditoria mostra" e **não tinha um único consumidor**.
 
+**O HISTÓRICO É REMASCARADO COM O MAPA ATUAL A CADA ENVIO, e o bloqueio da
+guarda tem saída que PRESERVA o nome** (`remascaradorDeSaida` dentro de
+`prepararEnvio`, `conferirSaidaSigilo`, a bolha com "Mascarar e reenviar" /
+"Nova conversa", v0.56.1). Caso real: "Antônio José Correia" ([PESSOA_9])
+bloqueava o envio e a bolha só oferecia "Liberar" — quem quer manter o nome
+protegido ficava sem opção. A causa é estrutural: o mapa CRESCE ao longo da
+conversa (o NER só achou o nome na terceira peça), a API é stateless e cada
+turno remonta a conversa inteira — o bloco antigo (texto da peça, ou a resposta
+em que o modelo repetiu o nome) volta com o nome em claro, e a guarda bloqueia
+para sempre. Regras:
+- **Remascara a CÓPIA de saída, nunca `conversation`**: `prepararEnvio` já
+  devolve uma cópia; só blocos de texto e `document` de texto (`source.data` e
+  `title`) são tocados. Assinado ou opaco (`thinking`, `x-gemini-item`,
+  `x-openai-item`, `x-openrouter-item`, imagem, `file`) fica intacto.
+- **Memoizado por bloco (WeakMap) e invalidado pela VERSÃO do mapa**
+  (rótulos + liberados): sem isso `mascararCurto` varreria o histórico inteiro
+  a cada envio. Durante a MEDIÇÃO (`medindoSemGravar`) o memo é pulado, e
+  `refinarContexto` liga o flag também em volta do `prepararEnvio` — a medição
+  não pode gravar rótulo novo (o teste do mapa-que-não-cresce cobre).
+- **`conferirSaidaSigilo(msgs)` roda ANTES do pré-voo nos três fluxos** com a
+  MESMA regra da guarda (`PSEUD.conferir`), bloco a bloco: ela sabe dizer ONDE
+  o valor está ("numa resposta anterior da IA", "no texto da peça «x», enviada
+  num turno anterior", "no raciocínio guardado do modelo") e se o bloco é
+  reescrevível. O erro tem a forma do bloqueio do worker (`vazamento`, `tipo`,
+  `rotulo`) mais `onde` e `editavel`. O system NÃO é conferido aqui (o worker
+  cobre, com as `isentas`).
+- **A bolha oferece primeiro o que PRESERVA o nome**: "Mascarar e reenviar"
+  (chat, canal reescrevível — o reenvio já remascara) e "Nova conversa (mantém
+  as peças)" (`panel.novaConversa`, o MESMO `resetCb` do botão) — a única saída
+  quando o canal é opaco, e aí ela ganha `.destaque`. "Liberar" fica por último,
+  no vermelho de alerta, dito como o que é: abrir mão de uma proteção. Minuta e
+  mapa passaram a mostrar a bolha (antes caíam em "Erro:").
+- **O `sigiloCache` também acompanha o mapa** (`textoSigiloAtual`, regravado
+  uma vez por versão do mapa): a caixa de conferência e a auditoria leem o
+  cache, e mostrariam o nome em claro num texto cuja cópia enviada já levava o
+  rótulo — o usuário aprovaria uma coisa e sairia outra.
+- **Segundo bloqueio do WORKER pelo MESMO rótulo tira o "Mascarar e reenviar"**
+  (`ultimoBloqueioWorker`, `repetido`): o reenvio já remascarou tudo o que é
+  reescrevível; repetir o botão seria um laço, e a bolha passa à conversa nova.
+- Coberto por `t-turno-sigiloso.mjs` modos `historico` (2º turno com uma peça
+  cujo NER descobre um nome que a 1ª peça já levara em claro: o bloco antigo
+  sai remascarado, nenhuma bolha, o mapa gravado conhece o nome) e `opaco`
+  (raciocínio do OpenRouter com o nome: bloqueio LOCAL antes da rede, sem
+  pré-voo, bolha sem "Mascarar" e com "Nova conversa" em destaque, que zera o
+  chat mantendo o modo) e pelo `t-sigilo-56 bloqueio` (as duas saídas presentes,
+  "Mascarar" antes de "Liberar"). O caminho da bolha na minuta e no mapa não
+  tem teste de ponta a ponta.
+
+**A ESPERA PELO MODELO TEM RELÓGIO** (`comecarEspera`/`rotularEspera`/
+`pararEspera` em content.js, v0.56.1). Entre o Enter e o primeiro token pode
+haver dezenas de segundos, e a tela mostrava uma bolha vazia com três pontos e o
+status em branco — relato real: "não sei se o chat está processando". O status
+conta os segundos ("Analisando… — 12 s"): um número que anda é o que distingue
+"esperando" de "travou". `rotularEspera` troca o texto sem zerar o relógio
+(raciocínio, busca); `pararEspera` no primeiro token e no `finally` dos três
+fluxos. E **delta VAZIO não é o primeiro token**: os clientes Gemini/OpenAI
+emitem `text: ""`, e limpar o status e tirar os pontos por ele deixava a bolha
+em branco pelo resto do raciocínio — `onDelta` ignora, e `updateAssistant`
+mantém o indicador enquanto não há texto.
+
 **Falso positivo da guarda vira decisão LOCAL, não erro de rede.** A bolha
 `.sigilo-bloqueio` mostra o valor resolvido localmente e oferece “Liberar neste
 processo”. A escolha entra em `casodb` junto do mapa (`sigilo.liberados`) e o

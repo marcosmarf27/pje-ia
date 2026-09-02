@@ -1508,6 +1508,28 @@ button > svg { flex: none; }
   font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
 }
 .sigilo-bloqueio .sb-aud:hover { border-color: var(--line-focus); color: var(--pje-2); }
+/* As saídas que PRESERVAM o nome. "Mascarar e reenviar" é a ação principal e
+   veste o gradiente do modo sigiloso (é o modo trabalhando a seu favor);
+   "Nova conversa" é secundária, salvo quando é a ÚNICA que preserva o nome
+   (`.destaque`, canal opaco). "Liberar" fica no vermelho de alerta, que é o
+   que ele é: abrir mão de uma proteção. */
+.sigilo-bloqueio .sb-mascarar {
+  border: none; border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
+  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
+  box-shadow: var(--sh-btn);
+}
+.sigilo-bloqueio .sb-mascarar:disabled { opacity: 0.72; cursor: default; }
+.sigilo-bloqueio .sb-nova {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
+  font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
+}
+.sigilo-bloqueio .sb-nova:hover { border-color: var(--ok-ink); color: var(--ok-ink); }
+.sigilo-bloqueio .sb-nova.destaque {
+  border: none; background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  box-shadow: var(--sh-btn);
+}
 .sigilo-bloqueio.liberado { border-left-color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
 .sigilo-bloqueio.liberado .sb-h { color: var(--ok-ink); }
 /* Item LIBERADO na tabela da auditoria: fica (uma minuta antiga pode carregar

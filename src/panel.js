@@ -6670,6 +6670,12 @@ var PjePanel = (function () {
       onConfigure(cb) {
         configureCb = cb;
       },
+      // O MESMO gesto do botão "Nova conversa" — usado pela bolha de bloqueio
+      // do modo sigiloso, que oferece a conversa nova como saída que preserva
+      // o nome. Passa pelo mesmo callback; não há segundo caminho de reset.
+      novaConversa() {
+        if (resetCb) resetCb();
+      },
       onReset(cb) {
         resetCb = cb;
       },
@@ -7186,6 +7192,10 @@ var PjePanel = (function () {
       // bolha. Com `id` (peça do processo), a linha vira botão que rola a
       // timeline até a peça — é o que torna a resposta auditável nos autos.
       updateAssistant(el, fullText, cites) {
+        // Nada para mostrar ainda: a bolha continua com o indicador de
+        // digitação. Um delta vazio (provedores mandam) não pode deixar uma
+        // bolha em branco pelo resto do raciocínio.
+        if (!fullText && !(cites && cites.length) && !el.__body) return;
         estruturaAssistant(el);
         // recolhe o raciocínio quando a resposta começa a chegar
         if (el.__think && !el.__think.hidden && fullText) el.__think.open = false;
@@ -7899,7 +7909,7 @@ var PjePanel = (function () {
           : String(o.tipo || "dado protegido").toLowerCase();
         el.querySelector(".sb-p").textContent =
           "A guarda encontrou no conteúdo que seria enviado um valor identificado como " +
-          tipo + ". Nada foi enviado à IA.";
+          tipo + (o.onde ? " — " + o.onde : "") + ". Nada foi enviado à IA.";
 
         const valorEl = el.querySelector(".sb-valor");
         if (o.valor) {
@@ -7909,10 +7919,76 @@ var PjePanel = (function () {
 
         const nota = el.querySelector(".sb-nota");
         const acts = el.querySelector(".sb-acts");
+        // AS SAÍDAS QUE PRESERVAM O NOME vêm PRIMEIRO. Até aqui a bolha só
+        // oferecia "Liberar", e quem não quer liberar ficava sem opção (relato
+        // real). Com o canal reescrevível, a máscara é refeita no reenvio; com
+        // o canal opaco (raciocínio guardado do modelo), só uma conversa nova
+        // mantém o nome protegido — e as peças mascaradas continuam prontas.
+        const editavel = o.editavel !== false;
+        const frases = [];
+        if (o.repetido) {
+          frases.push(
+            "A máscara já foi refeita e a proteção bloqueou de novo pelo mesmo valor: ele " +
+              "está numa parte da conversa que não dá para reescrever daqui. Para manter o " +
+              "nome protegido, comece uma nova conversa — as peças anonimizadas e a tabela " +
+              "de rótulos continuam valendo."
+          );
+        } else if (!editavel) {
+          frases.push(
+            "Para manter o nome protegido, comece uma nova conversa: as peças já " +
+              "anonimizadas e a tabela de rótulos continuam valendo, e essa parte da " +
+              "conversa que não pode ser reescrita fica para trás."
+          );
+        } else if (typeof o.onMascarar === "function") {
+          frases.push(
+            "Para manter o nome protegido, clique em Mascarar e reenviar: a máscara é " +
+              "refeita em toda a conversa com tudo o que o mapa já conhece."
+          );
+        } else {
+          frases.push(
+            "Para manter o nome protegido, gere novamente: a máscara é refeita em toda a " +
+              "conversa com tudo o que o mapa já conhece."
+          );
+        }
         if (o.valor && typeof o.onLiberar === "function") {
-          nota.textContent =
-            "Se este valor identifica apenas um órgão público ou outro dado não pessoal, " +
-            "você pode liberá-lo somente para este processo.";
+          frases.push(
+            "Liberar só faz sentido se este valor identificar um órgão público ou outro " +
+              "dado não pessoal — vale somente para este processo."
+          );
+        }
+        if (editavel && typeof o.onMascarar === "function") {
+          const bm = document.createElement("button");
+          bm.type = "button";
+          bm.className = "sb-mascarar";
+          bm.textContent = "Mascarar e reenviar";
+          bm.title = "Refaz a máscara em toda a conversa com o mapa atual e envia de novo";
+          bm.addEventListener("click", () => {
+            bm.disabled = true;
+            bm.textContent = "Reenviando…";
+            try {
+              o.onMascarar();
+              el.classList.add("liberado");
+              el.querySelector(".sb-h span").textContent = "Reenviado com a máscara refeita";
+              nota.textContent =
+                "Se a proteção bloquear de novo, a bolha seguinte diz onde o valor está.";
+            } catch (e) {
+              bm.disabled = false;
+              bm.textContent = "Mascarar e reenviar";
+            }
+          });
+          acts.appendChild(bm);
+        }
+        if (typeof o.onNovaConversa === "function") {
+          const bn = document.createElement("button");
+          bn.type = "button";
+          bn.className = editavel && !o.repetido ? "sb-nova" : "sb-nova destaque";
+          bn.textContent = "Nova conversa (mantém as peças)";
+          bn.title = "Zera o chat; as peças anonimizadas, o mapa e o modo sigiloso continuam";
+          bn.addEventListener("click", () => o.onNovaConversa());
+          acts.appendChild(bn);
+        }
+        if (o.valor && typeof o.onLiberar === "function") {
+          nota.textContent = frases.join(" ");
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "sb-liberar";
@@ -7941,9 +8017,11 @@ var PjePanel = (function () {
           });
           acts.appendChild(btn);
         } else {
-          nota.textContent =
+          frases.push(
             "Não foi possível identificar com segurança qual rótulo causou o bloqueio. " +
-            "Confira a auditoria do modo sigiloso antes de tentar novamente.";
+              "Confira a auditoria do modo sigiloso antes de tentar novamente."
+          );
+          nota.textContent = frases.join(" ");
         }
         // A segunda saída, sempre: ver a tabela do que foi mascarado. É lá que
         // se confere se o valor é mesmo o do órgão, e é o mesmo gesto do selo.

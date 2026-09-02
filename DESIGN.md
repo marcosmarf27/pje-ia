@@ -673,9 +673,16 @@ sai em claro"** (`.aud-map.liberado` + `.aud-lib`): apagá-lo da tabela afirmari
 uma proteção que não existe, e ele continua resolvendo o rótulo de uma minuta
 antiga.
 
-Não há segundo botão “manter protegido”: não clicar já é essa decisão. Uma ação
-neutra concorrendo com a única saída segura acrescentaria escolha sem acrescentar
-estado.
+**As saídas que PRESERVAM o nome vêm primeiro** (v0.56.1). A versão anterior
+dizia "não há segundo botão: não clicar já é manter protegido" — e estava
+errada, porque não clicar deixava o usuário sem conseguir enviar. A bolha
+passou a dizer ONDE o valor estava ("numa resposta anterior da IA") e a
+oferecer, nesta ordem: `.sb-mascarar` ("Mascarar e reenviar", no gradiente do
+modo — é o modo trabalhando a favor de quem o ligou), `.sb-nova` ("Nova
+conversa (mantém as peças)", secundária; vira `.destaque` quando o valor está
+numa parte da conversa que não pode ser reescrita e ela é a ÚNICA saída que
+preserva o nome), `.sb-liberar` (no vermelho de alerta, dito como o que é:
+abrir mão de uma proteção) e `.sb-aud`. A nota explica cada uma numa frase.
 
 ### Modo sigiloso: editor de revisão (`.sig-edit`) e ações no relatório
 
@@ -718,6 +725,16 @@ gradiente do modo (`--sig-btn-*`); "Cancelar envio" nomeia a consequência. O
 "Não perguntar de novo" vive na própria caixa (checkbox, como o da `.gwarn`) e
 a volta está nas Configurações — uma dispensa sem caminho de volta não é
 preferência, é armadilha.
+
+### A espera pelo modelo conta os segundos (`.status`)
+
+Entre o Enter e o primeiro token o `.status` mostra "Analisando… — 12 s", e o
+número anda. É a única mudança visível enquanto o modelo raciocina, e é o que
+separa "esperando" de "travou" — uma bolha com três pontos parados não
+responde a essa pergunta (relato real). O relógio só aparece a partir de 3 s
+(antes disso seria ruído), troca de rótulo sem zerar quando a busca ou o
+raciocínio começam, e some no primeiro token. A bolha do assistente mantém o
+indicador de digitação até haver texto: um delta vazio não a esvazia.
 
 ### Aviso dentro do card de progresso (`.prep-nota`)
 Nota em aviso suave abaixo da barra, usada quando o download passa de 12 s por

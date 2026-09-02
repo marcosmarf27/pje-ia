@@ -127,7 +127,9 @@ Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
   da conta Google. Apagar a memória de caso nas opções a apaga junto.
 - **Barreira final**: antes de qualquer envio, a extensão confere o corpo da
   requisição e **recusa o envio** se algum dos valores originais aparecer nele.
-  O bloqueio é do turno inteiro — nada é enviado pela metade.
+  O bloqueio é do turno inteiro — nada é enviado pela metade. A bolha diz onde
+  o valor estava e oferece manter o nome protegido (mascarar e reenviar, ou nova
+  conversa mantendo as peças); liberar é só para o que não é dado pessoal.
 
 - **Você APROVA antes de sair.** Quando o envio traz peça recém-anonimizada,
   uma caixa mostra o texto exatamente como vai sair, peça por peça, e espera a

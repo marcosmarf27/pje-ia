@@ -436,7 +436,8 @@ em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o text
   destruiria a utilidade jurídica do documento sem proteger ninguém.
 - **Barreira final.** Antes de cada envio a extensão **confere o que sairia** e recusa o
   envio se algum valor original tiver escapado — o turno inteiro é bloqueado, nada vai pela
-  metade.
+  metade. A bolha diz onde o valor estava e oferece manter o nome protegido (mascarar e
+  reenviar, ou nova conversa mantendo as peças); liberar é só para o que não é dado pessoal.
 - **Você aprova antes de sair.** Quando o envio traz peça recém-anonimizada, uma caixa
   mostra o texto exatamente como vai sair, peça por peça, e espera a sua aprovação — dá
   para editar, mascarar à mão ou liberar um valor antes de enviar; cancelar não manda nada.
