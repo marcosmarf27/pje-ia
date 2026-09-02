@@ -130,6 +130,9 @@
   --sh-seg: 0 1px 2px rgba(14, 50, 63, 0.1); /* pill ativo do segmented */
   --sh-btn: 0 1px 2px rgba(14, 50, 63, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   --sh-pop: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
+  /* Sombra do painel ERGUIDO (durante o arrasto). Mais funda e mais espalhada
+     que a --sh-pop: é a distância do papel à mesa que o olho lê como "na mão". */
+  --sh-erguido: 0 2px 6px rgba(14, 50, 63, 0.13), 0 34px 80px -20px rgba(14, 50, 63, 0.44);
   --sh-panel: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
   /* Escala tipográfica — ANTES eram 13 tamanhos distintos (9.5 a 18px, com
      meios-pixels); a variação sem intenção é o que faz a interface "parecer
@@ -148,6 +151,25 @@
      6–12px, e saltar de 6 direto para 10 (+66%) se via. */
   --sp-1: 4px; --sp-2: 6px; --sp-2b: 8px; --sp-3: 10px;
   --sp-3b: 12px; --sp-4: 14px; --sp-5: 20px; --sp-6: 28px;
+
+  /* ---------- MOVIMENTO ----------
+     TRÊS durações e TRÊS curvas, e nada fora delas — pelo mesmo motivo que a
+     tipografia tem sete degraus em vez de treze tamanhos com meio-pixel:
+     variação sem intenção é o que faz a interface "parecer poluída" mesmo com
+     cada peça correta. Acima de ~300ms a interface começa a parecer LENTA, que
+     é o oposto do que a animação existe para comunicar.
+
+     A DIREÇÃO da curva importa muito mais que a curva exata. Entrada desacelera
+     (o objeto chega e assenta); saída acelera (some do caminho, e o usuário já
+     decidiu — segurá-lo é cobrar pedágio pelo próprio clique); movimento entre
+     dois estados é simétrico. Nada de bounce: isto é ferramenta de trabalho
+     jurídico, não brinquedo. */
+  --dur-1: 120ms;  /* feedback imediato e saídas */
+  --dur-2: 180ms;  /* entradas de interface */
+  --dur-3: 240ms;  /* mudanças de layout (colapsos) */
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);   /* entra e assenta */
+  --ease-in: cubic-bezier(0.32, 0, 0.67, 0);    /* sai do caminho */
+  --ease-move: cubic-bezier(0.45, 0, 0.55, 1);  /* de um estado a outro */
   position: fixed;
   right: 18px;
   bottom: 18px;
@@ -176,6 +198,16 @@ button > svg { flex: none; }
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32);
+  /* O botão é a OUTRA METADE da mesma animação: ele encolhe enquanto a janela
+     cresce do lugar dele, e volta crescendo quando ela se recolhe. Um dos dois
+     sumindo de estalo desfaz a conexão espacial que o resto do efeito constrói. */
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out),
+    display var(--dur-2) allow-discrete;
+}
+@starting-style {
+  .wrap:not(.open) .launcher { opacity: 0; transform: scale(0.92); }
 }
 /* o emoji da balança; --fs-lg é o degrau da escala mais próximo do 16px que
    estava aqui — literal fora da escala era a única violação restante */
@@ -228,7 +260,15 @@ button > svg { flex: none; }
     50%      { filter: brightness(1.18); }
   }
 }
-.wrap.open .launcher { display: none; }
+.wrap.open .launcher {
+  display: none;
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity var(--dur-1) var(--ease-in),
+    transform var(--dur-1) var(--ease-in),
+    display var(--dur-1) allow-discrete;
+}
 
 /* ---------- Backdrop (modo expandido) ---------- */
 .backdrop { display: none; position: fixed; inset: 0; background: rgba(5, 32, 46, 0.45); z-index: -1; }
@@ -253,9 +293,45 @@ button > svg { flex: none; }
   border-radius: var(--r-2xl);
   box-shadow: var(--sh-pop);
   overflow: hidden;
-  animation: rise 0.16s ease-out;
+
+  /* ---------- A ENTRADA E A SAÍDA DA JANELA ----------
+     Era `animation: rise`, que só tinha ENTRADA: fechar era um sumiço seco. Com
+     `@starting-style` + `transition-behavior: allow-discrete` o mesmo par de
+     regras dá os dois sentidos e — o que a `animation` não dava — mantém o
+     painel visível durante a SAÍDA, apesar do `display: none`.
+
+     Por que transição e não `animation`/JS: as animações do d3 e do pdf.js já
+     ensinaram três vezes neste projeto que o `requestAnimationFrame` CONGELA em
+     aba de segundo plano, e abrir processos com Ctrl+clique em várias abas é o
+     padrão de trabalho no PJe. Transições correm na linha do tempo do documento
+     e não têm esse modo de falha.
+
+     `transform-origin` no canto de baixo à direita: é de lá que o `.launcher`
+     sai e é para lá que ele volta, então a janela CRESCE do botão em vez de
+     aparecer no meio do nada. Os outros modos redefinem a origem. */
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+  transform-origin: bottom right;
+  transition:
+    opacity var(--dur-1) var(--ease-in),
+    transform var(--dur-1) var(--ease-in),
+    display var(--dur-1) allow-discrete;
 }
-.wrap.open .panel { display: flex; }
+.wrap.open .panel {
+  display: flex;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out),
+    display var(--dur-2) allow-discrete;
+}
+/* O estado de PARTIDA da entrada. Sem isto o painel nasce já opaco: o
+   `@starting-style` é o que dá ao navegador um "antes" para interpolar quando o
+   elemento passa de `display:none` a renderizado. */
+@starting-style {
+  .wrap.open .panel { opacity: 0; transform: translateY(6px) scale(0.985); }
+}
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .wrap.expanded .panel {
@@ -326,6 +402,24 @@ button > svg { flex: none; }
    pseudo-elemento se resolveria contra o `.panel` e só funcionaria por
    coincidência — o cabeçalho é o primeiro filho, então hoje cairia no lugar
    certo e sairia dele no dia em que algo entrasse antes. */
+/* A origem da escala acompanha ONDE a janela está ancorada — crescer do canto
+   errado faz a entrada parecer um salto lateral. */
+.wrap.expanded .panel, .wrap.livre .panel { transform-origin: center; }
+.wrap.lateral .panel { transform-origin: right center; }
+
+/* ---------- A JANELA ERGUIDA (arrasto) ----------
+   Sombra mais funda e 0,5% de escala: o gesto ganha peso e a janela descola da
+   página do tribunal. A escala é o motivo de `salvarGeoLivre` aceitar uma
+   geometria CONHECIDA — `getBoundingClientRect` inclui o transform, e medir
+   aqui gravaria uma janela 0,5% maior a cada arrasto, cumulativamente. */
+.wrap.livre .panel.movendo {
+  box-shadow: var(--sh-erguido);
+  transform: scale(1.005);
+  transition:
+    box-shadow var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.wrap.livre .panel.movendo .hd { cursor: grabbing; }
 .wrap.livre .hd { cursor: move; touch-action: none; position: relative; }
 .wrap.livre .hd button { cursor: pointer; }
 .wrap.livre .docs { max-height: 32vh; }
@@ -488,7 +582,62 @@ button > svg { flex: none; }
   background: rgba(255, 255, 255, 0.32);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
-.wrap.docs-collapsed .docs { display: none; }
+/* ---------- O COLAPSO DA LISTA DE PEÇAS ----------
+   Era `display: none`, isto é, um salto. O EIXO muda com o modo e uma regra só
+   não serve: no expandido e no livre largo a lista é COLUNA (encolhe em
+   LARGURA), no flutuante, no lateral e no estreito é FAIXA (encolhe em ALTURA).
+
+   `overflow: hidden` + `min-width` nos filhos não é zelo: sem eles o texto da
+   lista se RE-QUEBRA a cada largura intermediária durante os 240ms, e o que se
+   vê é um borrão de reflow em vez de uma coluna deslizando para fora. Com o
+   piso de largura, o conteúdo fica firme e é CLIPADO — que é o que o olho lê
+   como "a coluna saiu de cena". */
+.docs {
+  overflow: hidden;
+  transition:
+    max-height var(--dur-3) var(--ease-move),
+    padding-top var(--dur-3) var(--ease-move),
+    padding-bottom var(--dur-3) var(--ease-move),
+    border-bottom-width var(--dur-3) var(--ease-move);
+}
+ /* Os contextos vão LISTADOS, e não é redundância: `.wrap.estreito .docs`
+    (mais adiante no arquivo) fixa `max-height: 46%` e um `padding` shorthand
+    com a MESMA especificidade desta regra, então vencia por ordem e a faixa
+    simplesmente não colapsava no painel estreito. Antes não havia conflito
+    porque o colapso era `display: none` — propriedade que ninguém disputa.
+    Depender da ordem no arquivo é o que faz uma regra correta parar de valer
+    quando alguém acrescenta outra 2000 linhas abaixo. */
+.wrap.docs-collapsed .docs,
+.wrap.lateral.docs-collapsed .docs,
+.wrap.livre.docs-collapsed .docs,
+.wrap.estreito.docs-collapsed .docs {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
+}
+/* 300px = os 328 da coluna menos os 2×14 de padding: o piso é a largura REAL do
+   conteúdo, então no estado normal nada muda. */
+.wrap.expanded .docs > *, .wrap.livre-wide .docs > * { min-width: 300px; }
+.wrap.expanded .docs, .wrap.livre-wide .docs {
+  transition:
+    width var(--dur-3) var(--ease-move),
+    padding-left var(--dur-3) var(--ease-move),
+    padding-right var(--dur-3) var(--ease-move),
+    border-right-width var(--dur-3) var(--ease-move);
+}
+.wrap.expanded.docs-collapsed .docs, .wrap.livre-wide.docs-collapsed .docs {
+  width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-right-width: 0;
+}
+/* A aba que fica no LUGAR da lista entra por fade — sem isso trocaríamos um
+   salto por outro, na mesma fração de segundo. */
+.docs-rail { transition: opacity var(--dur-2) var(--ease-out); }
+@starting-style {
+  .wrap.docs-collapsed .docs-rail { opacity: 0; }
+}
 
 /* Botão « no cabeçalho da própria coluna de peças (o controle mora junto do
    que ele controla — o botão do header sozinho passava despercebido). */
@@ -2105,6 +2254,19 @@ button > svg { flex: none; }
    CONFIRMAÇÃO de que uma proteção está valendo, e em `--warn` ela competiria com
    a `.sel-nota` e com o medidor de contexto, que sinalizam problema. Um estado
    PERMANENTE em cor de alerta é o "tudo alerta com a mesma intensidade" do §2. */
+/* As faixas de MODO (sigiloso, minuta, mapa) aparecem por `hidden`, que é
+   discreto: com `allow-discrete` elas deslizam para dentro em 120ms. Uma faixa
+   que muda a altura do painel de estalo empurra o que está embaixo dela — e no
+   rodapé isso é o bug do 📎 que "só abria na terceira vez". */
+.sigbar, .minutabar, .mapabar {
+  transition:
+    opacity var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out),
+    display var(--dur-1) allow-discrete;
+}
+@starting-style {
+  .sigbar, .minutabar, .mapabar { opacity: 0; transform: translateY(-4px); }
+}
 .sigbar {
   flex: none;
   display: flex; align-items: center; gap: 6px;
@@ -2160,6 +2322,22 @@ button > svg { flex: none; }
 /* Em 420px a frase inteira não cabe ao lado do padding; ela trunca com ellipsis
    (regra do `.sb-t`) e o hachurado sozinho já carrega o estado. */
 .wrap.estreito .sigbar { padding: 3px 10px; }
+
+/* Quem pediu menos movimento não pediu menos INFORMAÇÃO (a regra do
+   `.chamando` do launcher). Nada é DESLIGADO aqui: as durações caem para 1ms,
+   o que preserva a semântica do `allow-discrete` e do `transitionend` — com
+   `0s` o navegador pode não disparar a transição discreta, e o painel ficaria
+   preso em `display:flex`. O que some é o DESLOCAMENTO, que é o que incomoda. */
+@media (prefers-reduced-motion: reduce) {
+  .panel, .wrap.open .panel,
+  .launcher, .wrap.open .launcher,
+  .docs, .wrap.expanded .docs, .wrap.livre-wide .docs,
+  .docs-rail, .sigbar, .minutabar, .mapabar {
+    transition-duration: 1ms;
+  }
+  .panel, .wrap.open .panel { transform: none; }
+  .wrap.livre .panel.movendo { transform: none; }
+}
 
 /* CAIXA DE AUDITORIA do modo sigiloso. Herda a anatomia da `.movbox` (cabeçalho
    `.mv-hd`, lista `.mv-list`, vazio `.mv-vazio`) de propósito: é o MESMO gesto —

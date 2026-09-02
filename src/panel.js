@@ -1714,8 +1714,15 @@ var PjePanel = (function () {
       panelEl.style.height = "";
     }
     let geoTimer = null;
-    function salvarGeoLivre() {
-      const r = panelEl.getBoundingClientRect();
+    // `conhecida` ({left, top, width, height}) evita a MEDIÇÃO quando o chamador
+    // já sabe a geometria — e no arrasto ele sabe, porque acabou de calculá-la.
+    // Não é otimização: durante o arrasto o painel está com `scale(1.005)` e
+    // `getBoundingClientRect` INCLUI o transform, então medir ali gravaria uma
+    // janela meio por cento maior a cada arrasto, cumulativamente. As medidas do
+    // arrasto vêm de `offsetWidth`/`offsetHeight`, que são de LAYOUT e imunes ao
+    // transform. O ResizeObserver segue medindo: lá nunca há `.movendo`.
+    function salvarGeoLivre(conhecida) {
+      const r = conhecida || panelEl.getBoundingClientRect();
       geoLivre = {
         x: Math.round(r.left),
         y: Math.round(r.top),
@@ -1737,7 +1744,19 @@ var PjePanel = (function () {
       if (!wrap.classList.contains("livre")) return;
       if (e.button !== 0 || e.target.closest("button")) return;
       const r = panelEl.getBoundingClientRect();
-      arrasto = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      // `g` é a geometria de LAYOUT desta janela, mantida atualizada a cada
+      // movimento e entregue ao `salvarGeoLivre` no fim — ver a nota lá.
+      arrasto = {
+        dx: e.clientX - r.left,
+        dy: e.clientY - r.top,
+        g: {
+          left: r.left,
+          top: r.top,
+          width: panelEl.offsetWidth,
+          height: panelEl.offsetHeight,
+        },
+      };
+      panelEl.classList.add("movendo"); // ergue: sombra mais funda + 0,5% de escala
       try {
         hdEl.setPointerCapture(e.pointerId); // segura o arrasto fora do cabeçalho
       } catch {
@@ -1756,11 +1775,14 @@ var PjePanel = (function () {
       });
       panelEl.style.left = g.x + "px";
       panelEl.style.top = g.y + "px";
+      arrasto.g = { left: g.x, top: g.y, width: g.w, height: g.h };
     });
     const fimArrasto = () => {
       if (!arrasto) return;
+      const g = arrasto.g;
       arrasto = null;
-      salvarGeoLivre();
+      panelEl.classList.remove("movendo"); // pousa (a transição leva 120ms)
+      salvarGeoLivre(g); // NUNCA medir aqui: o transform ainda está em voo
     };
     hdEl.addEventListener("pointerup", fimArrasto);
     hdEl.addEventListener("pointercancel", fimArrasto);
@@ -1793,11 +1815,27 @@ var PjePanel = (function () {
       /* sem storage (harness de teste): fica no flutuante */
     }
 
+    // Espelha `--dur-1` do panel.css: é quanto dura a saída do painel. Só o
+    // valor pode divergir, e o pior caso de divergência é cosmético (desmontar
+    // o layout cedo demais aparece como um salto no fim da saída).
+    const MS_SAIDA = 120;
+    let saidaTimer = null;
     closeBtn.addEventListener("click", () => {
       hidePreview();
       if (wrap.classList.contains("livre")) salvarGeoLivre(); // antes de tirar a classe
-      wrap.classList.remove("open", "expanded", "full", "lateral", "livre", "livre-wide");
-      limparGeoLivre();
+      // SÓ o `open` sai agora — é ele que dispara a saída. As classes de LAYOUT
+      // e a geometria inline têm de sobreviver a ela: removidas aqui, a janela
+      // do modo livre saltaria para o canto em 420x660 e só então desapareceria.
+      wrap.classList.remove("open");
+      clearTimeout(saidaTimer);
+      saidaTimer = setTimeout(() => {
+        // Reabriu no meio da saída: quem manda é o painel novo, não a limpeza
+        // do antigo — sem esta guarda, desmontaríamos o layout de uma janela
+        // que o usuário acabou de abrir.
+        if (wrap.classList.contains("open")) return;
+        wrap.classList.remove("expanded", "full", "lateral", "livre", "livre-wide");
+        limparGeoLivre();
+      }, MS_SAIDA);
     });
     expandBtn.addEventListener("click", () =>
       aplicarModo(modoAtual() === "expandido" ? "flutuante" : "expandido")

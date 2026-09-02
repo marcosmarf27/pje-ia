@@ -1290,7 +1290,9 @@ o que não sabe que existe. **Sete dos treze passos são sobre marcar peças**, 
   mental), e abrir processos com Ctrl+clique em várias abas é o padrão de
   trabalho no PJe: a visita auto-abre ~1 s após o boot e o usuário encontraria a
   tela escurecida com um cartão **vazio**. Pinta-se síncrono, com **dois**
-  repintes (320 ms e 700 ms) porque o `.panel` tem `transition: all` e medir o
+  repintes (320 ms e 700 ms) porque o `.panel` ANIMA ao abrir (era
+  `animation: rise`, hoje a transição de entrada descrita em "Micro-animações")
+  e medir o
   alvo no meio dela põe o spotlight ao lado do botão.
 - **Ordem dos lados do balão: direita ANTES de abaixo** quando o alvo está na
   metade esquerda. "Abaixo primeiro" é o default óbvio e estava errado aqui — os
@@ -2567,6 +2569,59 @@ em `content.js`.
   trocar a CHAVE da API no meio da conversa deixa um `file_id` de outra conta e o turno
   seguinte leva 400. "Nova conversa" resolve. Se for tratar: os bytes do anexo estão
   sempre em memória, basta re-subir e reescrever o `file_id` no bloco — sem download.
+
+## Micro-animações do painel (`panel.css` + `panel.js`)
+
+Abrir, fechar, arrastar e colapsar deixaram de ser saltos. Tudo em CSS nativo:
+os tokens de movimento e o porquê de não haver biblioteca estão no DESIGN.md
+("Movimento"). O que mora aqui são as armadilhas — nenhuma delas visível num
+`getComputedStyle`.
+
+- **`@starting-style` + `allow-discrete` no lugar de `animation: rise`.** A
+  `animation` só tinha ENTRADA: fechar era um sumiço seco. As duas regras dão os
+  dois sentidos e mantêm o painel visível durante a saída, apesar do
+  `display: none`.
+- **O `close` NÃO pode desmontar o layout de forma síncrona.** Ele removia
+  `open` + `expanded/full/lateral/livre/livre-wide` e chamava `limparGeoLivre()`
+  na mesma linha. Com uma saída animada isso fica visível e feio: a janela do
+  modo livre SALTA para o canto inferior direito em 420x660 e só então
+  desaparece — trocar um sumiço seco por um salto é piorar. Hoje só o `open` sai
+  na hora; o resto é desmontado depois, por um `setTimeout` de `MS_SAIDA`, com
+  **guarda de reabertura** (`if (wrap.classList.contains("open")) return`) —
+  sem ela, reabrir durante a saída faria a limpeza do painel ANTIGO desmontar o
+  painel NOVO.
+- **`getBoundingClientRect` INCLUI o transform, e é por isso que
+  `salvarGeoLivre` aceita uma geometria CONHECIDA.** Durante o arrasto o painel
+  está com `scale(1.005)`; medir ali gravaria uma janela 0,5% maior a cada
+  arrasto, e o erro é CUMULATIVO (a leitura seguinte parte da anterior). O
+  arrasto informa a geometria que acabou de calcular, tirada de
+  `offsetWidth`/`offsetHeight`, que são de LAYOUT e imunes ao transform. O
+  `ResizeObserver` segue medindo — lá nunca há `.movendo`.
+- **A escala do arrasto é segura porque os popovers são irmãos do `.panel`**
+  (`wrap.appendChild`), não filhos: um `transform` cria bloco de contenção para
+  descendentes `position: fixed`, e `.audbox`, `.movbox`, `.selmenu` e
+  `.preview` ficariam ancorados no lugar errado se morassem dentro dele.
+- **O colapso da lista é AXIAL, e o eixo muda com o modo**: coluna (largura) no
+  expandido e no livre largo, faixa (altura) no flutuante, no lateral e no
+  estreito. E os contextos vão LISTADOS no seletor
+  (`.wrap.estreito.docs-collapsed .docs` etc.): `.wrap.estreito .docs` fixa
+  `max-height` e `padding` com a MESMA especificidade 2000 linhas adiante, e
+  vencia por ordem — a faixa não colapsava. Antes não havia conflito porque o
+  colapso era `display: none`, propriedade que ninguém disputa. **Trocar
+  `display` por uma propriedade animável cria disputas que não existiam.**
+- **`overflow: hidden` + `min-width` nos filhos não é zelo**: sem o piso de
+  largura o texto da lista se RE-QUEBRA a cada largura intermediária e o que se
+  vê são 240ms de borrão de reflow em vez de uma coluna saindo de cena.
+- **MEDIR ANIMAÇÃO EM HEADLESS TEM DUAS ARMADILHAS**, e as duas já falsificaram
+  medições aqui: (a) o `panel.css` chega por `fetch` ASSÍNCRONO — medir antes
+  dele mede uma árvore sem estilo, em que um `<button>` é `inline-block` e o
+  painel cai no fluxo normal; (b) sob `--virtual-time-budget` o relógio das
+  transições NÃO avança, então esperar fotografa o estado INICIAL congelado (a
+  coluna e a aba na tela ao mesmo tempo). A saída é inspecionar as
+  `CSSTransition` pela **WAAPI** — `getAnimations()` diz se existem, com que
+  duração e com que curva, e `finish()` leva ao estado final sem depender de
+  tempo nenhum. Headless também reporta `prefers-reduced-motion: reduce` por
+  padrão: sem saber disso, mede-se sempre o ramo reduzido.
 
 ## Modo sigiloso — anonimização LOCAL (`trava.js`, `pseudonimos.js`, `anonimizar.js`, `tokenizador.js`, `ner-nucleo.js`, `ner-worker.js`)
 

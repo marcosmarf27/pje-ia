@@ -416,6 +416,50 @@ aviso secundário.
 > e, com especificidade maior, devolvia `flex-wrap: wrap` em repouso: a fileira
 > única existia no papel e não na tela.
 
+### Movimento: três durações, três curvas, e nada fora delas
+
+`--dur-1` (120ms) para feedback e SAÍDAS, `--dur-2` (180ms) para ENTRADAS de
+interface, `--dur-3` (240ms) para mudanças de layout. `--ease-out` entra e
+assenta, `--ease-in` sai do caminho, `--ease-move` liga dois estados.
+
+O limite é o mesmo da tipografia: sete degraus em vez de treze tamanhos com
+meio-pixel. **Variação sem intenção é o que faz a interface parecer poluída
+mesmo com cada peça correta** — e em movimento isso aparece como "cada coisa
+aqui se mexe de um jeito". Acima de ~300ms a interface começa a parecer LENTA,
+que é o oposto do que a animação existe para comunicar. **Nada de bounce**: isto
+é ferramenta de trabalho jurídico.
+
+A **direção** da curva carrega quase toda a informação, muito mais que a curva
+exata: o que entra desacelera (chega e assenta), o que sai acelera (o usuário já
+decidiu — segurá-lo é cobrar pedágio pelo próprio clique).
+
+**Sem biblioteca de animação, e a regra que decide é a de sempre**: nenhum bundle
+entra em página de tribunal. GSAP + Draggable custariam ~100 KB em TODA página
+`jus.br` — inclusive as de login, onde o painel nem monta — para entregar o que
+`@starting-style`, `transition-behavior: allow-discrete` e `linear()` fazem
+nativamente. Medido no Chrome desta máquina: as três disponíveis, mais
+`interpolate-size` e `calc-size()`. É o mesmo argumento que manteve o JSZip, o
+`markmap-lib` e três bibliotecas de tour fora do projeto.
+
+**E há um motivo próprio do produto para preferir CSS a JS**: as bibliotecas de
+animação correm no `requestAnimationFrame`, que o Chrome CONGELA em aba de
+segundo plano. Este projeto já foi mordido por isso TRÊS vezes (o primeiro
+desenho do mapa mental, a primeira pintura do tour e o `render()` do pdf.js no
+OCR), e abrir processos com Ctrl+clique em várias abas é o padrão de trabalho no
+PJe. Transições correm na linha do tempo do documento e não têm esse modo de
+falha.
+
+**Entradas e saídas de elementos que somem do layout** usam `@starting-style` +
+`transition-behavior: allow-discrete`, nunca um par animação-de-entrada +
+`display:none` seco. É o que dá os DOIS sentidos com um par de regras — e o que
+mantém o elemento visível durante a saída, apesar do `display: none`.
+
+**`prefers-reduced-motion` não desliga: encurta.** As durações caem para 1ms e o
+DESLOCAMENTO some; nada de `0s`, que pode fazer o navegador pular a transição
+discreta e deixar um painel preso em `display:flex`. A regra do projeto é "menos
+movimento, não menos informação" — a sombra do arrasto, por exemplo, permanece,
+porque ela não é movimento, é profundidade.
+
 ### Modo sigiloso: a tarja e a moldura da janela (`.wrap.sigiloso`)
 
 Um MODO que muda **o que sai da máquina** não pode viver só num botão. O botão
