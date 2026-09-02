@@ -363,7 +363,22 @@ var PjePanel = (function () {
     mapa: '<circle cx="12" cy="12" r="3"/><path d="M12 9V5"/><path d="M14.5 13.5l3 2.5"/><path d="M9.5 13.5l-3 2.5"/>',
     prompts: '<path d="M12 4l1.8 4.2L18 10l-4.2 1.8L12 16l-1.8-4.2L6 10l4.2-1.8z"/><path d="M18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z"/>',
     modelos: '<path d="M4 6h7v14H4z"/><path d="M13 6h7v14h-7z"/>',
-    cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    // Metade do círculo preenchida: a convenção de contraste/aparência. Não é
+    // uma paleta de pintor (que sugere "escolher uma cor", e o que se escolhe
+    // aqui é um conjunto) nem uma lua (que sugere só claro/escuro, e são cinco).
+    tema: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/>',
+    // A TARJA — duas linhas de texto e a barra de redação por cima da do meio.
+    // Substitui o cadeado no modo sigiloso, e a troca não é estética: cadeado é
+    // segurança GENÉRICA (e neste produto já é o ícone de "a chave fica neste
+    // navegador", ver o comentário do `chave` abaixo), enquanto a tarja é o que
+    // ESTA função faz — ela mascara nomes num documento. Um sinal, um glifo,
+    // nos três lugares (botão da barra, carimbo do cabeçalho, selo da metarow).
+    //
+    // O <rect> é a ÚNICA forma preenchida do conjunto de ícones, e é ela que
+    // faz o desenho ler como "texto tarjado" em vez de três linhas soltas. O
+    // `stroke="none"` nele é obrigatório: sem isso o contorno de 1,9 engrossa a
+    // barra até ela encostar nas linhas vizinhas em 13px.
+    tarja: '<path d="M4 7h16"/><rect x="4" y="10.6" width="13" height="4" rx="1.4" fill="currentColor" stroke="none"/><path d="M4 19h8"/>',
     // mesmo desenho do botão "Importar de .docx" da página modelos.html: as
     // duas portas de entrada da importação precisam mostrar o mesmo ícone
     importar: '<path d="M12 20V9"/><path d="M7 13l5-5 5 5"/><path d="M5 4h14"/>',
@@ -436,7 +451,8 @@ var PjePanel = (function () {
     mapa: ic(P.mapa, 13, 1.9),
     prompts: ic(P.prompts, 13, 1.9),
     modelos: ic(P.modelos, 13, 1.9),
-    cadeado: ic(P.cadeado, 13, 1.9),
+    tarja: ic(P.tarja, 13, 1.9),
+    tema: ic(P.tema, 15, 1.7),
     importar: ic(P.importar, 13, 1.9),
     importarG: ic(P.importar, 24, 1.4), // grande: traço mais fino (DESIGN.md §5)
     // --- demais ---
@@ -865,7 +881,10 @@ var PjePanel = (function () {
           <span class="mark"><img src="${iconUrl}" alt=""></span>
           <span class="tit-wrap">
             <span class="ttl">Assistente dos Autos</span>
-            <span class="cnj" title="Número do processo em análise"></span>
+            <span class="cnj-row">
+              <span class="cnj" title="Número do processo em análise"></span>
+              <button class="sigselo" hidden aria-expanded="false">${SVG.tarja}<span class="ss-a"></span><span class="ss-t"></span><span class="ss-n"></span></button>
+            </span>
           </span>
           <div class="hd-grp">
             <button class="dl" title="Baixar a conversa em arquivo (.md)" aria-label="Baixar a conversa em arquivo">${SVG.download}</button>
@@ -873,6 +892,7 @@ var PjePanel = (function () {
             <button class="reset" title="Nova conversa — a atual fica guardada na lista ao lado" aria-label="Nova conversa">${SVG.reset}</button>
           </div>
           <div class="hd-grp">
+            <button class="tema" title="Aparência do painel" aria-label="Aparência do painel" aria-haspopup="true" aria-expanded="false">${SVG.tema}</button>
             <button class="docsvis" title="Ocultar a lista de peças (mais espaço para o chat)" aria-label="Ocultar ou exibir a lista de peças" aria-pressed="false">${SVG.docshide}</button>
             <button class="expand" title="Painel largo (mostra as peças na lateral)" aria-label="Painel largo">${SVG.expand}</button>
             <button class="side" title="Painel lateral (mantém o processo visível ao lado)" aria-label="Painel lateral">${SVG.side}</button>
@@ -881,7 +901,6 @@ var PjePanel = (function () {
           </div>
           <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
         </div>
-        <div class="sigbar" hidden>${SVG.cadeado}<span class="sb-t"></span><span class="sb-n" hidden></span></div>
         <div class="content">
           <button type="button" class="docs-rail" title="Exibir a lista de peças" aria-label="Exibir a lista de peças">
             <span class="rail-i">${SVG.docsshow}</span>
@@ -955,7 +974,7 @@ var PjePanel = (function () {
               <div class="toolbar">
                 <div class="tools">
                   <button class="tgl-search" aria-pressed="false" title="Liga/desliga a busca de jurisprudência e legislação em fontes oficiais (STF, STJ, Planalto…). Com a busca ligada, escreva a pergunta e use o botão Enviar normalmente.">${SVG.juris}<span class="lbl">Jurisprudência</span></button>
-                  <button class="tgl-sigilo" aria-pressed="false" title="Modo sigiloso: as peças deixam de ser enviadas como ARQUIVO e passam a ser enviadas como texto com nomes, CPF, OAB, endereços e o número do processo substituídos por rótulos ([PESSOA_1]). Todo o reconhecimento acontece no seu computador; o PDF não sai da máquina. Exigido pelo art. 19, §3º, IV da Resolução CNJ 615/2025 para processo em segredo de justiça.">${SVG.cadeado}<span class="lbl">Sigiloso</span></button>
+                  <button class="tgl-sigilo" aria-pressed="false" title="Modo sigiloso: as peças deixam de ser enviadas como ARQUIVO e passam a ser enviadas como texto com nomes, CPF, OAB, endereços e o número do processo substituídos por rótulos ([PESSOA_1]). Todo o reconhecimento acontece no seu computador; o PDF não sai da máquina. Exigido pelo art. 19, §3º, IV da Resolução CNJ 615/2025 para processo em segredo de justiça.">${SVG.tarja}<span class="lbl">Sigiloso</span></button>
                   <button class="btn-minuta" title="Liga o modo minuta: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar minuta” — a resposta abre num editor de texto, em nova aba, de onde você copia para o PJe, baixa em Word (.docx) ou imprime.">${SVG.minuta}<span class="lbl">Minutar</span></button>
                   <button class="btn-mapa" title="Liga o modo mapa mental: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar mapa” — a resposta abre num mapa mental interativo, em nova aba.">${SVG.mapa}<span class="lbl">Mapa mental</span></button>
                   <button class="btn-plib" title="Seus prompts salvos: crie instruções reutilizáveis (título + texto) e insira-as na conversa digitando “/” no início do campo de mensagem. Sincronizam entre navegadores logados na mesma conta Google.">${SVG.prompts}<span class="lbl">Prompts</span></button>
@@ -972,7 +991,7 @@ var PjePanel = (function () {
                   <button class="linhatempo" hidden aria-expanded="false">
                     ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
                   </button>
-                  <button class="selo-sigilo" hidden aria-expanded="false">${SVG.cadeado}<span class="sl-l"></span><span class="sl-s"></span></button>
+                  <button class="selo-sigilo" hidden aria-expanded="false">${SVG.tarja}<span class="sl-l"></span><span class="sl-s"></span></button>
                   <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
                   <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
                 </div>
@@ -1138,7 +1157,7 @@ var PjePanel = (function () {
         <div class="sigok plib" hidden>
           <div class="sigok-card plib-card" role="dialog" aria-modal="true" aria-label="Conferir antes de enviar" tabindex="-1">
             <div class="plib-hd">
-              <span class="t">${SVG.cadeado}Conferir antes de enviar</span>
+              <span class="t">${SVG.tarja}Conferir antes de enviar</span>
               <button class="sigok-close plib-close" title="Fechar (Esc)" aria-label="Fechar">${SVG.close}</button>
             </div>
             <div class="sigok-body">
@@ -1951,9 +1970,154 @@ var PjePanel = (function () {
     });
     roLivre.observe(panelEl);
 
+    // ------------------------------------------------------------- TEMAS
+    //
+    // Um tema é um bloco de overrides de token no `panel.css`, selecionado por
+    // `[data-tema]` no `.wrap`. Aqui não há CSS nenhum: trocar de tema é trocar
+    // um ATRIBUTO. Isso importa porque o `panel.css` é buscado UMA vez no
+    // `mount()` e nunca reinjetado — se o tema dependesse do arquivo, mudá-lo
+    // ao vivo exigiria um segundo fetch e uma janela de FOUC.
+    const TEMAS = [
+      { id: "", nome: "Azul TecJustiça", amostra: ["#0e4459", "#2e7e9c", "#ffffff"] },
+      { id: "noite", nome: "Noite", amostra: ["#0b161d", "#4aa6c9", "#16232c"] },
+      { id: "papel", nome: "Papel", amostra: ["#eef3f6", "#2e7e9c", "#ffffff"] },
+      { id: "vidro", nome: "Vidro", amostra: ["#6f8f9e", "#2e7e9c", "#ffffff"] },
+      { id: "toga", nome: "Toga", amostra: ["#46202a", "#8c4351", "#ffffff"] },
+      { id: "rosa", nome: "Rosa", amostra: ["#b8336e", "#ef74a8", "#fdf5f9"] },
+    ];
+    let temaAtual = "";
+
+    // Declarada ANTES do `storage.get` que a chama. Não é estilo: o stub de
+    // teste executa o callback de forma SÍNCRONA, e uma função declarada
+    // depois estaria na zona morta temporal — a mesma armadilha que já mordeu
+    // `docsOcultas`, `guiaAberta` e `launcherUsado`.
+    function aplicarTema(id, gravar) {
+      const valido = TEMAS.some((t) => t.id === id) ? id : "";
+      temaAtual = valido;
+      if (valido) wrap.setAttribute("data-tema", valido);
+      else wrap.removeAttribute("data-tema");
+      const cx = $(".temabox");
+      if (cx) {
+        for (const b of cx.querySelectorAll(".tm-i"))
+          b.setAttribute("aria-checked", String(b.dataset.tema === valido));
+      }
+      if (gravar === false) return;
+      try {
+        chrome.storage.local.set({ tema: valido });
+      } catch {
+        /* contexto invalidado: o tema vale para esta sessão e mais nada */
+      }
+    }
+
+    // A CAIXA DE TEMAS. `position: fixed` e filha do `.wrap`, como a `.movbox`,
+    // a `.audbox` e o `.selmenu` — o `.wrap` é um container de tamanho ZERO
+    // (quem tem dimensão é o `.panel`), então posicionar por dentro dele joga o
+    // elemento para fora da tela.
+    let temabox = null;
+    function fecharTema() {
+      if (!temabox) return;
+      temabox.remove();
+      temabox = null;
+      const b = $(".hd .tema");
+      if (b) b.setAttribute("aria-expanded", "false");
+    }
+    function abrirTema() {
+      fecharTema();
+      const btn = $(".hd .tema");
+      if (!btn) return;
+      temabox = document.createElement("div");
+      temabox.className = "temabox";
+      temabox.setAttribute("role", "radiogroup");
+      temabox.setAttribute("aria-label", "Aparência do painel");
+      const tit = document.createElement("div");
+      tit.className = "tm-h";
+      tit.textContent = "Aparência";
+      temabox.appendChild(tit);
+      for (const t of TEMAS) {
+        const b = document.createElement("button");
+        b.className = "tm-i";
+        b.dataset.tema = t.id;
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", String(t.id === temaAtual));
+        const sw = document.createElement("span");
+        sw.className = "tm-sw";
+        // A amostra mostra a CHROME, o acento e a superfície — as três decisões
+        // que separam um tema do outro. Um quadrado de cor só não distingue
+        // Papel de Vidro, que compartilham a superfície clara.
+        for (const c of t.amostra) {
+          const q = document.createElement("i");
+          q.style.background = c;
+          sw.appendChild(q);
+        }
+        b.appendChild(sw);
+        const n = document.createElement("span");
+        n.className = "tm-n";
+        n.textContent = t.nome;
+        b.appendChild(n);
+        b.addEventListener("click", () => {
+          aplicarTema(t.id);
+          fecharTema();
+        });
+        temabox.appendChild(b);
+      }
+      wrap.appendChild(temabox);
+      const r = btn.getBoundingClientRect();
+      const larg = 210;
+      temabox.style.left = Math.max(8, Math.min(r.right - larg, innerWidth - larg - 8)) + "px";
+      // Abaixo do botão quando cabe; acima quando não — a mesma regra da
+      // `.movbox`, que é ancorada num selo do rodapé e por isso prefere subir.
+      const alt = temabox.getBoundingClientRect().height || 190;
+      temabox.style.top =
+        (r.bottom + 6 + alt < innerHeight ? r.bottom + 6 : Math.max(8, r.top - 6 - alt)) + "px";
+      btn.setAttribute("aria-expanded", "true");
+    }
+    const btnTema = $(".hd .tema");
+    if (btnTema) {
+      btnTema.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (temabox) fecharTema();
+        else abrirTema();
+      });
+    }
+    // O clique fora fecha pelo DOCUMENTO, não pelo `wrap`: nos modos lateral,
+    // livre e flutuante a página do tribunal fica visível e CLICÁVEL ao lado,
+    // com a caixa `position: fixed` por cima dela — ancorado no `wrap`, clicar
+    // nos autos não fecharia nada. E a decisão é por `composedPath()`, nunca
+    // por `e.target`: no documento o alvo de dentro do Shadow DOM chega
+    // RETARGETADO para o host, então `closest(".temabox")` daria `null` e o
+    // clique dentro da própria caixa a fecharia — inclusive o do botão de tema,
+    // que morreria antes do `click`. (A mesma lição da `.movbox`.)
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (!temabox) return;
+        const cam = e.composedPath ? e.composedPath() : [];
+        if (cam.includes(temabox) || cam.includes(btnTema)) return;
+        fecharTema();
+      },
+      true
+    );
+
+    // Esc fecha a caixa, com `stopPropagation` para não cancelar junto o modo
+    // minuta — a cascata de Esc do painel é `/` → `@` → modal → modo minuta, e
+    // quem está por cima consome o evento.
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && temabox) {
+          e.stopPropagation();
+          fecharTema();
+        }
+      },
+      true
+    );
+
     // Restaura a preferência de layout (vale a partir do próximo open()).
     try {
-      chrome.storage.local.get(["layoutModo", "livreGeo"], (v) => {
+      chrome.storage.local.get(["layoutModo", "livreGeo", "tema"], (v) => {
+        // `gravar: false` — restaurar não é escolher, e regravar aqui
+        // dispararia um `storage.onChanged` em todas as abas a cada boot.
+        if (v && typeof v.tema === "string") aplicarTema(v.tema, false);
         if (v && v.livreGeo) geoLivre = v.livreGeo;
         if (v && v.layoutModo === "lateral") wrap.classList.add("lateral");
         else if (v && v.layoutModo === "expandido") wrap.classList.add("expanded");
@@ -2122,14 +2286,74 @@ var PjePanel = (function () {
     // status escreve o que passou a valer, em vez de só confirmar o clique.
     const tglSigilo = $(".tgl-sigilo");
     const seloSigilo = $(".selo-sigilo");
+    const sigselo = $(".sigselo");
     let sigiloOn = false;
     let sigiloCb = null;
+    // O que o carimbo mostra enquanto a anonimização roda: `{feitas, total,
+    // detalhe}`, ou `null` em repouso. Ver `setSigiloProgresso`.
+    let sigProgresso = null;
+    let sigAnuncioTimer = 0;
+    // A última contagem que `pintarSigilo` recebeu. `setSigiloProgresso` repinta
+    // o carimbo fora do ciclo de `pintarSigilo` e precisa dela para não zerar o
+    // número ao voltar do progresso para o repouso.
+    let ultimoQuantosSigilo = 0;
+    // O anúncio dura o bastante para ser lido uma vez e não o bastante para
+    // virar paisagem. Mesmo prazo do resultado da leitura da lista, que volta
+    // ao repouso em 12 s — aqui é menos, porque a frase é mais curta.
+    const MS_ANUNCIO_SIGILO = 7000;
+
+    // O TEXTO DO CARIMBO. Três momentos, um elemento — e a ordem importa: o
+    // progresso VENCE o estado de repouso, porque enquanto as peças estão sendo
+    // lidas a contagem de protegidos ainda está subindo e um número que muda
+    // sozinho sem explicação é pior que nenhum.
+    function pintarCarimbo(n) {
+      if (!sigselo) return;
+      const rot = sigselo.querySelector(".ss-t");
+      const num = sigselo.querySelector(".ss-n");
+      if (sigProgresso) {
+        const p = sigProgresso;
+        rot.textContent = "ANONIMIZANDO";
+        num.textContent = p.total ? p.feitas + "/" + p.total : String(p.feitas || "");
+        // A FOLHA em filho próprio, pelo mesmo motivo do substantivo: no
+        // estreito ela é o que sobra depois de já se saber a peça, e são os
+        // 31px que faziam o cabeçalho do modo lateral quebrar numa 3ª linha.
+        if (p.detalhe) {
+          const d = document.createElement("i");
+          d.className = "ss-d";
+          d.textContent = " · " + p.detalhe;
+          num.appendChild(d);
+        }
+        return;
+      }
+      rot.textContent = "SIGILOSO";
+      // O número é a única coisa que muda em repouso, e é por isso que ele
+      // continua sendo lido depois do terceiro processo do dia. Sem nenhum dado
+      // protegido ainda, o carimbo diz só o estado — inventar um "0 protegidos"
+      // faria a primeira impressão do modo ser a de que ele não fez nada.
+      // O SUBSTANTIVO num filho próprio, para o estreito poder tirá-lo sem
+      // tirar o número. É o mesmo par `.sl-l`/`.sl-s` do selo da metarow: duas
+      // formas no DOM, a escolha no CSS. MEDIDO: com "· 47 protegidos" o
+      // carimbo tem 103px, o CNJ tem 140, e os dois não cabem na linha do
+      // cabeçalho a 420px — ele quebrava e o cabeçalho ia de 98px para 140px.
+      num.textContent = "";
+      if (n) {
+        num.appendChild(document.createTextNode("· " + n));
+        const u = document.createElement("i");
+        u.className = "ss-u";
+        u.textContent = n === 1 ? " protegido" : " protegidos";
+        num.appendChild(u);
+      }
+    }
 
     // Pintar é SEPARADO de alternar: o content script também precisa pintar
     // (ao retomar um processo que já estava em modo sigiloso), e sem a separação
     // ele teria de simular um clique — que dispararia o callback e ligaria o
     // modo de novo, do lado de lá.
     function pintarSigilo(ligado, quantos, dados) {
+      // Guardado ANTES da atribuição: é a transição desligado→ligado que dispara
+      // o anúncio do carimbo, e não o estado. Sem isto o anúncio voltaria a cada
+      // repinte — e `setSigiloso` é chamada pelo content a cada turno.
+      const acendeu = !sigiloOn && !!ligado;
       sigiloOn = !!ligado;
       // A classe veste o PAINEL INTEIRO. É ela que liga a tarja, o anel da
       // janela e a borda do campo de mensagem — um modo que muda o que sai da
@@ -2140,20 +2364,37 @@ var PjePanel = (function () {
       // usuário já comprou o faz duvidar se comprou mesmo.
       const convite = $(".hint-sigilo");
       if (convite) convite.hidden = sigiloOn;
-      const barra = $(".sigbar");
-      if (barra) {
-        barra.hidden = !sigiloOn;
-        barra.querySelector(".sb-t").textContent =
-          "MODO SIGILOSO — as peças saem anonimizadas deste computador; o PDF não sai da máquina";
-        // A contagem também na tarja: é a única marca do modo que fica no campo
-        // de visão o tempo todo, e "o que está sendo protegido?" é a pergunta
-        // que ela precisa responder sem que ninguém abra nada.
-        const nEl = barra.querySelector(".sb-n");
-        if (nEl) {
-          const n = Number(quantos) || 0;
-          nEl.hidden = !n;
-          nEl.textContent = n + (n === 1 ? " dado protegido" : " dados protegidos");
+      // O CARIMBO, colado à IDENTIDADE do processo (a linha do CNJ). Ele
+      // substituiu a `.sigbar`, que era uma faixa hachurada de largura inteira
+      // logo abaixo do cabeçalho — ver o porquê da troca no DESIGN.md. O que
+      // importa preservar aqui: o carimbo não custa altura nenhuma, então
+      // nenhum dos três momentos dele move a `.inrow` (o bug do 📎).
+      if (sigselo) {
+        sigselo.hidden = !sigiloOn;
+        if (!sigiloOn) {
+          // Desligar limpa o progresso: um "ANONIMIZANDO 3/12" congelado é a
+          // pior coisa que o carimbo pode dizer depois que o modo saiu de cena.
+          sigProgresso = null;
+          clearTimeout(sigAnuncioTimer);
+          sigselo.classList.remove("anunciando");
+        } else if (acendeu) {
+          // O ANÚNCIO. A frase que a faixa antiga mantinha para sempre agora
+          // aparece uma vez, no instante em que ela responde a uma pergunta —
+          // logo depois do gesto que ligou o modo — e some sozinha. É
+          // confirmação de uma ação recém-tomada, não um cartaz.
+          sigselo.querySelector(".ss-a").textContent =
+            "As peças saem anonimizadas daqui";
+          sigselo.classList.add("anunciando");
+          clearTimeout(sigAnuncioTimer);
+          sigAnuncioTimer = setTimeout(() => {
+            sigselo.classList.remove("anunciando");
+          }, MS_ANUNCIO_SIGILO);
         }
+        ultimoQuantosSigilo = Number(quantos) || 0;
+        pintarCarimbo(ultimoQuantosSigilo);
+        sigselo.title =
+          "Modo sigiloso ligado: as peças vão como texto anonimizado e o arquivo original não sai desta máquina." +
+          " Clique para AUDITAR o que foi mascarado.";
       }
       if (dados !== undefined) audDados = dados;
       // A caixa nunca pode mostrar o retrato de um estado anterior — a mesma
@@ -2515,6 +2756,14 @@ var PjePanel = (function () {
     }
 
     seloSigilo.addEventListener("click", () => (audbox ? fecharAud() : abrirAud()));
+    // O CARIMBO é a segunda porta para a MESMA caixa. Duas portas para um
+    // destino é padrão daqui (o "ver na timeline" tem três: a row da peça, a
+    // citação da bolha e a lista de movimentos), e as duas se justificam: o selo
+    // da metarow fica na fileira dos fatos sobre a resposta, e o carimbo é o
+    // estado ambiente — quem quer conferir olha para o cabeçalho primeiro.
+    if (sigselo) {
+      sigselo.addEventListener("click", () => (audbox ? fecharAud() : abrirAud()));
+    }
 
     // Esc fecha — e com `stopPropagation`, senão a cascata de Esc do painel
     // (`/` -> `@` -> modal -> modo minuta) cancelaria outra coisa junto. Mesma
@@ -7365,6 +7614,13 @@ var PjePanel = (function () {
       startPrep,
       setPrepState,
       endPrep,
+      // O tema, para o content propagar a troca feita NOUTRA aba (ou na página
+      // de opções) pelo `storage.onChanged`. `gravar: false` porque quem
+      // recebe a notificação não é quem escolheu — regravar aqui devolveria o
+      // evento ao storage e as abas ficariam em pingue-pongue.
+      setTema(id) {
+        aplicarTema(id, false);
+      },
       isSigiloso() {
         return sigiloOn;
       },
@@ -7375,6 +7631,24 @@ var PjePanel = (function () {
       // processo que já estava em modo sigiloso.
       setSigiloso(ligado, quantos, dados) {
         pintarSigilo(ligado, quantos, dados);
+      },
+      // O PROGRESSO DA ANONIMIZAÇÃO, no carimbo. É uma API própria e não um
+      // parâmetro de `setSigiloso` porque as duas mudam em ritmos diferentes:
+      // o estado do modo muda uma vez por turno, o progresso muda uma vez por
+      // peça (e uma vez por FOLHA, no OCR). Passar `null` volta ao repouso.
+      //
+      // O que ela mostra já era escrito em `setPrepNota`, dentro do card de
+      // preparo — mas o card some quando o turno termina, e é justamente
+      // durante a anonimização que o carimbo estaria mudo com "0 protegidos".
+      // PARCIAL FUNDE, `null` ZERA. São dois chamadores em escopos diferentes:
+      // o laço das peças conhece `{feitas, total}` e o OCR, lá dentro, conhece
+      // só a folha. Se o parcial substituísse, a chamada da folha apagaria o
+      // contador de peças e o carimbo diria "fl. 3" sem dizer 3 de quantas.
+      setSigiloProgresso(p) {
+        if (!p) sigProgresso = null;
+        else if (p.total || p.feitas || p.detalhe)
+          sigProgresso = Object.assign({}, sigProgresso, p);
+        if (sigiloOn) pintarCarimbo(ultimoQuantosSigilo);
       },
       // O relatório de conferência: quem monta é o content (ele tem o texto e a
       // ficha); o painel só oferece o gesto.

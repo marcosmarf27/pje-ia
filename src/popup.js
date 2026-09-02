@@ -20,6 +20,8 @@ const limparMemBtn = document.getElementById("limparMemoria");
 // Exclusivos da página de opções: no popup eles não existem, e ler `.textContent`
 // de `null` quebraria a tela inteira. A regra vale para todo elemento que só
 // existe numa das duas telas servidas por este mesmo arquivo.
+// Só na página de opções (como o `memoriaCaso`): no popup vem null.
+const temaEl = document.getElementById("tema");
 const remedirOcrBtn = document.getElementById("remedirOcr");
 const ocrStatus = document.getElementById("ocrStatus");
 const memStatus = document.getElementById("memStatus");
@@ -459,7 +461,7 @@ chrome.storage.local.get(
     "customPrompt",
     "memoriaCaso",
     "modeloMinuta",
-    "sigiloAprovar",
+    "sigiloAprovar", "tema",
   ],
   (v) => {
     if (v.apiKey) apiKeyEl.value = v.apiKey;
@@ -491,6 +493,7 @@ chrome.storage.local.get(
     // tela não tem a chave no storage, e `v.memoriaCaso` vem `undefined`.
     if (memoriaEl) memoriaEl.checked = v.memoriaCaso !== false;
     if (sigiloAprovarEl) sigiloAprovarEl.checked = v.sigiloAprovar !== false;
+    if (temaEl) temaEl.value = typeof v.tema === "string" ? v.tema : "";
     pintarMascaras();
     setChip();
     // Os passos "Como usar" só existem enquanto NENHUMA chave foi salva: é
@@ -675,6 +678,9 @@ saveBtn.addEventListener("click", () => {
   if (customEl) cfg.customPrompt = customEl.value.trim();
   if (memoriaEl) cfg.memoriaCaso = memoriaEl.checked;
   if (sigiloAprovarEl) cfg.sigiloAprovar = sigiloAprovarEl.checked;
+  // "" = Azul TecJustiça. Gravado SEMPRE que o campo existe, para voltar ao
+  // padrão ser possível — a mesma regra do `modeloMinuta`.
+  if (temaEl) cfg.tema = temaEl.value;
   chrome.storage.local.set(cfg, () => {
     // DESLIGAR tem de apagar o que já existe, na hora. Um interruptor que só
     // impede gravações futuras deixaria no disco exatamente o material que o

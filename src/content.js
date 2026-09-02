@@ -1515,6 +1515,16 @@
       // o system mudou → a última medição de contexto não vale mais
       ultimaChaveEst = "";
     }
+    // O TEMA trocado noutra aba (ou na página de opções) chega aqui. Não é
+    // reinjeção de CSS: o painel só troca um atributo no `.wrap`, e os blocos
+    // `[data-tema]` já estão no `panel.css` desde o boot.
+    if (area === "local" && ch.tema) {
+      try {
+        panel.setTema(String(ch.tema.newValue || ""));
+      } catch {
+        /* painel ainda não montado nesta aba */
+      }
+    }
     if (area === "local" && ch.sigiloAprovar) {
       sigiloAprovar = ch.sigiloAprovar.newValue !== false;
     }
@@ -3526,6 +3536,9 @@
         // é uma folha cujo conteúdo o modelo não vai ver, e isso muda a resposta.
         try {
           panel.setPrepNota((fase || "Lendo") + " — OCR da fl. " + f.p + " · " + rotulo);
+          // A folha é a unidade que anda numa peça digitalizada de 40 páginas;
+          // sem ela o carimbo ficaria parado na mesma peça por minutos.
+          panel.setSigiloProgresso({ detalhe: "fl. " + f.p });
           const o = await comTeto(
             rpc({ type: "ocrReconhecer", payload: { img: f.img } }),
             pagsOcrSigilo === 0 ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
@@ -3564,6 +3577,10 @@
     panel.setPrepNota(
       "Anonimizando" + (total ? " " + posicao + " de " + total : "") + " — " + rotulo
     );
+    // E TAMBÉM no carimbo do cabeçalho. O card de preparo some com o fim do
+    // turno; o carimbo fica. Sem isto ele diria "SIGILOSO" sem número durante
+    // toda a fase lenta — que é o estado que a captura do usuário flagrou.
+    panel.setSigiloProgresso({ feitas: posicao || 0, total: total || 0, detalhe: "" });
     // NFC UMA vez, na entrada: a string canônica é a que se tokeniza, a que se
     // mascara e a que vai ao modelo. Sem isso haveria dois sistemas de
     // coordenadas — o offset que o NER devolve apontaria para outra string, e o
@@ -3681,6 +3698,9 @@
       }
     }
     panel.setPrepNota("");
+    // Volta ao repouso: daqui em diante o carimbo mostra a CONTAGEM. Progresso
+    // congelado depois do turno seria pior que progresso nenhum.
+    panel.setSigiloProgresso(null);
     // O worker do NER segura ~109 MB de WASM, e o documento offscreen também
     // hospeda o OCR: o BERT residente ali deixa a extração mais lenta (medido,
     // 1,48x, no app irmão). Fechado assim que o lote acaba.

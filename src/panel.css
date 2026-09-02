@@ -44,6 +44,10 @@
   --muted-3: #93a3ac;  /* placeholders, ícones inativos */
   --eyebrow: #a0aeb6;  /* eyebrow mono uppercase */
   --surface: #ffffff;
+  /* O fundo da JANELA. Igual a `--surface` no padrão, e é isso que mantém o
+     tema institucional byte a byte; separado porque só ele fica translúcido
+     no Vidro (ver "Temas" no DESIGN.md §2). */
+  --surface-painel: #ffffff;
   /* A conversa é BRANCA e a lista é que fica tingida — até a v0.23 era o
      inverso. Põe o peso visual no texto da resposta, não na navegação. */
   --surface-2: #fafcfc;      /* coluna de peças, rodapé de entrada */
@@ -67,10 +71,6 @@
      ESPELHA o ui.css, onde este token já existia (DESIGN.md §1). */
   --ok-bg: #eaf4ef;
   --ok-line: #cbe3d8; /* borda do banner "Pronto para usar" */
-  /* Tom do HACHURADO da tarja do modo sigiloso. Entre --ok-bg e --ok-line os
-     dois tons são quase o mesmo e a listra desaparecia; este é o meio-termo que
-     lê como textura de capa sem virar um bloco verde. Ver DESIGN.md §5. */
-  --ok-tarja: #b9d9c8;
   --ok-ink: #1e5c44;  /* texto sobre confirmação suave */
   /* MODO SIGILOSO — a família que veste o painel inteiro quando ele está
      ligado (cabeçalho, marca, botão primário, moldura). Verde PROFUNDO no
@@ -85,8 +85,21 @@
   --sig-btn-para: #1f6a4b;
   --sig-btn-de-h: #35a074;
   --sig-btn-para-h: #1a5c41;
-  --sig-tarja: #a7d2bd;     /* hachura da tarja, mais funda que --ok-tarja */
   --sig-halo: rgba(47, 146, 104, 0.28); /* anel externo da janela e foco */
+  /* O CARIMBO na linha do CNJ. Placa CLARA com tinta escura porque um carimbo é
+     tinta sobre papel — e sobre o cabeçalho verde profundo é o contraste máximo
+     disponível. Num tema de chrome CLARA a polaridade se inverte (placa escura,
+     tinta clara): o glifo e a forma continuam idênticos, só a luminosidade
+     acompanha o fundo. É a regra "matiz constante, luminosidade ajustada". */
+  --sig-carimbo-bg: #cfe8db;
+  --sig-carimbo-bg-h: #dcf0e6;
+  --sig-carimbo-ink: #10352a;
+  /* A TEXTURA DE REDAÇÃO do cabeçalho no modo — linhas de texto com barras
+     tarjadas por cima, a 5,5%. Substituiu a hachura a −45° da faixa antiga, que
+     era fita de isolamento (linguagem de PERIGO) num modo que confirma uma
+     proteção funcionando. Data-URI pela regra de nenhum recurso externo; o `#`
+     vai como `%23`, senão o navegador corta a URL ali e a textura some calada. */
+  --sig-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23ffffff' fill-opacity='0.055'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
   --warn: #de8b2c;
   --erro: #a5301f;
   /* Aviso SUAVE — informa sem impedir de continuar. Veste o relatório de peças
@@ -110,6 +123,26 @@
   --on-hd: #eaf4f7;   /* texto/ícone principal sobre fundo escuro */
   --on-hd-2: #bbd8e2; /* ícone secundário, estado inativo */
   --on-hd-3: #cfe3ea; /* texto de chip sobre o cabeçalho */
+  /* TINTA sobre o cabeçalho, no branco puro. Distinto de `--on-hd` (#eaf4f7,
+     que é o texto secundário): este é o título, os ícones e o ✕ — e num tema de
+     chrome CLARA ele precisa virar tinta escura, senão o cabeçalho fica em
+     branco sobre branco. Enquanto estava escrito `#fff` em 12 regras, nenhum
+     tema o alcançava. */
+  --on-hd-forte: #ffffff;
+  /* TINTA sobre superfície de AÇÃO (botão primário, launcher, toggle aceso).
+     Não muda por tema — o botão continua saturado em todos —, mas fica em token
+     para a exceção ser uma decisão e não um esquecimento. */
+  --on-acao: #ffffff;
+  /* VÉUS do cabeçalho: as películas claras que dão relevo à chrome escura.
+     Num tema de chrome clara elas se invertem (película ESCURA), e é por isso
+     que precisam de nome. Só os do cabeçalho entram: o véu de um botão saturado
+     continua branco em qualquer tema. */
+  --veu-1: rgba(255, 255, 255, 0.07);   /* fundo do grupo de botões */
+  --veu-2: rgba(255, 255, 255, 0.16);   /* hover */
+  --veu-3: rgba(255, 255, 255, 0.32);   /* botão ativo */
+  --veu-borda: rgba(255, 255, 255, 0.55); /* contorno do ativo */
+  --veu-luz: rgba(255, 255, 255, 0.22);   /* o brilho no topo da marca */
+  --veu-pega: rgba(255, 255, 255, 0.3);   /* a pega de arrastar do modo livre */
   /* categorias de peças (lista, chips, popup @ e mapa mental).
      Petições deixou de ser AZUL porque azul é a cor de AÇÃO do sistema: uma
      categoria azul na lista competia com botões e links, e não dava para
@@ -197,6 +230,330 @@
   font-family: var(--ff-sans);
 }
 
+/* =========================================================================
+   TEMAS DO PAINEL
+   =========================================================================
+   Um tema é um bloco de OVERRIDES de token sobre o `.wrap` — nenhuma regra de
+   componente muda, nenhum seletor novo é criado. É o mesmo gesto que
+   `.wrap.sigiloso` já fazia desde a v0.55 trocando `--hd`/`--mark-*`/`--btn-*`
+   pela família `--sig-*`, e foi por reconhecer esse molde que os temas custaram
+   um bloco de tokens em vez de uma arquitetura.
+
+   ATRIBUTO (`[data-tema]`) e não classe. Dois motivos: a especificidade 0,2,0
+   vence o `.wrap` base sem depender da ordem no arquivo, e o tema não entra na
+   mesma dimensão das classes de MODO (`.sigiloso`, `.expanded`, `.estreito`),
+   que se combinam livremente com ele.
+
+   O QUE VARIA e o que NÃO varia. Variam superfície, tinta, linha, chrome e a
+   família `--sig-*`. NÃO varia o MATIZ dos tokens semânticos: `--cat-*` (a
+   categoria da peça), `--ok`, `--warn`, `--alerta`. Um `--cat-decisao` que
+   mudasse de cor por tema quebraria a semântica que o §2 estabeleceu — a cor
+   ali É o dado. O que se ajusta neles é só a LUMINOSIDADE das variantes `-bg`,
+   `-line` e `-ink`, para o contraste sobreviver ao fundo escuro.
+
+   O tema PADRÃO (Azul TecJustiça) não tem bloco: é o `.wrap` de cima, byte a
+   byte. Há teste que compara as 25 mil propriedades computadas.
+   ========================================================================= */
+
+/* O painel NUNCA declarou uma cor de texto base: `:host { all: initial }` deixa
+   `canvastext` (preto), e sobre a conversa branca isso sempre funcionou — a
+   bolha da resposta não tem `color` próprio, ela herda.
+
+   Num tema de superfície ESCURA o preto herdado vira texto invisível: a medição
+   de contraste deu 1,3:1 na resposta do Noite e 1,2:1 no nome da peça. Não é um
+   token faltando; é uma declaração que nunca existiu porque nunca precisou.
+
+   Declarada só para o painel TEMATIZADO (`[data-tema]`), e não para todo
+   `.panel`: assim o tema padrão continua byte a byte o de antes — há teste que
+   compara 25 mil propriedades computadas, e ele é a razão de esta linha ser
+   condicional em vez de global. */
+.wrap[data-tema] .panel { color: var(--text); }
+
+/* ---------- NOITE ----------
+   O tema que faltava de verdade: a página do PJe é branca e ofuscante, e quem
+   trabalha à noite fica com ela ao lado do painel por horas.
+
+   NÃO é "preto com acento neon" — o clichê da moda. O chão é tinta-petróleo
+   (#0b161d, um azul-esverdeado muito escuro, não um cinza neutro) e o acento
+   continua sendo o MESMO azul institucional da marca, apenas clareado o
+   bastante para passar contraste. A identidade não muda com a luz.
+
+   O §2 é preservado INVERTIDO: lá "a conversa é branca e a lista é que fica
+   tingida", para o peso visual ficar no texto da resposta. Aqui a conversa é a
+   superfície mais CLARA (#16232c) e a lista a mais escura (#101c24) — a mesma
+   relação, no outro sentido. */
+.wrap[data-tema="noite"] {
+  --hd: #0b161d;
+  --on-hd: #dbe7ed;
+  --on-hd-2: #90a4ae;
+  --on-hd-3: #b9cdd6;
+  --on-hd-forte: #eef6fa;
+  /* Véus mais discretos: sobre um fundo quase preto, a mesma opacidade de véu
+     que dá relevo num azul médio vira um bloco cinza visível. */
+  --veu-1: rgba(255, 255, 255, 0.055);
+  --veu-2: rgba(255, 255, 255, 0.11);
+  --veu-3: rgba(255, 255, 255, 0.2);
+  --veu-borda: rgba(255, 255, 255, 0.34);
+  --veu-luz: rgba(255, 255, 255, 0.14);
+  --veu-pega: rgba(255, 255, 255, 0.2);
+
+  --surface: #16232c;
+  --surface-2: #101c24;
+  --surface-3: #16232c;
+  --surface-card: #1a2831;
+  --surface-list-ft: #131f27;
+  --paper: #101a21;
+  --canvas: #0a1319;
+  --hover: #1e2d37;
+  --hover-2: #1a2831;
+  --accent-bg: #1c3743;
+  --accent-bg-2: #1a3140;
+
+  --ink: #e4eef3;
+  --ink-2: #f0f7fa;
+  --text: #dbe7ed;
+  --text-2: #aec1cb;
+  --text-3: #a8c8d6;
+  --muted: #8698a2;
+  --muted-2: #7e909a;
+  --muted-3: #6d7f89;
+  --eyebrow: #647680;
+
+  --line: #26353e;
+  --line-2: #1f2d35;
+  --line-card: #29383f;
+  --line-input: #30404a;
+  --line-strong: #37474f;
+  --line-check: #48595f;
+
+  /* O acento sobe de luminosidade, não muda de matiz. */
+  --pje: #4aa6c9;
+  /* `--pje-2` é FUNDO da bolha do usuário, com `--on-acao` (branco) por cima.
+     Clareá-lo para servir de tinta sobre o escuro deixaria a bolha ilegível —
+     um token, dois papéis, e aqui vence o de fundo, que ocupa mais pixels. */
+  --pje-2: #1f5f7a;
+  --pje-3: #4099bd;
+  --pje-soft: #587683;
+  --mark-de: #2e7e9c;
+  --mark-para: #175d79;
+  --btn-de: #2b83a4;
+  --btn-para: #1f6a88;
+  --btn-de-h: #338fb1;
+  --btn-para-h: #1a5c78;
+  --line-focus: #4aa6c9;
+  --ring: 0 0 0 3px rgba(74, 166, 201, 0.22);
+
+  /* Estados: MATIZ intacto, `-bg`/`-line`/`-ink` reancorados no escuro. */
+  --ok: #3aa87a;
+  --ok-bg: #14302a;
+  --ok-line: #2b5747;
+  --ok-ink: #7fd7b1;
+  --warn: #e09a45;
+  --warn-bg: #33260f;
+  --warn-line: #57431a;
+  --warn-ink: #f0bd7a;
+  --erro: #c9503c;
+  --erro-hd: #b4402f;
+  --alerta: #cf5f49;
+  --alerta-bg: #34201b;
+  --alerta-line: #5d372c;
+  --alerta-ink: #f0a08c;
+
+  /* Categorias: só as duas escuras demais para fundo escuro sobem de luz. */
+  --cat-peticao: #8b83e0;
+  --cat-audiencia: #3aa87a;
+  --cat-outro: #56656d;
+
+  /* Sombra sobre fundo escuro precisa ser mais PRETA e mais funda; a sombra
+     azulada do tema claro simplesmente some. */
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-seg: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sh-btn: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --sh-pop: 0 1px 2px rgba(0, 0, 0, 0.45), 0 24px 60px -18px rgba(0, 0, 0, 0.8);
+  --sh-erguido: 0 2px 6px rgba(0, 0, 0, 0.5), 0 34px 80px -20px rgba(0, 0, 0, 0.85);
+  --sh-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 24px 60px -18px rgba(0, 0, 0, 0.8);
+
+  --sig-hd: #0c2419;
+  --sig-halo: rgba(58, 168, 122, 0.3);
+}
+
+/* ---------- PAPEL ----------
+   O oposto do Noite no eixo que importa: aqui é a CHROME que perde a
+   escuridão. O cabeçalho vira quase-branco, e o quadrado da marca fica sendo a
+   única coisa saturada da janela — o que torna este o tema mais silencioso dos
+   cinco, e o mais próximo de um documento.
+
+   É o tema que só existe por causa da Fase 1: com `color: #fff` escrito em 12
+   regras do cabeçalho, ele seria texto branco sobre branco. */
+.wrap[data-tema="papel"] {
+  --hd: #eef3f6;
+  --on-hd: #0e323f;
+  --on-hd-2: #4d6673;
+  --on-hd-3: #3e5561;
+  --on-hd-forte: #0b2a3a;
+  /* Os véus INVERTEM: sobre chrome clara, a película que dá relevo é escura.
+     É a razão de eles terem virado token. */
+  --veu-1: rgba(14, 50, 63, 0.055);
+  --veu-2: rgba(14, 50, 63, 0.1);
+  --veu-3: rgba(14, 50, 63, 0.14);
+  --veu-borda: rgba(14, 50, 63, 0.2);
+  --veu-luz: rgba(255, 255, 255, 0.5);
+  --veu-pega: rgba(14, 50, 63, 0.14);
+
+  --surface-2: #f5f9fb;
+  --surface-list-ft: #eff5f8;
+  --canvas: #dfe7ec;
+  --line: #dbe5ea;
+  --line-2: #e8eef1;
+  --line-card: #dde7eb;
+  --line-strong: #cfdce2;
+
+  /* O cabeçalho claro precisa de uma linha para não se fundir com a conversa —
+     no tema escuro quem separava era o próprio contraste. */
+  --sig-hd: #dfeee6;
+  /* A textura de redação inverte junto: branca sobre claro é invisível. */
+  --sig-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23153f31' fill-opacity='0.07'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
+  /* O carimbo INVERTE a polaridade: placa escura, tinta clara. O glifo e a
+     forma continuam idênticos — só a luminosidade acompanha o fundo, senão uma
+     placa clara sumiria num cabeçalho claro. */
+  --sig-carimbo-bg: #1d6248;
+  --sig-carimbo-bg-h: #247657;
+  --sig-carimbo-ink: #eaf4ef;
+}
+/* A única regra de COMPONENTE que um tema acrescenta, e ela existe porque o
+   cabeçalho claro não tem como se separar da conversa por contraste. */
+.wrap[data-tema="papel"] .hd { border-bottom: 1px solid var(--line-strong); }
+
+/* ---------- VIDRO ----------
+   Funde o "transparente" e o "vidro" pedidos: a janela vira uma placa fosca e a
+   página do tribunal atravessa ela, desfocada.
+
+   A PRIMEIRA VERSÃO NÃO ERA VIDRO, e o motivo é estrutural, não de gosto: o
+   `.panel` pintava `var(--surface)` — branco OPACO — e o cabeçalho é filho
+   dele. `backdrop-filter` filtra o que está pintado ATRÁS do elemento, e atrás
+   do cabeçalho estava o branco do próprio painel. Desfocar branco dá branco: o
+   resultado era um cinza lavado. Daí `--surface-painel`: enquanto o fundo da
+   janela e o fundo de um cartão eram o mesmo token, vidro era impossível.
+
+   O DESFOQUE MORA NO `.panel`, e só nele. Uma placa de vidro, não cinco:
+   `backdrop-filter` aninhado refiltra o que o pai já filtrou e o resultado
+   embarra. As superfícies de dentro (cabeçalho, lista, barra) são apenas
+   VÉUS de cor por cima da mesma placa — é assim que vidro real se comporta, e
+   é o que dá a sensação de camadas.
+
+   NÃO no `.wrap`: `backdrop-filter` cria bloco de contenção para descendentes
+   `position: fixed`, e os popovers (`.movbox`, `.audbox`, `.selmenu`,
+   `.temabox`, `.preview`) são filhos do `.wrap`. No `.panel` eles ficam fora e
+   continuam ancorados na viewport — a mesma razão pela qual eles são irmãos do
+   `.panel`, e não filhos, por causa do `transform` do arrasto.
+
+   O QUE FICA OPACO. `--surface` NÃO é tocado: ele veste as bolhas da resposta,
+   o campo de mensagem e todos os popovers. Bolha translúcida põe o texto do
+   tribunal por trás do texto da resposta, e o §2 põe o peso visual justamente
+   aí. O efeito colateral é o desenho: cartões sólidos flutuando sobre a placa
+   fosca — que é exatamente a leitura de profundidade que se quer. */
+.wrap[data-tema="vidro"] {
+  /* 30px de desfoque não é exagero: abaixo de ~20px a página atrás continua
+     LEGÍVEL e disputa com a conversa. O desfoque tem de transformar o fundo
+     numa mancha de cor, não numa página embaçada. */
+  --vidro-desfoque: blur(30px) saturate(185%);
+  --surface-painel: rgba(248, 251, 253, 0.55);
+  /* A chrome é vidro TINGIDO: o azul institucional a 0,52 sobre a placa. */
+  --hd: rgba(10, 50, 68, 0.52);
+  --sig-hd: rgba(13, 52, 40, 0.56);
+  /* Superfícies internas viram VÉUS — elas não desfocam nada, só tingem. */
+  --surface-2: rgba(255, 255, 255, 0.22);
+  --surface-list-ft: rgba(255, 255, 255, 0.16);
+  --surface-card: rgba(255, 255, 255, 0.5);
+  --hover: rgba(255, 255, 255, 0.42);
+  --hover-2: rgba(255, 255, 255, 0.3);
+  --accent-bg: rgba(255, 255, 255, 0.62);
+  --accent-bg-2: rgba(255, 255, 255, 0.52);
+  /* Linhas claras, não escuras: sobre vidro, quem separa é a LUZ. */
+  --line: rgba(255, 255, 255, 0.5);
+  --line-2: rgba(255, 255, 255, 0.34);
+  --line-card: rgba(255, 255, 255, 0.55);
+  --line-strong: rgba(255, 255, 255, 0.62);
+  --line-input: rgba(255, 255, 255, 0.6);
+  /* A tinta escurece: o fundo agora é uma mancha de luminosidade variável, e o
+     que era confortável sobre branco fica no limite sobre ela. */
+  --text-2: #2c414c;
+  --muted: #4e626c;
+  --muted-2: #566a74;
+  --eyebrow: #61757e;
+  --on-hd-2: #d3e4ec;
+  /* Cantos mais generosos: é assinatura de superfície de vidro, e a 14px a
+     placa lê como painel de aplicativo comum. */
+  --r-2xl: 18px;
+  /* Sombra funda e larga: é ela que separa a placa da página. */
+  --sh-pop: 0 2px 6px rgba(8, 30, 42, 0.18), 0 32px 72px -18px rgba(8, 30, 42, 0.55);
+  --sh-panel: 0 2px 6px rgba(8, 30, 42, 0.18), 0 32px 72px -18px rgba(8, 30, 42, 0.55);
+  --sh-erguido: 0 3px 10px rgba(8, 30, 42, 0.24), 0 44px 96px -20px rgba(8, 30, 42, 0.62);
+}
+/* A PLACA. Três coisas fazem vidro parecer vidro, e nenhuma delas é a
+   transparência sozinha: o desfoque com SATURAÇÃO (o que passa fica mais
+   colorido, não mais cinza), a borda que CAPTA LUZ e a sombra que descola a
+   placa do fundo. */
+.wrap[data-tema="vidro"] .panel {
+  backdrop-filter: var(--vidro-desfoque);
+  -webkit-backdrop-filter: var(--vidro-desfoque);
+  /* Borda mais clara em CIMA e mais apagada embaixo: é a aresta iluminada de
+     uma placa vista sob luz de cima. Uma borda uniforme lê como contorno de
+     caixa; esta lê como espessura. BORDA e não `box-shadow: inset`, pela regra
+     de sempre — o inset é pintado ABAIXO dos filhos, e o cabeçalho o cobriria. */
+  border: 1px solid;
+  border-color: rgba(255, 255, 255, 0.8) rgba(255, 255, 255, 0.42)
+                rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.42);
+}
+/* Nos modos sem borda a aresta que encosta na página carrega a luz sozinha. */
+.wrap[data-tema="vidro"].lateral .panel { border: none; border-left: 1px solid rgba(255, 255, 255, 0.7); }
+.wrap[data-tema="vidro"].full .panel { border: none; }
+/* O BACKDROP do modo expandido é o que fica ATRÁS da placa — a 0,45 ele apaga
+   a página e a placa passa a desfocar um cinza chapado, isto é, deixa de ser
+   vidro no exato modo em que a janela é maior. Aqui ele escurece só o
+   suficiente para dar foco, sem matar o que há para atravessar. */
+.wrap[data-tema="vidro"] .backdrop { background: rgba(5, 32, 46, 0.26); }
+/* EM TELA CHEIA NÃO HÁ NADA ATRÁS: o desfoque lavaria o próprio branco da
+   página e sobraria uma chrome sem graça. Ali o tema degrada para o
+   institucional — comportamento correto, não falta. */
+.wrap[data-tema="vidro"].full {
+  --vidro-desfoque: none;
+  --surface-painel: #ffffff;
+  --hd: #0e4459;
+  --sig-hd: #143f33;
+  --surface-2: #fafcfc;
+  --line: #e2eaee;
+  --line-strong: #d8e2e6;
+}
+
+/* ---------- TOGA ----------
+   O "vermelho" pedido, feito de um jeito que não quebra a interface: vinho
+   profundo, a cor da toga.
+
+   A COR DE AÇÃO CONTINUA AZUL, e essa é a decisão central do tema. Vermelho
+   neste produto é `--alerta` — o que pode levar a erro de decisão —, e um botão
+   primário vinho ao lado de uma barra de alerta vermelha apagaria a fronteira
+   que o §2 estabeleceu entre "informa" e "impede". Toga é tema de CHROME: veste
+   o cabeçalho e a marca, e deixa a ação onde ela sempre esteve. */
+.wrap[data-tema="toga"] {
+  --hd: #46202a;
+  --mark-de: #8c4351;
+  --mark-para: #5f2a35;
+  --on-hd: #f6e9ec;
+  --on-hd-2: #d3b3ba;
+  --on-hd-3: #e5cdd2;
+  --on-hd-forte: #fdf6f7;
+
+  --surface-2: #fbf8f8;
+  --surface-list-ft: #f7f2f3;
+  --canvas: #ece4e5;
+  --line: #e8dde0;
+  --line-2: #f1eaeb;
+  --line-card: #ebe1e3;
+  --erro-hd: #8c3242;
+}
+
+
 /* ---------- Base de ícone + rótulo ----------
    Todo botão com ícone é <svg> + <span class="lbl">. Os helpers rotulo()/
    icone() do panel.js escrevem em um sem destruir o outro — trocar o
@@ -210,7 +567,7 @@ button > svg { flex: none; }
   align-items: center;
   gap: 8px;
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
-  color: #fff;
+  color: var(--on-acao);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: var(--r-pill);
   padding: 11px 18px;
@@ -316,8 +673,15 @@ button > svg { flex: none; }
   max-height: 86vh;
   /* Fundo BRANCO: a área de conversa herda daqui. Até a v0.23 era --paper
      (azulado) e a lista é que era branca — o refinamento inverteu, para o
-     peso visual ficar no texto da resposta. Ver DESIGN.md §2. */
-  background: var(--surface);
+     peso visual ficar no texto da resposta. Ver DESIGN.md §2.
+
+     TOKEN PRÓPRIO, e não `--surface`, desde que os temas existem: o fundo do
+     PAINEL e o fundo de um CARTÃO são a mesma cor no tema padrão e coisas
+     diferentes num tema translúcido. Enquanto os dois compartilhavam o token,
+     o Vidro era impossível — o painel continuava branco opaco e o
+     `backdrop-filter` do cabeçalho desfocava esse branco, nunca a página do
+     tribunal. O resultado era um cinza lavado, e não vidro. */
+  background: var(--surface-painel);
   border: 1px solid var(--line);
   border-radius: var(--r-2xl);
   box-shadow: var(--sh-pop);
@@ -492,7 +856,7 @@ button > svg { flex: none; }
   height: 3px;
   transform: translateX(-50%);
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--veu-pega);
   pointer-events: none;
 }
 /* (2) ALÇA de redimensionar no canto. O `resize: both` do navegador desenha um
@@ -537,7 +901,7 @@ button > svg { flex: none; }
   /* CHAPADO — a assinatura migrou para o quadrado da marca (.mark). Ver o
      porquê no DESIGN.md §2: o painel abre sob a barra do próprio PJe. */
   background: var(--hd);
-  color: #fff;
+  color: var(--on-hd-forte);
 }
 /* Título em duas linhas: produto em cima, número do processo embaixo. Com
    vários processos abertos em abas, não dava para saber a qual deles o painel
@@ -565,7 +929,7 @@ button > svg { flex: none; }
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--r-ctrl);
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 var(--veu-luz);
 }
 /* A imagem é MENOR que o quadrado de propósito: é o gradiente em volta que
    capta a luz. Uma <img> ocupando 100% cobriria o gradiente e o quadrado
@@ -586,7 +950,7 @@ button > svg { flex: none; }
    agrupamento diz isso e ainda revela QUAIS botões são parentes. */
 .hd-grp {
   display: flex; align-items: center; gap: 2px; flex: none;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--veu-1);
   border-radius: var(--r-ctrl);
   padding: 3px;
 }
@@ -600,7 +964,7 @@ button > svg { flex: none; }
   display: flex; align-items: center; justify-content: center;
   transition: background 0.14s ease, color 0.14s ease;
 }
-.hd button:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.hd button:hover { background: var(--veu-2); color: var(--on-hd-forte); }
 /* Conversas guardadas: ícone + CONTADOR. O botão é o único do cabeçalho que
    não é quadrado, e por um motivo — dois desenhos de balão vizinhos (listar e
    criar) são indistinguíveis a 15px, e foi exatamente esse o relato. O número
@@ -615,11 +979,11 @@ button > svg { flex: none; }
 .hd .convs .convs-n:empty { display: none; }
 /* O ✕ fica fora dos clusters — é a única ação irreversível da barra. */
 .hd > .close {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--veu-1);
   color: var(--on-hd-3);
   width: 32px; height: 32px; border-radius: var(--r-md);
 }
-.hd > .close:hover { background: var(--erro-hd); color: #fff; }
+.hd > .close:hover { background: var(--erro-hd); color: var(--on-hd-forte); }
 .hd button svg { display: block; }
 /* Ocultar/exibir a lista de peças: disponível em TODOS os modos. Onde a lista
    é coluna (expandido/tela cheia/livre largo) ela vira a aba vertical; onde é
@@ -627,8 +991,8 @@ button > svg { flex: none; }
    é no flutuante, aliás, que recolher mais rende: são ~180px devolvidos ao chat. */
 .hd .docsvis { display: flex; }
 .hd .docsvis.on {
-  background: rgba(255, 255, 255, 0.32);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  background: var(--veu-3);
+  box-shadow: inset 0 0 0 1px var(--veu-borda);
 }
 /* ---------- O COLAPSO DA LISTA DE PEÇAS ----------
    Era `display: none`, isto é, um salto. O EIXO muda com o modo e uma regra só
@@ -713,7 +1077,7 @@ button > svg { flex: none; }
   display: flex; flex-direction: row; align-items: center; gap: 8px;
   flex: none; width: 100%; padding: 7px 14px;
   border: none; border-bottom: 1px solid var(--line);
-  background: #fff; color: var(--pje-2); cursor: pointer;
+  background: var(--surface); color: var(--pje-2); cursor: pointer;
   font-family: inherit; text-align: left;
 }
 .wrap.expanded.docs-collapsed .docs-rail,
@@ -734,7 +1098,7 @@ button > svg { flex: none; }
 .docs-rail .rail-n {
   writing-mode: horizontal-tb;
   font-size: var(--fs-nano); font-weight: 600;
-  background: var(--pje-soft); color: #fff;
+  background: var(--pje-soft); color: var(--on-acao);
   border-radius: 8px; padding: 2px 5px;
   min-width: 14px; text-align: center;
 }
@@ -1067,7 +1431,7 @@ button > svg { flex: none; }
 .tip-load, .tip-zip, .tip-ia, .tip-txt-ocr, .tip-zip-mais {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   height: 30px; padding: 0 var(--sp-3b);
-  border: 1px solid var(--line-strong); background: #fff; color: var(--pje);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--pje);
   border-radius: var(--r-md);
   font-size: var(--fs-meta); font-weight: 500;
   cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease;
@@ -1214,7 +1578,7 @@ button > svg { flex: none; }
    resultado — por isso ele é marca, não bullet. */
 .gwarn-m {
   flex: none; width: 18px; height: 18px; border-radius: 50%;
-  background: var(--pje-2); color: #fff;
+  background: var(--pje-2); color: var(--on-acao);
   font-size: var(--fs-nano); font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   margin-top: 1px;
@@ -1349,10 +1713,10 @@ button > svg { flex: none; }
 }
 .se-hd {
   display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px;
-  background: var(--sig-hd); color: #fff;
+  background: var(--sig-hd); color: var(--on-hd-forte);
 }
 .se-t { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.se-x { border: none; background: transparent; color: #fff; cursor: pointer; opacity: 0.8; display: inline-flex; padding: 4px; border-radius: var(--r-ctrl); }
+.se-x { border: none; background: transparent; color: var(--on-acao); cursor: pointer; opacity: 0.8; display: inline-flex; padding: 4px; border-radius: var(--r-ctrl); }
 .se-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
 .se-nota { margin: 0; padding: 8px 14px 6px; color: var(--text-2); font-size: var(--fs-micro); line-height: 1.45; }
 .se-sobras { padding: 0 14px 6px; display: flex; flex-direction: column; gap: 4px; }
@@ -1380,7 +1744,7 @@ button > svg { flex: none; }
 .se-acts { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 14px 12px; }
 .se-usar {
   border: none; border-radius: var(--r-ctrl); padding: 7px 16px; cursor: pointer;
-  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: var(--on-acao);
   font: inherit; font-size: var(--fs-ui); font-weight: 600; box-shadow: var(--sh-btn);
 }
 .se-usar:disabled { opacity: 0.6; cursor: default; }
@@ -1398,9 +1762,9 @@ button > svg { flex: none; }
    beco sem saída. A nota de honestidade usa `--warn-*` (aviso suave, não
    bloqueio): ela informa o limite do detector, e a decisão é do usuário. */
 .sigok .plib-hd { background: var(--sig-hd); border-bottom-color: var(--sig-hd); }
-.sigok .plib-hd .t { color: #fff; display: inline-flex; align-items: center; gap: 8px; }
+.sigok .plib-hd .t { color: var(--on-hd-forte); display: inline-flex; align-items: center; gap: 8px; }
 .sigok .plib-close { color: rgba(255, 255, 255, 0.85); }
-.sigok .plib-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.sigok .plib-close:hover { background: rgba(255, 255, 255, 0.14); color: var(--on-hd-forte); }
 .sigok-card {
   border-color: var(--ok);
   box-shadow: 0 18px 48px rgba(5, 32, 46, 0.3), 0 0 0 4px var(--sig-halo);
@@ -1552,7 +1916,7 @@ button > svg { flex: none; }
 .sigilo-bloqueio.liberado .sb-nota { margin-top: var(--sp-2b); }
 .sigilo-bloqueio .sb-mascarar {
   border: none; border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
-  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: var(--on-acao);
   font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
   box-shadow: var(--sh-btn);
 }
@@ -1564,7 +1928,7 @@ button > svg { flex: none; }
 }
 .sigilo-bloqueio .sb-nova:hover { border-color: var(--ok-ink); color: var(--ok-ink); }
 .sigilo-bloqueio .sb-nova.destaque {
-  border: none; background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  border: none; background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: var(--on-acao);
   box-shadow: var(--sh-btn);
 }
 .sigilo-bloqueio.liberado { border-left-color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
@@ -1629,14 +1993,14 @@ button > svg { flex: none; }
    estreito — ela é o conteúdo de privacidade e não pode ser cortada. */
 .retomada .ret-onde { display: block; color: var(--muted); font-size: var(--fs-micro); }
 .retomada .ret-esq {
-  flex: none; border: 1px solid var(--ok-line); background: #fff;
+  flex: none; border: 1px solid var(--ok-line); background: var(--surface);
   color: var(--ok-ink); border-radius: 8px; padding: 4px 10px;
   font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
 }
-.retomada .ret-esq:hover { background: #fff; border-color: var(--ok); }
+.retomada .ret-esq:hover { background: var(--surface); border-color: var(--ok); }
 /* Segundo clique: a exclusão fica ARMADA e se veste de destrutiva. */
 .retomada .ret-esq.armado {
-  border-color: var(--erro); color: var(--erro); background: #fff;
+  border-color: var(--erro); color: var(--erro); background: var(--surface);
 }
 /* ---------- Menu de conversas guardadas do processo ----------
    `position: fixed` pela mesma razão do .selmenu e da .confirmbox: o .wrap é um
@@ -1696,7 +2060,7 @@ button > svg { flex: none; }
    que diz onde o documento está. */
 .mapacard-hint { font-size: var(--fs-meta); color: var(--muted); margin-top: 4px; }
 .wrap.expanded .msg { font-size: var(--fs-lg); max-width: 82%; }
-.msg.user { background: var(--pje-2); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg.user { background: var(--pje-2); color: var(--on-acao); align-self: flex-end; border-bottom-right-radius: 4px; }
 /* NOME REIDENTIFICADO NA TELA (modo sigiloso). A IA recebeu `[PESSOA_1]`; o
    nome é restaurado aqui, pela tabela deste computador. A marca diz que o
    trecho passou por isso (fundo de confirmação suave + traço pontilhado, e o
@@ -1706,9 +2070,9 @@ button > svg { flex: none; }
   border-bottom: 1px dotted var(--ok-ink); border-radius: 3px;
   padding: 0 2px; cursor: help;
 }
-.msg.user .reid { background: rgba(255, 255, 255, 0.18); border-bottom-color: #fff; }
+.msg.user .reid { background: rgba(255, 255, 255, 0.18); border-bottom-color: var(--surface); }
 .msg.user .txt { white-space: pre-wrap; }
-.msg.assistant { background: #fff; border: 1px solid var(--line); align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.assistant { background: var(--surface); border: 1px solid var(--line); align-self: flex-start; border-bottom-left-radius: 4px; }
 
 /* peças anexadas junto à mensagem do usuário */
 .msg-atts {
@@ -1747,7 +2111,7 @@ button > svg { flex: none; }
 /* ---------- Card de preparo das peças ---------- */
 .prep {
   align-self: flex-start;
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; border-bottom-left-radius: 4px;
   padding: 11px 13px; max-width: 90%; min-width: 240px;
   font-size: var(--fs-meta); animation: rise 0.16s ease-out;
@@ -1770,7 +2134,7 @@ button > svg { flex: none; }
 }
 .prep-okic {
   width: 15px; height: 15px; flex: none; border-radius: 50%;
-  background: var(--ok); color: #fff;
+  background: var(--ok); color: var(--on-acao);
   display: flex; align-items: center; justify-content: center;
 }
 .prep.ok .prep-hd { color: var(--ok); }
@@ -1799,7 +2163,7 @@ button > svg { flex: none; }
   border: 2px solid var(--hover); border-top-color: var(--pje-soft);
   animation: spin 0.7s linear infinite;
 }
-.prep-ic.done { background: var(--ok); color: #fff; animation: pop 0.22s ease-out; }
+.prep-ic.done { background: var(--ok); color: var(--on-acao); animation: pop 0.22s ease-out; }
 /* Peça que não pôde ser baixada: a exportação SEGUE em frente (o índice lista
    as falhas no fim), então o estado precisa ser visível sem parecer fatal. */
 .prep-ic.erro {
@@ -1948,7 +2312,7 @@ button > svg { flex: none; }
 .passo {
   display: grid; grid-template-columns: auto 1fr; gap: 2px var(--sp-2);
   align-items: center;
-  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   padding: var(--sp-2) var(--sp-3);
 }
 .passo .pn {
@@ -1981,7 +2345,7 @@ button > svg { flex: none; }
 
 /* Guia recolhível: fechada por padrão, estado lembrado em storage.local. */
 .hint-empty .guia {
-  text-align: left; background: #fff;
+  text-align: left; background: var(--surface);
   border: 1px solid var(--line); border-radius: 10px;
   font-size: var(--fs-meta); line-height: 1.55; color: var(--muted);
 }
@@ -2023,7 +2387,7 @@ button > svg { flex: none; }
 .needkey p { color: var(--muted); font-size: var(--fs-ui); margin: 0 0 16px; line-height: 1.55; }
 .needkey button {
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
-  color: #fff; border: none; border-radius: 10px;
+  color: var(--on-acao); border: none; border-radius: 10px;
   padding: 11px 20px; font-weight: 600; font-size: var(--fs-body); cursor: pointer;
 }
 .needkey button:hover { filter: brightness(1.05); }
@@ -2067,11 +2431,11 @@ button > svg { flex: none; }
 .alertbar .alert-t { flex: 1; min-width: 0; line-height: 1.4; }
 .alertbar .alert-reset {
   flex: none; display: inline-flex; align-items: center; gap: 5px;
-  border: 1px solid var(--alerta); background: #fff; color: var(--alerta);
+  border: 1px solid var(--alerta); background: var(--surface); color: var(--alerta);
   border-radius: 8px; padding: 4px 10px; font-size: var(--fs-meta); font-weight: 600;
   cursor: pointer;
 }
-.alertbar .alert-reset:hover { background: var(--alerta); color: #fff; }
+.alertbar .alert-reset:hover { background: var(--alerta); color: var(--on-acao); }
 
 /* ----- Faixas do rodapé -----
    A faixa de PEÇAS mantém o rótulo em coluna (chips sem rótulo ficariam
@@ -2135,7 +2499,7 @@ button > svg { flex: none; }
 /* ----- Popups de menção @ (peças) e / (prompts salvos) ----- */
 .mention, .slash {
   position: absolute; left: 12px; right: 12px; bottom: calc(100% + 8px);
-  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 14px 38px rgba(5, 32, 46, 0.2);
   overflow: hidden; z-index: 5; animation: rise 0.12s ease-out;
 }
@@ -2215,7 +2579,7 @@ button > svg { flex: none; }
 .preview {
   position: fixed; z-index: 2147483647;
   width: min(520px, 46vw); height: min(640px, 82vh);
-  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 18px 48px rgba(5, 32, 46, 0.3);
   display: flex; flex-direction: column; overflow: hidden;
   /* redimensionável pela alça do canto (overflow:hidden já é requisito);
@@ -2255,7 +2619,7 @@ button > svg { flex: none; }
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
 .preview-dl, .preview-tab {
-  margin-top: 8px; border: 1px solid var(--pje); background: #fff;
+  margin-top: 8px; border: 1px solid var(--pje); background: var(--surface);
   color: var(--pje-2); border-radius: 8px; padding: 5px 12px;
   font-size: var(--fs-meta); font-weight: 600; cursor: pointer; font-family: inherit;
 }
@@ -2287,7 +2651,7 @@ button > svg { flex: none; }
 .inrow.com-prompt { border-top-left-radius: 0; border-top-right-radius: 0; }
 .pchip {
   display: inline-flex; align-items: center; gap: 6px;
-  background: #fff; border: 1px solid var(--line); color: var(--text-3);
+  background: var(--surface); border: 1px solid var(--line); color: var(--text-3);
   border-radius: var(--r-pill); padding: 3px 4px 3px 10px; font-size: var(--fs-micro);
   max-width: 100%;
 }
@@ -2300,7 +2664,7 @@ button > svg { flex: none; }
 .pchip-tip {
   display: none; position: absolute; left: 0; bottom: calc(100% + 8px);
   z-index: 6; width: min(440px, 100%); max-height: 190px; overflow: hidden;
-  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 14px 38px rgba(5, 32, 46, 0.2);
   padding: 9px 11px; font-size: var(--fs-meta); line-height: 1.5; color: var(--text);
   white-space: pre-wrap; overflow-wrap: break-word;
@@ -2318,7 +2682,7 @@ button > svg { flex: none; }
 .inrow.com-anexo { border-top-left-radius: 0; border-top-right-radius: 0; }
 .achip {
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
-  background: #fff; border: 1px solid var(--line); color: var(--text-3);
+  background: var(--surface); border: 1px solid var(--line); color: var(--text-3);
   border-radius: var(--r-pill); padding: 3px 4px 3px 8px; font-size: var(--fs-micro);
 }
 .achip-i { display: inline-flex; color: var(--pje); flex: none; }
@@ -2345,7 +2709,7 @@ button > svg { flex: none; }
 .inrow {
   display: flex; gap: 8px; align-items: flex-end;
   border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 10px;
-  background: #fff; transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--surface); transition: border-color 0.15s, box-shadow 0.15s;
 }
 .inrow:focus-within { border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15); }
 .in {
@@ -2358,7 +2722,7 @@ button > svg { flex: none; }
 .send {
   flex: none; display: inline-flex; align-items: center; gap: var(--sp-2);
   background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
-  color: #fff; border: none; border-radius: var(--r-ctrl);
+  color: var(--on-acao); border: none; border-radius: var(--r-ctrl);
   height: 38px; padding: 0 18px;
   font-size: var(--fs-ui); font-weight: 600; cursor: pointer;
   box-shadow: var(--sh-btn);
@@ -2582,7 +2946,50 @@ button > svg { flex: none; }
    é um container de tamanho ZERO. A largura é generosa porque o complemento do
    movimento é a informação que fecha a conta do prazo ("Decorrido prazo de … em
    16/07/2026 23:59") e cortá-lo tiraria justamente o que se veio ler. */
-/* ---------- MODO SIGILOSO: a tarja ----------
+/* ---------- A CAIXA DE TEMAS (abre no botão do cabeçalho) ----------
+   `position: fixed` pela mesma razão do `.selmenu`, da `.movbox` e da
+   `.confirmbox`: o `.wrap` é um container de tamanho ZERO.
+
+   Ela vive no cluster de APRESENTAÇÃO do cabeçalho (o dos modos de layout), e
+   não na `.toolbar`: aquela linha já vive no limite com seis botões em 484px
+   (DESIGN.md §5), e tema é como o painel se apresenta — exatamente o escopo
+   deste grupo. */
+.temabox {
+  position: fixed;
+  z-index: 2147483647;
+  width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-box);
+  box-shadow: var(--sh-pop);
+  padding: var(--sp-1);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.tm-h {
+  font-size: var(--fs-nano); font-weight: 700; letter-spacing: 0.06em;
+  color: var(--eyebrow); padding: var(--sp-2) var(--sp-2b) var(--sp-1);
+}
+.tm-i {
+  display: flex; align-items: center; gap: var(--sp-2b);
+  padding: var(--sp-2) var(--sp-2b);
+  border: none; background: transparent; color: var(--text);
+  border-radius: var(--r-tight); cursor: pointer;
+  font-family: inherit; font-size: var(--fs-ui); text-align: left;
+}
+.tm-i:hover { background: var(--hover); }
+.tm-i[aria-checked="true"] { background: var(--accent-bg); color: var(--pje); font-weight: 600; }
+/* A AMOSTRA mostra três faixas — chrome, acento e superfície —, não um
+   quadrado de cor só: Papel e Vidro compartilham a superfície clara e se
+   distinguem justamente pela chrome. */
+.tm-sw {
+  flex: none; display: flex; width: 34px; height: 18px;
+  border-radius: var(--r-xs); overflow: hidden;
+  border: 1px solid var(--line-strong);
+}
+.tm-sw i { flex: 1; display: block; }
+.tm-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- MODO SIGILOSO: o carimbo ----------
    Um MODO que muda o que sai da máquina não pode viver só num botão — o botão
    diz "eu liguei isto"; o que se precisa é "eu ESTOU aqui". Daí a marca vestir o
    painel inteiro (`.wrap.sigiloso`) em vez de acender só o controle.
@@ -2590,72 +2997,113 @@ button > svg { flex: none; }
    MOLDURA, NUNCA SUPERFÍCIE. O §2 decidiu que "a conversa é branca e a lista é
    que fica tingida", para o peso visual ficar onde está a leitura — tingir o
    chat reverteria isso e brigaria com o texto da resposta, que é o trabalho.
-   Então a marca fica na CHROME: a faixa, o anel da janela e a borda do campo.
+   Então a marca fica na CHROME: o cabeçalho, o anel da janela e a borda do
+   campo de mensagem.
 
-   A TARJA vem do mundo do assunto, e não de um "estado verde" genérico: autos em
-   segredo de justiça carregam uma tarja na capa — uma faixa que se vê ANTES de
-   abrir o processo. O hachurado é o que a faz ler como marca de capa e não como
-   mais uma barra de status; sem ele, uma faixa lisa some entre o cabeçalho
-   escuro e o branco da conversa.
+   O QUE MUDOU DA v0.57 PARA CÁ, e por quê. Até aqui o estado morava numa
+   `.sigbar`: uma faixa hachurada de LARGURA INTEIRA logo abaixo do cabeçalho,
+   com a frase "MODO SIGILOSO — as peças saem anonimizadas…" e, à direita, a
+   contagem. Três defeitos, e o terceiro é o que a captura do usuário mostrou:
 
-   Cor: a família `--ok-*`, a mesma do selo. Aqui não é sucesso nem alerta — é
-   CONFIRMAÇÃO de que uma proteção está valendo, e em `--warn` ela competiria com
-   a `.sel-nota` e com o medidor de contexto, que sinalizam problema. Um estado
-   PERMANENTE em cor de alerta é o "tudo alerta com a mesma intensidade" do §2. */
-/* As faixas de MODO aparecem por `hidden`, que é discreto: com `allow-discrete`
-   elas deslizam para dentro em 120ms. Uma faixa que muda a altura do painel de
-   estalo empurra o que está embaixo dela — e no rodapé isso é o bug do 📎 que
-   "só abria na terceira vez".
+   (1) ~26px de altura PERMANENTES para uma frase que se lê uma vez só. No
+       painel flutuante isso é uma peça a menos visível na lista.
+   (2) A hachura a −45° é FITA DE ISOLAMENTO — linguagem de perigo. O comentário
+       que vivia aqui argumentava corretamente que a COR não podia ser `--warn`
+       porque o modo é confirmação de uma proteção valendo, e então contradizia
+       o próprio argumento na TEXTURA.
+   (3) A contagem (`.sb-n`) era `hidden` com zero protegidos — que é exatamente
+       o estado durante a anonimização, a fase LENTA. Na captura real a faixa
+       ocupava a largura da janela dizendo nada, enquanto "Anonimizando — OCR da
+       fl. 1" aparecia lá embaixo, na coluna de peças. A faixa tinha espaço e
+       nada a dizer; o progresso tinha o que dizer e nenhum espaço.
 
-   SÓ a `.sigbar`: a `.minutabar`, a `.mapabar` e a `.promptbar` JÁ entram por
-   `animation: chip-in` desde antes, e `animation` vence `transition` na mesma
-   propriedade — declarar uma transição para elas seria código morto com um
-   comentário afirmando o contrário. Pior: o `allow-discrete` lhes daria uma
-   SAÍDA de 120ms que elas não tinham, e a faixa ficaria presa na tela depois de
-   fechada. (Medido: elas computam `scale(0.85)`, o `from` do `chip-in`.)
-   Ela cai de cima porque mora colada ao cabeçalho — é de lá que ela vem. */
-.sigbar {
-  transition:
-    opacity var(--dur-1) var(--ease-out),
-    transform var(--dur-1) var(--ease-out),
-    display var(--dur-1) allow-discrete;
+   O CARIMBO resolve os três. Ele mora na linha do CNJ (`.cnj-row`), dentro do
+   `.tit-wrap` — colado à IDENTIDADE do processo, que é a leitura certa: "este
+   processo, em segredo". Custa ZERO px de altura, e por isso nenhum dos seus
+   três momentos move a `.inrow` (o bug do 📎, em que a faixa que cresce empurra
+   a linha dos botões e o clique cai no elemento errado).
+
+   O MOTIVO passou de hachura para REDAÇÃO — barras horizontais de comprimento
+   variável, a assinatura visual de um documento tarjado. É o que a função
+   literalmente faz, e é um motivo que nenhuma interface genérica usa. Ele
+   aparece em dois níveis: cheio no glifo (`SVG.tarja`) e a 5,5% como TEXTURA do
+   cabeçalho, onde de perto lê como linhas tarjadas e de longe como papel.
+
+   POR QUE DENTRO DO `.tit-wrap`, e não como filho direto do `.hd`: em
+   `.estreito` o cabeçalho é `flex-wrap` com `order` calibrado (ver "Cabeçalho
+   em duas linhas"), e um item novo ali exigiria reordenar tudo. Dentro do
+   `.tit-wrap` ele atravessa os dois layouts sem tocar naquilo.
+
+   NADA DE `@starting-style` AQUI. A `.sigbar` tinha entrada e saída discretas,
+   e a lição que morava naquele comentário continua valendo para quem for
+   animar outra faixa: `.minutabar`, `.mapabar` e `.promptbar` JÁ entram por
+   `animation: chip-in`, e `animation` vence `transition` na mesma propriedade —
+   declarar uma transição para elas é código morto, e o `allow-discrete` lhes
+   daria uma SAÍDA que elas não tinham, deixando a faixa presa na tela depois de
+   fechada. O carimbo não precisa de nada disso: ele troca de texto, e a troca é
+   instantânea de propósito (a mesma escolha de `.sl-l`/`.sl-s` e de
+   `.g-full`/`.g-short`) — animar largura com o conteúdo mudando ao mesmo tempo
+   corta o texto no meio da transição. */
+.cnj-row {
+  display: flex; align-items: center; gap: var(--sp-2b);
+  min-width: 0; margin-top: 3px; overflow: hidden;
 }
-@starting-style {
-  .sigbar { opacity: 0; transform: translateY(-4px); }
+/* `min-width: 0` no CNJ, e ele não é redundante com o da linha. Item de flex
+   nasce com `min-width: auto` e SE RECUSA a encolher abaixo do conteúdo: no
+   modo lateral o CNJ (140px) mais o carimbo empurravam o `.tit-wrap` além da
+   largura disponível, e como o `.hd` é `flex-wrap` no estreito, quem quebrava
+   não era a linha do CNJ — era o CABEÇALHO, jogando os botões para baixo e
+   somando 40px. Com isto o CNJ trunca com reticências, que é o que ele já
+   prometia fazer. */
+.hd .cnj-row .cnj { flex: 0 1 auto; min-width: 0; }
+/* O CARIMBO. Placa SÓLIDA, e isso é correção de um defeito concreto: na faixa
+   antiga a frase vinha numa pílula branca boiando sobre a hachura, duas
+   texturas disputando o mesmo espaço. Aqui o texto tem chão.
+
+   Raio de 4px (`--r-xs`) e não `--r-pill`: as pílulas deste painel são chips e
+   selos, e um carimbo de capa é RETANGULAR. A diferença de forma é o que separa
+   "mais um chip" de "uma marca aposta no documento". */
+/* `.hd .sigselo` e NUNCA `.sigselo` sozinho. Só a captura de pixel mostrou o
+   porquê: `.hd button` (especificidade 0,1,1) governa TODO botão do cabeçalho
+   com `background: transparent`, `width/height: 30px` e `--r-sm` — e vence um
+   `.sigselo` de 0,1,0 propriedade a propriedade. O carimbo saía como um
+   quadrado transparente de 30×30, com o texto quebrando dentro dele e o
+   cabeçalho inteiro esticando para 111px. `getComputedStyle` reportava a regra
+   viva e correta; ela simplesmente perdia.
+
+   Por isso `width: auto` e `height` explícitos: não basta declarar o que se
+   quer, é preciso DESFAZER o que a regra genérica já impôs. */
+.hd .sigselo {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  flex: none; width: auto; height: 19px; padding: 0 8px 0 6px;
+  border: none; border-radius: var(--r-xs);
+  background: var(--sig-carimbo-bg); color: var(--sig-carimbo-ink);
+  font-family: inherit; font-size: var(--fs-nano); font-weight: 700;
+  letter-spacing: 0.07em; cursor: pointer;
+  /* NOWRAP é o que garante a promessa de "não muda a altura": sem ele o
+     anúncio quebra em duas linhas dentro do botão e empurra o cabeçalho. */
+  white-space: nowrap; min-width: 0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
 }
-.sigbar {
-  flex: none;
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 16px;
-  border-bottom: 2px solid var(--ok);
-  /* O hachurado da tarja: passo de 12px (6 claros + 6 do tom), a −45°. Mais
-     largo e mais fundo que a primeira versão (8px sobre --ok-tarja), que de
-     longe lia como uma faixa lisa e clara — a listra é o que faz a faixa ser
-     tarja de capa e não mais uma barra de status. */
-  background-image: repeating-linear-gradient(
-    -45deg,
-    var(--ok-bg) 0 6px,
-    var(--sig-tarja) 6px 12px
-  );
+.hd .sigselo svg { flex: none; display: block; }
+.hd .sigselo:hover { background: var(--sig-carimbo-bg-h); color: var(--sig-carimbo-ink); }
+.hd .sigselo:focus-visible { outline: 2px solid var(--sig-carimbo-bg); outline-offset: 2px; }
+/* O número em tabular: ele muda a cada peça, e sem largura fixa por dígito o
+   carimbo inteiro treme a cada atualização. */
+.hd .sigselo .ss-n {
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+  font-weight: 500; opacity: 0.82;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
-.sigbar > svg { width: 14px; height: 14px; flex: none; color: var(--ok-ink); }
-.sb-t {
-  font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.02em;
-  color: var(--ok-ink);
-  background: var(--surface); padding: 2px 9px; border-radius: var(--r-pill);
-  border: 1px solid var(--ok);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0;
-}
-/* A contagem do que está protegido, na própria tarja: é a única marca do modo
-   que fica no campo de visão o tempo todo, e "está protegendo o quê?" é a
-   pergunta que ela responde sem que se abra nada. Sólida, sobre --ok. */
-.sb-n {
-  margin-left: auto; flex: none;
-  font-size: var(--fs-nano); font-weight: 700; letter-spacing: 0.03em;
-  color: #fff; background: var(--ok); border-radius: var(--r-pill); padding: 2px 9px;
-  white-space: nowrap;
-}
+.hd .sigselo .ss-n:empty { display: none; }
+.hd .sigselo .ss-u,
+.hd .sigselo .ss-d { font-style: normal; }
+/* O ANÚNCIO — os 7 segundos depois de ligar o modo. Fora dele o span não existe
+   no layout, então a troca não custa altura nenhuma. */
+.hd .sigselo .ss-a { display: none; font-weight: 600; letter-spacing: 0.01em; }
+.hd .sigselo.anunciando .ss-a { display: inline; }
+.hd .sigselo.anunciando .ss-t,
+.hd .sigselo.anunciando .ss-n { display: none; }
 /* A MOLDURA da janela. Duas rotas foram tentadas antes e as duas falham por um
    motivo de plataforma — nenhum aparece no `getComputedStyle`, que reporta tudo
    vivo e correto nos dois casos; só a captura de pixel mostra.
@@ -2697,7 +3145,17 @@ button > svg { flex: none; }
    profundo no lugar do azul institucional é o que faz o estado ser visto de
    relance, de qualquer canto da tela. O quadrado da marca e o botão primário
    acompanham — uma família, um sinal. */
-.wrap.sigiloso .hd { background: var(--sig-hd); }
+/* A TEXTURA DE REDAÇÃO no cabeçalho: o mesmo motivo do glifo, a 5,5%. É o que
+   substitui a hachura da faixa antiga — e a diferença é que aqui ela não custa
+   espaço nenhum, porque veste uma superfície que já existia.
+
+   Data-URI e não arquivo: nenhum recurso externo entra numa página de tribunal
+   (DESIGN.md §6), e é o mesmo caminho do `--ic-lupa-busca`. O `#` do hex vai
+   como `%23` — sem isso o navegador corta a URL ali e a textura some, calada. */
+.wrap.sigiloso .hd {
+  background-color: var(--sig-hd);
+  background-image: var(--sig-textura);
+}
 .wrap.sigiloso .hd .mark {
   background: linear-gradient(180deg, var(--sig-mark-de), var(--sig-mark-para));
 }
@@ -2721,9 +3179,46 @@ button > svg { flex: none; }
 .wrap.sigiloso .inrow:focus-within {
   border-color: var(--ok-ink); box-shadow: 0 0 0 3px var(--sig-halo);
 }
-/* Em 420px a frase inteira não cabe ao lado do padding; ela trunca com ellipsis
-   (regra do `.sb-t`) e o hachurado sozinho já carrega o estado. */
-.wrap.estreito .sigbar { padding: 3px 10px; }
+/* Em 420px o CNJ e o carimbo dividem uma linha estreita. Sai o rótulo e ficam o
+   glifo e o NÚMERO — a mesma regra do selo da metarow (`.sl-l`/`.sl-s`): o
+   ícone já diz "sigiloso", o que falta é o que muda. */
+.wrap.estreito .hd .sigselo .ss-t,
+.wrap.estreito .hd .sigselo .ss-d,
+.wrap.estreito .hd .sigselo .ss-u { display: none; }
+.wrap.estreito .hd .sigselo { padding: 0 7px 0 5px; }
+/* MEDIDO: com o carimbo aceso, o bloco do título fica ~62px mais largo e o
+   cabeçalho estreito passa de DUAS linhas para TRÊS — o ✕ desce sozinho e o
+   cluster de layout vai para a terceira. São 42px, mais do que os 26px que a
+   faixa antiga custava: seria trocar um defeito por outro maior.
+
+   A causa é como `flex-wrap` funciona: ele QUEBRA a linha antes de encolher os
+   itens dela. O `.tit-wrap` é `flex: 1 1 auto`, então sua base é o conteúdo e
+   ele nunca cede — quem sai da linha é o último item.
+
+   `flex: 1 1 0` faz o bloco do título ceder, e aí o título trunca com
+   reticências. É o oposto da decisão registrada em "Cabeçalho em duas linhas"
+   ("sem isto os sete botões espremiam o título até 'Assist…'"), e por isso vale
+   SÓ com o carimbo aceso (`:has(.sigselo:not([hidden]))`): sem sigilo o
+   cabeçalho estreito continua byte a byte o de antes. Num painel de 420px o
+   nome da extensão é decoração — quem está olhando sabe onde está —, enquanto o
+   número do processo e o estado do sigilo são DADO. Truncar o primeiro para não
+   gastar 42px com os outros dois é a troca certa. */
+.wrap.estreito .hd:has(.sigselo:not([hidden])) .tit-wrap { flex: 1 1 0; }
+
+/* MEDIDO: no estreito o anúncio (198px) ao LADO do CNJ (140px) não cabe na
+   linha e a joga para baixo — o cabeçalho ia de 140px para 184px por 7
+   segundos, que é precisamente a "faixa que muda de altura perto de botões"
+   que este desenho existe para não repetir.
+   Nos 7 s do anúncio o CNJ sai de cena: ele é o dado que continua na tela o
+   resto do tempo, e o anúncio é o que só se lê uma vez. `:has()` porque o
+   `.cnj` é IRMÃO ANTERIOR do botão — nenhum combinador clássico alcança para
+   trás. (Já usado no painel: `.docs-tip:has(.tip-i:focus)`.)
+
+   A regra vale em TODOS os modos, e não só no estreito: medido no painel largo,
+   CNJ (155px) mais anúncio (200px) empatam com a largura útil do bloco do
+   título e o CNJ saía truncado em "0000860-39.2017.8.06…". Um anúncio que
+   espreme o número do processo para caber não vale os 7 segundos que dura. */
+.cnj-row:has(.sigselo.anunciando) .cnj { display: none; }
 
 /* Quem pediu menos movimento não pediu menos INFORMAÇÃO (a regra do
    `.chamando` do launcher). Nada é DESLIGADO aqui: as durações caem para 1ms,
@@ -2734,7 +3229,7 @@ button > svg { flex: none; }
   .panel, .wrap.open .panel,
   .launcher, .wrap.open .launcher,
   .docs, .wrap.expanded .docs, .wrap.livre-wide .docs,
-  .docs-rail, .sigbar, .msg, .alertbar, .backdrop {
+  .docs-rail, .msg, .alertbar, .backdrop {
     transition-duration: 1ms;
   }
   .panel, .wrap.open .panel { transform: none; }
@@ -2949,7 +3444,7 @@ button > svg { flex: none; }
 .btn-minuta, .btn-plib, .btn-mapa, .btn-mlib {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   height: 30px; padding: 0 var(--sp-3b);
-  border: 1px solid var(--line); background: #fff; color: var(--text-2);
+  border: 1px solid var(--line); background: var(--surface); color: var(--text-2);
   border-radius: var(--r-md); font-size: var(--fs-meta); font-weight: 500;
   cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
@@ -2981,9 +3476,9 @@ button > svg { flex: none; }
    três. */
 .tgl-sigilo.on {
   background: var(--ok); border-color: var(--ok);
-  color: #fff; font-weight: 600;
+  color: var(--on-acao); font-weight: 600;
 }
-.tgl-sigilo.on svg { color: #fff; }
+.tgl-sigilo.on svg { color: var(--on-acao); }
 .tgl-sigilo.on:hover { background: var(--sig-btn-para); border-color: var(--sig-btn-para); }
 /* Selo do MODO SIGILOSO. Usa os tokens --ok-*, e a escolha e' deliberada:
    sigiloso ligado nao e' aviso nem alerta, e' CONFIRMACAO de que uma protecao
@@ -3131,7 +3626,7 @@ button > svg { flex: none; }
 .minuta-modelo-sel {
   flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
   border: 1px solid rgba(20, 96, 126, 0.35); border-radius: 7px;
-  padding: 4px 8px; background: #fff; cursor: pointer;
+  padding: 4px 8px; background: var(--surface); cursor: pointer;
 }
 .minuta-modelo-sel:focus {
   outline: none; border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
@@ -3156,7 +3651,7 @@ button > svg { flex: none; }
 .mm-nota[hidden] { display: none; }
 .mm-add {
   flex: none; display: inline-flex; align-items: center; gap: 5px;
-  border: 1px solid var(--pje); background: #fff; color: var(--pje-2);
+  border: 1px solid var(--pje); background: var(--surface); color: var(--pje-2);
   border-radius: var(--r-sm); padding: 3px 9px;
   font: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
 }
@@ -3180,7 +3675,7 @@ button > svg { flex: none; }
 .mapacard-acts { display: flex; gap: 7px; flex-wrap: wrap; }
 .mapacard-abrir, .mapacard-md {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  border: 1px solid var(--line); background: #fff; color: var(--text);
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
   border-radius: 8px; padding: 6px 12px; font-size: var(--fs-meta); cursor: pointer;
   font-family: inherit; font-weight: 500;
   transition: all 0.15s;
@@ -3188,7 +3683,7 @@ button > svg { flex: none; }
 .mapacard-md svg { flex: none; color: var(--pje); }
 .mapacard-abrir {
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
-  border-color: var(--pje-2); color: #fff; font-weight: 600;
+  border-color: var(--pje-2); color: var(--on-acao); font-weight: 600;
 }
 .mapacard-abrir:hover { filter: brightness(1.06); }
 .mapacard-md:hover { border-color: var(--pje); }
@@ -3220,9 +3715,9 @@ button > svg { flex: none; }
 .editor-act.destaque button {
   border-style: solid; border-color: var(--pje-2); font-size: var(--fs-meta);
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
-  color: #fff; font-weight: 600; padding: 6px 12px;
+  color: var(--on-acao); font-weight: 600; padding: 6px 12px;
 }
-.editor-act.destaque button:hover { filter: brightness(1.06); color: #fff; }
+.editor-act.destaque button:hover { filter: brightness(1.06); color: var(--on-acao); }
 /* Ação SECUNDÁRIA ao lado de "Abrir no editor": leva ao modo minuta, onde se
    escolhe a categoria das peças-modelo. Precisa reafirmar o estilo discreto
    porque a regra `.editor-act.destaque button` acima pinta TODO botão do bloco
@@ -3277,7 +3772,7 @@ button > svg { flex: none; }
 .plib-card {
   width: min(560px, 96%); max-height: 92%;
   display: flex; flex-direction: column;
-  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 18px 48px rgba(5, 32, 46, 0.3); overflow: hidden;
   animation: rise 0.12s ease-out; outline: none;
 }
@@ -3287,7 +3782,7 @@ button > svg { flex: none; }
 }
 .plib-hd .t { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-ui); color: var(--ink); }
 .plib-new {
-  flex: none; border: 1px solid var(--pje); background: #fff; color: var(--pje-2);
+  flex: none; border: 1px solid var(--pje); background: var(--surface); color: var(--pje-2);
   border-radius: 8px; padding: 4px 10px; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
 }
 .plib-new:hover { background: var(--accent-bg); }
@@ -3303,7 +3798,7 @@ button > svg { flex: none; }
 }
 .plib-row {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
 }
 .plib-row:hover { background: var(--paper); }
 .plib-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -3317,7 +3812,7 @@ button > svg { flex: none; }
 }
 .plib-acts { flex: none; display: flex; gap: 5px; }
 .plib-acts button {
-  border: 1px solid var(--line); background: #fff; color: var(--pje-2);
+  border: 1px solid var(--line); background: var(--surface); color: var(--pje-2);
   border-radius: 7px; padding: 3px 9px; font-size: var(--fs-micro); font-weight: 600;
   cursor: pointer; font-family: inherit;
 }
@@ -3346,7 +3841,7 @@ button > svg { flex: none; }
 .plib-form input, .plib-form textarea {
   font: inherit; font-size: var(--fs-ui); color: var(--text);
   border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
-  outline: none; background: #fff;
+  outline: none; background: var(--surface);
 }
 .plib-form input:focus, .plib-form textarea:focus {
   border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
@@ -3358,12 +3853,12 @@ button > svg { flex: none; }
 .plib-err:empty { display: none; }
 .plib-form-acts { display: flex; gap: 8px; justify-content: flex-end; }
 .plib-cancel {
-  border: 1px solid var(--line); background: #fff; color: var(--muted);
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
   border-radius: 8px; padding: 7px 12px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .plib-cancel:hover { border-color: var(--pje); color: var(--text); }
 .plib-save {
-  background: linear-gradient(180deg, var(--pje), var(--pje-2)); color: #fff;
+  background: linear-gradient(180deg, var(--pje), var(--pje-2)); color: var(--on-acao);
   border: none; border-radius: 8px; padding: 7px 16px; font-weight: 600;
   cursor: pointer; font-family: inherit;
 }
@@ -3371,7 +3866,7 @@ button > svg { flex: none; }
 .mlib-form select {
   font: inherit; font-size: var(--fs-ui); color: var(--text);
   border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
-  outline: none; background: #fff; cursor: pointer;
+  outline: none; background: var(--surface); cursor: pointer;
 }
 .mlib-form select:focus {
   border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
@@ -3569,7 +4064,7 @@ button > svg { flex: none; }
 .msg.assistant { position: relative; }
 .msg.assistant .copy {
   position: absolute; top: 6px; right: 6px; opacity: 0;
-  border: 1px solid var(--line); background: #fff; color: var(--muted);
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
   border-radius: 6px; padding: 3px 5px; cursor: pointer; transition: opacity 0.15s;
 }
 .msg.assistant:hover .copy { opacity: 1; }
@@ -3745,7 +4240,7 @@ button > svg { flex: none; }
 
 .tour-faisca {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: var(--r-ctrl); color: #fff;
+  width: 40px; height: 40px; border-radius: var(--r-ctrl); color: var(--on-acao);
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
   box-shadow: var(--sh-btn); margin-bottom: var(--sp-2b);
 }
@@ -3800,7 +4295,7 @@ button > svg { flex: none; }
 }
 .tour-prev:hover, .tour-skip:hover { background: var(--hover); color: var(--pje-2); }
 .tour-next {
-  border: none; color: #fff; font-weight: 600;
+  border: none; color: var(--on-acao); font-weight: 600;
   background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
   box-shadow: var(--sh-btn);
 }
@@ -3835,7 +4330,7 @@ button > svg { flex: none; }
   flex: none; width: 13px; height: 13px; border-radius: var(--r-xs);
   border: 1px solid var(--line-check); background: var(--surface);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; transition: 140ms ease;
+  color: var(--on-acao); transition: 140ms ease;
 }
 .tp-chk svg { opacity: 0; transition: opacity 120ms ease; }
 .tp-row.on .tp-chk { background: var(--pje); border-color: var(--pje); }
@@ -4008,7 +4503,7 @@ button > svg { flex: none; }
   text-align: center; line-height: 13px; vertical-align: super;
   transition: 200ms ease;
 }
-.tp-sup.on { background: var(--pje); color: #fff; }
+.tp-sup.on { background: var(--pje); color: var(--on-acao); }
 .tp-cites {
   display: flex; flex-direction: column; gap: 3px;
   margin-top: var(--sp-2b); padding-top: var(--sp-2);

@@ -2631,6 +2631,148 @@ em `content.js`.
   seguinte leva 400. "Nova conversa" resolve. Se for tratar: os bytes do anexo estão
   sempre em memória, basta re-subir e reescrever o `file_id` no bloco — sem download.
 
+## Temas do painel e o carimbo do modo sigiloso (`panel.css` + `panel.js`)
+
+Seis paletas (**Azul TecJustiça** = padrão, **Noite**, **Papel**, **Vidro**,
+**Toga**, **Rosa**) e a substituição da faixa do modo sigiloso por um **carimbo** na linha
+do CNJ. O visual e o porquê de cada escolha estão no `DESIGN.md` ("Temas" no §2
+e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
+
+- **UM TEMA É SÓ UM BLOCO DE OVERRIDES DE TOKEN.** `.wrap[data-tema="…"]` logo
+  depois do `.wrap` base — nenhuma regra de componente muda, nenhum seletor
+  novo nasce. O molde já existia e roda em produção desde a v0.55: é o que
+  `.wrap.sigiloso` faz trocando `--hd`/`--mark-*`/`--btn-*` por `--sig-*`. Se um
+  tema precisar de uma regra de componente, ou o token está faltando ou a regra
+  está errada — **a única exceção aceita hoje** é `.wrap[data-tema="papel"] .hd
+  { border-bottom }`, porque um cabeçalho claro não tem como se separar da
+  conversa por contraste.
+- **ATRIBUTO, nunca classe.** A especificidade 0,2,0 vence o `.wrap` base sem
+  depender da ordem no arquivo, e o tema não disputa a mesma dimensão das
+  classes de MODO (`.sigiloso`, `.expanded`, `.estreito`, `.livre`), que se
+  combinam livremente com ele.
+- **MATIZ CONSTANTE, LUMINOSIDADE AJUSTADA.** `--cat-*`, `--ok`, `--warn` e
+  `--alerta` não mudam de matiz por tema: ali a cor É o dado (a categoria da
+  peça, a gravidade do aviso). O que se ajusta são as variantes `-bg`, `-line` e
+  `-ink`, para o contraste sobreviver ao fundo escuro.
+- **O SANEAMENTO DOS LITERAIS É PRÉ-REQUISITO, e ele já pagou por si.**
+  `panel.css` tinha 113 literais de cor fora do bloco de tokens — mas só **3 de
+  matiz**. Os outros eram três famílias mecânicas, e cada uma quebrava um tema
+  diferente: `background: #fff` (29) era um cartão branco no meio do Noite;
+  `color: #fff` no cabeçalho (6) era texto branco sobre branco no Papel; os véus
+  `rgba(255,255,255,a)` (7) sumiam sobre chrome clara. Viraram `--surface`,
+  `--on-hd-forte` e `--veu-*`. O `color: #fff` sobre AÇÃO (23) virou `--on-acao`
+  e **não muda em tema nenhum** — o botão continua saturado —, mas ficou
+  explícito para a exceção ser decisão e não esquecimento.
+- **A PROVA DO SANEAMENTO É UMA IMPRESSÃO DIGITAL, não a leitura do diff.**
+  Cinquenta substituições não se conferem a olho. O arnês headless coleta, para
+  CADA elemento da árvore sombra, as 11 propriedades de cor computadas, em
+  quatro estados (largo/estreito × sigilo on/off): **25.454 propriedades, zero
+  diferentes** antes e depois. Refazer essa medição é a única maneira honesta de
+  mexer nos tokens de novo.
+- **A COR DE TEXTO BASE DO PAINEL NÃO EXISTIA, e foi a medição que achou.**
+  `:host { all: initial }` deixa `canvastext` (preto) e a bolha da resposta não
+  declara `color` — ela herda. Sobre conversa branca sempre funcionou; no Noite
+  virou texto invisível (**1,3:1**, medido). A declaração é
+  `.wrap[data-tema] .panel { color: var(--text) }` — condicional ao tema, para o
+  padrão continuar idêntico. Se ela virar global, a impressão digital acusa.
+- **Um token, dois papéis: vence o papel que ocupa mais pixels.** `--pje-2` é
+  tinta em alguns lugares e FUNDO da bolha do usuário em outro. No Noite,
+  clareá-lo para ser tinta legível sobre o escuro deixaria a bolha ilegível.
+  Ficou escuro (fundo), e o consumidor que precisava de tinta clara (`.tm-i`
+  marcado) passou a usar `--pje`.
+- **Toga tinge a CHROME, nunca a AÇÃO.** Vermelho aqui é `--alerta`; um botão
+  primário vinho ao lado da barra de alerta apagaria a fronteira entre "informa"
+  e "impede" do §2. `--pje` e `--btn-*` continuam azuis.
+- **VIDRO: o fundo da JANELA precisou de token próprio, e essa é a lição.** A
+  primeira versão não era vidro — o `.panel` pintava `var(--surface)` (branco
+  OPACO) e o cabeçalho é filho dele, então o `backdrop-filter` desfocava o
+  branco do próprio painel e saía um cinza lavado. Enquanto o fundo da janela e
+  o fundo de um cartão compartilhavam o token, vidro era impossível. Daí
+  `--surface-painel`: igual a `--surface` no padrão (a impressão digital
+  confirma), translúcido só no Vidro. **Ao acrescentar um tema, perguntar quais
+  tokens estão fazendo DOIS trabalhos** — foi o mesmo problema do `--pje-2`.
+- **Uma placa de vidro, não cinco.** O desfoque mora no `.panel` e só nele:
+  `backdrop-filter` aninhado refiltra o que o pai já filtrou e embarra. E
+  **nunca no `.wrap`** — ele cria bloco de contenção para descendentes
+  `position: fixed`, e os popovers são filhos dele (a mesma razão pela qual
+  eles não são filhos do `.panel`, por causa do `transform` do arrasto).
+- **A CHROME DO VIDRO É ESCURA E TINGIDA, e a versão que a deixou CLARA foi
+  desfeita — transparência só se VÊ onde o véu difere em LUMINOSIDADE do que
+  está atrás.** A página do PJe é papel branco: um véu quase-branco sobre ela é
+  invisível em qualquer alfa, porque o desfoque não tem o que revelar. O
+  resultado medido foi um painel branco de cabeçalho branco, que o usuário
+  descreveu como "você tirou a transparência". Com `--hd: rgba(10,50,68,.52)` a
+  mesma página atravessa como fumê e o olho lê "estou olhando ATRAVÉS de algo"
+  na primeira fixação.
+  - **A receita de glassmorphism que se lê por aí pressupõe fundo escuro ou
+    colorido** (é de onde vem "superfície luminosa"). Sobre papel de tribunal
+    ela se inverte. Foi por seguir a receita, e não a medição, que a chrome
+    clareou: eu troquei uma versão que o usuário tinha aprovado por uma teoria.
+  - **A lista fica em 0,22**, como na versão aprovada. A 0,62 ela some junto com
+    o efeito, e o ruído que 0,62 existia para conter não aparece nas capturas —
+    a preocupação era real, o remédio era caro demais.
+  - Em `.full` não há nada atrás: o desfoque é desligado e o tema degrada para o
+    institucional.
+- **ROSA é o único tema em que a AÇÃO acompanha a chrome**, e a diferença para o
+  Toga tem motivo: vinho fica perto demais do vermelho-tijolo de `--alerta`;
+  magenta fica a ~40° dele, e `--alerta` aparece como fundo claro com tinta
+  escura, nunca como botão sólido.
+- **DECLARAR O MESMO TOKEN DUAS VEZES NO MESMO BLOCO É SILENCIOSO, e a última
+  vence.** O Vidro ficou com o CNJ em 1,3:1 de contraste porque sobrou um
+  `--on-hd-2` claro depois do novo escuro. Nem o `node --check` nem o balanço de
+  chaves pegam; quem pegou foi a medição de contraste, e há uma varredura de
+  duplicatas por bloco de tema no scratchpad. **Todo tema novo passa pela
+  medição antes de existir** — o Rosa nasceu com 3,5:1 no CNJ e só virou tema
+  depois de dois ajustes.
+- **Persistência**: `chrome.storage.local.tema` (`""` = padrão). Lido no
+  `mount()` do `panel.js`, o mesmo tier de `layoutModo`/`docsOcultas` —
+  **`aplicarTema` é declarada ANTES do `get`**, porque o stub de teste chama o
+  callback de forma síncrona (a zona morta temporal que já mordeu `docsOcultas`,
+  `guiaAberta` e `launcherUsado`). Restaurar passa `gravar: false`: regravar no
+  boot dispararia `storage.onChanged` em todas as abas. A propagação entre abas
+  entra no listener que já existe em `content.js` → `panel.setTema(v)`, que
+  também não regrava — senão as abas ficam em pingue-pongue.
+- **Dois controles, uma chave**: o botão no cabeçalho (primeiro item do segundo
+  `.hd-grp`, o cluster de APRESENTAÇÃO — a `.toolbar` já vive no limite com seis
+  botões) e o campo em `options.html`. A `.temabox` é `position: fixed` como a
+  `.movbox` e o `.selmenu`, fecha por `composedPath()` no `document` com
+  `capture:true` (o alvo chega RETARGETADO para o host, então `e.target` fecharia
+  a caixa no próprio clique de dentro) e por Esc com `stopPropagation`.
+- **As telas satélites NÃO são tematizadas** nesta rodada: o tema veste só o
+  painel dentro do PJe. `ui.css` continua espelhando os valores do `.wrap` base.
+
+### O carimbo (`.sigselo`) — o que não pode voltar a quebrar
+
+- **`.hd .sigselo`, nunca `.sigselo`.** `.hd button` (0,1,1) governa TODO botão
+  do cabeçalho com `background: transparent`, `30×30` e `--r-sm`, e vence um
+  seletor de 0,1,0 propriedade a propriedade: o carimbo saía como um quadrado
+  transparente com o texto quebrando dentro e o cabeçalho esticando para 111px.
+  `getComputedStyle` reportava a regra viva e correta — ela simplesmente perdia.
+  E é preciso `width: auto` explícito: **não basta declarar o que se quer, é
+  preciso DESFAZER o que a regra genérica impôs.**
+- **`white-space: nowrap` no carimbo** é o que garante a promessa de "não muda a
+  altura": sem ele o anúncio quebra em duas linhas DENTRO do botão.
+- **No estreito, `flex-wrap` quebra a linha antes de encolher os itens dela.** O
+  carimbo empurrava o ✕ para uma terceira linha (+42px — mais que os 26px da
+  faixa que ele substituiu). `flex: 1 1 0` no `.tit-wrap` resolve, e vale **só
+  com o carimbo aceso** (`:has(.sigselo:not([hidden]))`): sem sigilo o cabeçalho
+  estreito continua byte a byte o de antes.
+- **As formas curtas são TRÊS spans, não uma string** (`.ss-t` rótulo, `.ss-n`
+  número, `.ss-u` substantivo, `.ss-d` folha): é o CSS do estreito que decide o
+  que cai, como em `.sl-l`/`.sl-s`. Medido: "· 47 protegidos" custa 103px e não
+  cabe ao lado do CNJ em 420px; "· 47" custa 50px e cabe.
+- **`setSigiloProgresso` FUNDE o parcial e `null` zera.** São dois chamadores em
+  escopos diferentes — o laço das peças conhece `{feitas, total}` e o OCR, lá
+  dentro, conhece só a folha. Se o parcial substituísse, a chamada da folha
+  apagaria o contador de peças. E o laço passa `detalhe: ""` ao trocar de peça,
+  senão a folha da peça anterior sobrevive à troca.
+- **O anúncio dispara na TRANSIÇÃO desligado→ligado**, nunca no estado:
+  `setSigiloso` é chamada pelo content a cada turno, e um anúncio por estado
+  voltaria toda vez.
+- **O teste lia `.sigbar .sb-n` com `|| {}` e passava comparando `""` com `""`.**
+  Apagar a faixa não o quebrou — ele parou de testar em silêncio, que é pior.
+  Trocar o seletor fez parte da mudança, não de limpeza posterior.
+
 ## Micro-animações do painel (`panel.css` + `panel.js`)
 
 Abrir, fechar, arrastar e colapsar deixaram de ser saltos. Tudo em CSS nativo:

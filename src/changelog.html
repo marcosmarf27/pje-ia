@@ -103,7 +103,30 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.57.0</span> O bloqueio vira uma <strong>pergunta</strong>, a espera se vê, e chega o <strong>Gemini 3.8 Flash</strong></h2>
+        <h2><span class="v novo">v0.58.0</span> <strong>Seis aparências</strong> para o painel, e o modo sigiloso ganha um <strong>carimbo</strong></h2>
+        <p>
+          O painel agora tem <strong>tema</strong>. Além do azul de sempre, entram
+          <strong>Noite</strong> (escuro, para quem trabalha à noite ao lado da página branca do
+          PJe), <strong>Papel</strong> (claro e silencioso), <strong>Vidro</strong> (a moldura
+          fica translúcida e o processo aparece atrás dela), <strong>Toga</strong> (vinho) e <strong>Rosa</strong>. A
+          escolha fica no botão de aparência do cabeçalho do painel — e também em
+          Configurações, para quem quiser deixar decidido antes de abrir um processo. Ela vale
+          em todas as abas na hora.
+        </p>
+        <p>
+          O <strong>modo sigiloso</strong> deixou de anunciar-se por uma faixa listrada de
+          largura inteira. No lugar dela entra um <strong>carimbo ao lado do número do
+          processo</strong>, que não ocupa altura nenhuma — a lista de peças ganhou o espaço de
+          volta — e que agora <strong>conta</strong>: enquanto as peças são lidas ele mostra
+          “anonimizando 3 de 12 · fl. 1”, e em repouso, quantos dados estão protegidos. Antes,
+          justamente durante a leitura (a parte demorada), a faixa ficava sem dizer nada.
+          Clicar no carimbo abre a conferência do que foi mascarado. E cada tema tem a própria
+          paleta de sigilo, para o sinal se ler igual em todos.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.57.0</span> O bloqueio vira uma <strong>pergunta</strong>, a espera se vê, e chega o <strong>Gemini 3.8 Flash</strong></h2>
         <p>
           <strong>“Este valor é um dado pessoal?”</strong> Quando a proteção do modo sigiloso
           segura um envio, a bolha agora mostra o valor, em que peça ele foi reconhecido e onde
@@ -2000,6 +2023,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.58.0</span></td><td>02/09/2026</td><td><strong>Seis aparências para o painel</strong> — Azul TecJustiça (padrão), Noite, Papel, Vidro, Toga e Rosa —, escolhidas no cabeçalho do painel ou em Configurações, com o modo sigiloso derivando a própria paleta de cada uma. A faixa listrada do modo sigiloso deu lugar a um <strong>carimbo na linha do número do processo</strong>: não custa altura, mostra o progresso da anonimização enquanto ela roda e a contagem de dados protegidos depois, e abre a conferência no clique</td></tr>
             <tr><td><span class="v">0.57.0</span></td><td>02/09/2026</td><td><strong>O bloqueio da proteção vira uma pergunta</strong> (“este valor é um dado pessoal?”) com dois caminhos: manter protegido e reenviar (o raciocínio guardado que carregava o valor é descartado) ou liberar, neste processo ou em todos; tirar a peça da conversa; “não é dado pessoal” na auditoria; “Não enviar” por peça na conferência; vocabulário processual fora do reconhecedor de nomes. A espera pelo modelo aparece dentro da bolha e no campo. <strong>Gemini 3.8 Flash</strong> entra na lista (direto e via OpenRouter) e vira o indicado do cartão Gemini</td></tr>
             <tr><td><span class="v">0.56.1</span></td><td>02/09/2026</td><td><strong>Bloqueio da proteção com saída que preserva o nome.</strong> A conversa inteira é remascarada com o mapa atual a cada envio (um nome descoberto tarde não volta em claro num bloco antigo); a conferência roda antes de qualquer rede e diz onde o valor estava; a bolha oferece “Mascarar e reenviar” e “Nova conversa (mantém as peças)” antes de “Liberar”, também na minuta e no mapa. A espera pelo modelo conta os segundos no status e a bolha mantém o indicador até haver texto</td></tr>
             <tr><td><span class="v">0.56.0</span> <span class="dot-marco"></span></td><td>02/09/2026</td><td><strong>Modo sigiloso corrigido, visível e negociável.</strong> A lista de termos nunca mascarados não carregava (faltava no manifesto); o que o reconhecedor achava numa peça não era aplicado na ficha, nos títulos e na pergunta, e a última barreira bloqueava o envio por um órgão público. Agora tudo o que já foi mascarado vale em todos os canais, órgãos públicos saem em claro por prefixo, e um bloqueio vira decisão na conversa: “Liberar neste processo” devolve a pergunta ao campo e reenvia. Peça que não pôde ser anonimizada diz isso; o card não conta além do total. Os nomes voltam na tela (a resposta chega com rótulos e é reidentificada pela tabela local, marcada) e no editor de minutas (“Restaurar nomes”); formas diferentes do mesmo nome recebem um rótulo só. O painel inteiro muda de cor com o modo ligado (cabeçalho verde, tarja com a contagem, botão Enviar). Abrir, fechar, trocar de modo e recolher a lista ganharam animações perceptíveis. OpenRouter: modelo que não lê PDF (DeepSeek, GLM) recebe o texto extraído no computador do usuário, com OCR local — o processo de 120 folhas que batia em “~22 MB” passa; DeepSeek atualizado para o V4 Flash 0731 (1,3M); teto de tamanho por fabricante nos modelos que leem PDF; liberar um nome libera todas as formas dele. E o envio passou a pedir aprovação: uma caixa mostra o texto anonimizado exatamente como vai sair, peça por peça, com editar/mascarar/liberar, antes de qualquer coisa ir ao provedor (chat, minuta e mapa; desligável nas Configurações)</td></tr>

@@ -289,6 +289,32 @@
           <button type="button" class="persona" data-txt="Sou magistrado(a). Resuma controvérsia, provas produzidas e teses de cada parte, indicando o que ainda precisa ser decidido.">Magistrado(a)</button>
         </div>
 
+        <!-- APARÊNCIA. Entra aqui, no bloco de preferências, e não junto dos
+             cartões de provedor: não é credencial nem modelo. É `<select>` e
+             não `.seg` porque são CINCO opções — um segmented de cinco itens
+             em 460px de popup quebraria em duas fileiras. O campo é exclusivo
+             desta página (o popup segue sendo o console rápido), então o
+             popup.js o acessa sob `if (el)` como todos os outros daqui.
+
+             O painel tem o MESMO controle no cabeçalho: quem já está lendo um
+             processo troca sem sair dele; quem nunca abriu um descobre que a
+             opção existe. Os dois escrevem a mesma chave e o
+             `storage.onChanged` sincroniza as abas. -->
+        <label class="field" for="tema">Aparência do painel</label>
+        <select id="tema">
+          <option value="">Azul TecJustiça (padrão)</option>
+          <option value="noite">Noite — escuro</option>
+          <option value="papel">Papel — claro</option>
+          <option value="vidro">Vidro — chrome translúcida</option>
+          <option value="toga">Toga — vinho</option>
+          <option value="rosa">Rosa</option>
+        </select>
+        <span class="hint">
+          Veste só o painel dentro do PJe; esta página e as demais telas da
+          extensão não mudam. O modo sigiloso deriva do tema — em cada um ele
+          tem a própria paleta, para o sinal se ler igual em todos.
+        </span>
+
         <!-- Memória de processos. O interruptor existe porque este é o único
              recurso que guarda TRECHO DOS AUTOS no disco por conta própria (as
              minutas e os modelos são coisas que o usuário mandou salvar). Ligado

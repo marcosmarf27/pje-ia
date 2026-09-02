@@ -166,6 +166,109 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 > envio ou um risco apontado no conteúdo. É deliberado: a cor é a mesma para o
 > usuário não precisar aprender duas escalas de gravidade na mesma tela.
 
+### Temas
+
+Cinco paletas, escolhidas pelo botão de aparência no cabeçalho do painel ou pelo
+campo em Configurações. **Um tema é um bloco de OVERRIDES de token sobre o
+`.wrap` — nenhuma regra de componente muda, nenhum seletor novo nasce.** É o
+mesmo gesto que `.wrap.sigiloso` já fazia desde a v0.55 trocando
+`--hd`/`--mark-*`/`--btn-*` pela família `--sig-*`; reconhecer esse molde é o
+que fez os temas custarem um bloco de tokens em vez de uma arquitetura.
+
+| Tema | `data-tema` | Chrome | O que ele é |
+|---|---|---|---|
+| Azul TecJustiça | *(ausente)* | `#0e4459` | O padrão. **Byte a byte o de sempre** |
+| Noite | `noite` | `#0b161d` | Escuro tinta-petróleo, para o trabalho noturno ao lado da página branca do PJe |
+| Papel | `papel` | `#eef3f6` | Chrome clara; só a marca fica saturada |
+| Vidro | `vidro` | `rgba(10,50,68,.52)` | Placa fosca: a página do tribunal atravessa desfocada. Chrome TINGIDA — sobre papel branco, véu claro é véu invisível |
+| Toga | `toga` | `#46202a` | Vinho na chrome; a **ação continua azul** |
+| Rosa | `rosa` | `#a82c63` | Magenta-rosado; aqui a **ação acompanha** |
+
+**ATRIBUTO, não classe.** A especificidade 0,2,0 de `[data-tema]` vence o
+`.wrap` base sem depender da ordem no arquivo, e o tema não entra na mesma
+dimensão das classes de MODO (`.sigiloso`, `.expanded`, `.estreito`), que se
+combinam livremente com ele.
+
+**O que varia e o que NÃO varia.** Variam superfície, tinta, linha, chrome, véus
+e a família `--sig-*`. **Não varia o MATIZ dos tokens semânticos** — `--cat-*`,
+`--ok`, `--warn`, `--alerta` —, porque ali a cor **é o dado**: um
+`--cat-decisao` que mudasse de tema para tema quebraria a semântica de categoria
+que este §2 estabeleceu. O que se ajusta neles é só a LUMINOSIDADE das variantes
+`-bg`, `-line` e `-ink`, para o contraste sobreviver ao fundo escuro. A regra em
+uma frase: **matiz constante, luminosidade ajustada.**
+
+> **Toga tinge a chrome, nunca a AÇÃO.** Vermelho neste produto é `--alerta` — o
+> que pode levar a erro de decisão. Um botão primário vinho ao lado de uma barra
+> de alerta vermelha apagaria a fronteira entre "informa" e "impede" que este §2
+> construiu. Por isso `--pje` e `--btn-*` continuam azuis no Toga.
+
+> **O Vidro exigiu uma separação de token, e ela é a lição da rodada.** A
+> primeira versão não era vidro: o `.panel` pintava `var(--surface)` — branco
+> OPACO — e o cabeçalho é filho dele. `backdrop-filter` filtra o que está
+> pintado ATRÁS do elemento, e atrás do cabeçalho estava o branco do próprio
+> painel. Desfocar branco dá branco, e o resultado foi um cinza lavado.
+> **Enquanto o fundo da JANELA e o fundo de um CARTÃO eram o mesmo token, vidro
+> era impossível** — daí `--surface-painel`, idêntico a `--surface` no padrão e
+> translúcido só aqui.
+
+> **Uma placa de vidro, não cinco.** O desfoque mora no `.panel` e só nele:
+> `backdrop-filter` aninhado refiltra o que o pai já filtrou e embarra. As
+> superfícies de dentro são apenas VÉUS de cor sobre a mesma placa — é assim que
+> vidro real se comporta. E **não** no `.wrap`: `backdrop-filter` cria bloco de
+> contenção para descendentes `position: fixed`, e os popovers são filhos dele.
+
+> **TRANSPARÊNCIA SÓ SE VÊ ONDE O VÉU DIFERE EM LUMINOSIDADE DO QUE ESTÁ
+> ATRÁS** — é a regra do tema, e ela custou uma versão. A página do PJe é papel
+> branco. Um véu quase-branco sobre papel branco é invisível em QUALQUER alfa:
+> o desfoque não tem o que revelar, e o resultado é um painel branco. Por isso a
+> chrome é `rgba(10,50,68,.52)`, tingida e mais escura que a página: aí o olho
+> lê "estou olhando ATRAVÉS de algo" na primeira fixação, sem precisar procurar.
+
+> **A receita corrente de glassmorphism ("superfície luminosa") pressupõe fundo
+> escuro ou colorido.** Sobre papel de tribunal ela se inverte. Uma versão deste
+> tema seguiu a receita, clareou a chrome e perdeu o efeito inteiro. Ao portar
+> um padrão visual, conferir a premissa dele sobre o FUNDO — aqui o fundo é dado
+> e não temos como escolhê-lo.
+
+> **Vidro é moldura, não superfície de leitura.** As bolhas da resposta, o campo
+> e os popovers ficam OPACOS (`--surface` intocado): cartões sólidos flutuando
+> sobre a placa, que é a leitura de profundidade que se quer. A lista fica em
+> 0,22 — subi-la a 0,62 para conter o texto do tribunal por baixo dos nomes
+> apagava o efeito junto, e o ruído não aparece na medição. Em tela cheia não há
+> nada atrás: o desfoque é desligado e o tema degrada para o institucional —
+> comportamento correto, não falta.
+
+> **Rosa é o único tema em que a AÇÃO acompanha a chrome.** O que impede o Toga
+> de tingir o botão primário é o vinho ficar perto demais do vermelho-tijolo de
+> `--alerta`; o rosa é magenta, fica a ~40° dele, e `--alerta` aparece como fundo
+> claro com tinta escura, nunca como botão sólido. Um tema rosa com botão azul
+> pareceria pela metade.
+
+**Três tokens nasceram do saneamento que os temas exigiram**, e os três existiam
+antes como literais espalhados pelas regras — onde nenhum tema os alcançava:
+
+| Token | Era | Papel |
+|---|---|---|
+| `--on-hd-forte` | `color: #fff` em 12 regras | Tinta sobre o CABEÇALHO. Vira escura no Papel |
+| `--on-acao` | `color: #fff` em 23 regras | Tinta sobre superfície de AÇÃO. Não muda em tema nenhum — o botão continua saturado —, mas fica explícita para a exceção ser decisão e não esquecimento |
+| `--veu-1..3`, `--veu-borda`, `--veu-luz`, `--veu-pega` | `rgba(255,255,255,a)` no cabeçalho | As películas que dão relevo à chrome. **Invertem** para película escura no Papel |
+
+E `background: #fff` em 29 regras virou `var(--surface)`: num tema escuro cada
+uma delas era um cartão branco no meio da noite.
+
+> **A cor de texto BASE do painel não existia.** `:host { all: initial }` deixa
+> `canvastext` (preto), e a bolha da resposta não declara `color` — ela herda.
+> Sobre a conversa branca isso sempre funcionou; num tema de superfície escura
+> vira texto invisível (**medido: 1,3:1** na resposta do Noite). A declaração
+> `color: var(--text)` existe agora, e **só para o painel tematizado**
+> (`.wrap[data-tema] .panel`), para o tema padrão continuar idêntico — há teste
+> que compara 25 mil propriedades computadas.
+
+**Contraste conferido por medição, não por olho**: os oito pares tinta/superfície
+que decidem a legibilidade passam o mínimo AA (4,5:1) nos cinco temas. Dois
+pares ficam em 4,1–4,2 (`--muted` sobre superfície clara) — e **já ficavam no
+tema padrão de hoje**: é dívida anterior, não regressão dos temas.
+
 ---
 
 ## 3. Tipografia
@@ -539,9 +642,9 @@ estado aqui é o que decide se o PDF sai da máquina. Hoje, com o modo ligado, o
 **cabeçalho** troca o azul institucional pelo verde profundo (`--sig-hd`), o
 quadrado da marca e o botão primário (Enviar, e o launcher com a janela
 fechada) vão para o mesmo gradiente (`--sig-btn-*`), a janela ganha borda de
-2px em `--ok` com um halo externo (`--sig-halo`), e a tarja fica mais funda,
-com cadeado e com a **contagem do que está protegido** (`.sb-n`). O toggle
-ligado é sólido em `--ok`. O que continua intocado é a **conversa** — branca,
+2px em `--ok` com um halo externo (`--sig-halo`), e o **carimbo** entra na linha
+do número do processo, com a contagem do que está protegido. O toggle ligado é
+sólido em `--ok`. O que continua intocado é a **conversa** — branca,
 como o §2 decidiu, porque o peso visual segue no texto da resposta. A regra
 virou: *a moldura pode ser ambiente; a superfície da leitura, não.*
 
@@ -584,6 +687,78 @@ de layout e contorna também o cabeçalho escuro. **`--ok` e não `--ok-line`**:
 medido no pixel, o `#cbe3d8` some contra o fundo da página do tribunal, e moldura
 que não se vê não é moldura.
 
+
+### Modo sigiloso: o carimbo (`.sigselo`), no lugar da tarja
+
+Até a v0.57 o estado morava numa **`.sigbar`**: faixa hachurada de largura
+inteira sob o cabeçalho, com a frase "MODO SIGILOSO — as peças saem
+anonimizadas…" e a contagem no extremo oposto. Três defeitos, e o terceiro só
+apareceu numa captura de uso real:
+
+1. **~26px de altura permanentes** para uma frase que se lê uma vez só. No
+   painel flutuante isso é uma peça a menos visível na lista.
+2. **A hachura a −45° é fita de isolamento** — linguagem de PERIGO. O próprio
+   comentário do CSS argumentava, corretamente, que a *cor* não podia ser
+   `--warn` porque o modo é confirmação de uma proteção valendo, e contradizia o
+   argumento na *textura*.
+3. **A contagem era `hidden` com zero protegidos** — que é exatamente o estado
+   durante a anonimização, a fase LENTA. Na captura, a faixa ocupava a largura
+   da janela dizendo nada, enquanto "Anonimizando — OCR da fl. 1" aparecia lá
+   embaixo, na coluna de peças. A faixa tinha espaço e nada a dizer; o progresso
+   tinha o que dizer e nenhum espaço.
+
+**O motivo passou a ser REDAÇÃO**: barras horizontais de comprimento variável, a
+assinatura visual de um documento tarjado. É o que a função literalmente faz, e
+é um motivo que nenhuma interface genérica alcança. Ele aparece em dois níveis —
+cheio no glifo (`SVG.tarja`, que substituiu o cadeado nas quatro superfícies do
+modo) e a **5,5% como textura do cabeçalho** (`--sig-textura`, data-URI), onde de
+perto lê como linhas tarjadas e de longe como papel.
+
+**O carimbo mora na linha do CNJ** (`.cnj-row`, dentro do `.tit-wrap`) — colado à
+IDENTIDADE do processo, que é a leitura certa: "este processo, em segredo". Placa
+SÓLIDA (na faixa antiga a frase boiava numa pílula branca sobre a hachura: duas
+texturas disputando o mesmo espaço) e raio de 4px, não `--r-pill`: as pílulas
+deste painel são chips e selos, e **um carimbo de capa é retangular** — é a forma
+que separa "mais um chip" de "uma marca aposta no documento".
+
+**Três momentos, um elemento**, e nenhum deles muda a altura:
+
+| Momento | Mostra | Quando |
+|---|---|---|
+| Anúncio | "As peças saem anonimizadas daqui" | 7 s depois de ligar o modo |
+| Trabalhando | `ANONIMIZANDO 3/12 · fl. 1` | Enquanto a anonimização roda |
+| Repouso | `SIGILOSO · 47 protegidos` | O resto do tempo |
+
+O anúncio é **confirmação de uma ação recém-tomada**, não um cartaz: a frase que
+a faixa mantinha para sempre agora aparece uma vez, no instante em que responde a
+uma pergunta, e some sozinha. A troca de texto é INSTANTÂNEA de propósito — a
+mesma escolha de `.sl-l`/`.sl-s` e de `.g-full`/`.g-short`; animar largura com o
+conteúdo mudando junto corta o texto no meio da transição.
+
+**MEDIDO, e cada número corrigiu um defeito real:**
+
+- Painel largo: **60px de cabeçalho nos quatro estados** — idêntico ao painel sem
+  sigilo. Custo zero.
+- `.hd button` (0,1,1) governa TODO botão do cabeçalho com `background:
+  transparent`, `30×30` e `--r-sm`, e vencia um `.sigselo` de 0,1,0 propriedade a
+  propriedade: o carimbo saía como um quadrado transparente com o texto
+  quebrando dentro e o cabeçalho esticando para **111px**. Daí `.hd .sigselo`, e
+  `width: auto` explícito — **não basta declarar o que se quer, é preciso
+  desfazer o que a regra genérica impôs**.
+- No estreito, `flex-wrap` **quebra a linha antes de encolher os itens dela**: o
+  carimbo empurrava o ✕ para uma terceira linha (+42px, mais que os 26px da faixa
+  antiga). `flex: 1 1 0` no `.tit-wrap` faz o título ceder — e vale **só com o
+  carimbo aceso** (`:has(.sigselo:not([hidden]))`), para o cabeçalho estreito sem
+  sigilo continuar byte a byte o de antes. Num painel de 420px o nome da extensão
+  é decoração; o número do processo e o estado do sigilo são DADO.
+- O CNJ sai de cena durante o anúncio (`:has()` porque ele é irmão ANTERIOR do
+  botão): CNJ mais anúncio empatam com a largura útil e o número saía truncado.
+  Um anúncio que espreme o número do processo não vale os 7 s que dura.
+
+No estreito sobram o glifo e o **número** (`.ss-t`, `.ss-u` e `.ss-d` somem) — a
+mesma regra do selo da metarow: o ícone já diz "sigiloso", o que falta é o que
+muda. Clicar abre a `.audbox`, a mesma porta do selo; duas portas para um destino
+é padrão daqui (o "ver na timeline" tem três).
 
 ### Modo sigiloso: toggle, selo e caixa de auditoria
 
