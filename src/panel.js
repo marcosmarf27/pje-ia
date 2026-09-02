@@ -845,6 +845,7 @@ var PjePanel = (function () {
           </div>
           <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
         </div>
+        <div class="sigbar" hidden><span class="sb-t"></span></div>
         <div class="content">
           <button type="button" class="docs-rail" title="Exibir a lista de peças" aria-label="Exibir a lista de peças">
             <span class="rail-i">${SVG.docsshow}</span>
@@ -1928,6 +1929,21 @@ var PjePanel = (function () {
     // modo de novo, do lado de lá.
     function pintarSigilo(ligado, quantos, dados) {
       sigiloOn = !!ligado;
+      // A classe veste o PAINEL INTEIRO. É ela que liga a tarja, o anel da
+      // janela e a borda do campo de mensagem — um modo que muda o que sai da
+      // máquina precisa estar no ambiente, não só no controle que o ligou.
+      wrap.classList.toggle("sigiloso", sigiloOn);
+      // O convite do estado vazio some com o modo LIGADO: ele oferece fazer o
+      // que já está sendo feito, e uma interface que insiste em vender o que o
+      // usuário já comprou o faz duvidar se comprou mesmo.
+      const convite = $(".hint-sigilo");
+      if (convite) convite.hidden = sigiloOn;
+      const barra = $(".sigbar");
+      if (barra) {
+        barra.hidden = !sigiloOn;
+        barra.querySelector(".sb-t").textContent =
+          "Modo sigiloso — as peças saem anonimizadas deste computador";
+      }
       if (dados !== undefined) audDados = dados;
       // A caixa nunca pode mostrar o retrato de um estado anterior — a mesma
       // regra do `setLinhaDoTempo`, que fecha a `.movbox` ao trocar o retrato.

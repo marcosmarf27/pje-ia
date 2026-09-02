@@ -67,6 +67,10 @@
      ESPELHA o ui.css, onde este token já existia (DESIGN.md §1). */
   --ok-bg: #eaf4ef;
   --ok-line: #cbe3d8; /* borda do banner "Pronto para usar" */
+  /* Tom do HACHURADO da tarja do modo sigiloso. Entre --ok-bg e --ok-line os
+     dois tons são quase o mesmo e a listra desaparecia; este é o meio-termo que
+     lê como textura de capa sem virar um bloco verde. Ver DESIGN.md §5. */
+  --ok-tarja: #b9d9c8;
   --ok-ink: #1e5c44;  /* texto sobre confirmação suave */
   --warn: #de8b2c;
   --erro: #a5301f;
@@ -2081,6 +2085,82 @@ button > svg { flex: none; }
    é um container de tamanho ZERO. A largura é generosa porque o complemento do
    movimento é a informação que fecha a conta do prazo ("Decorrido prazo de … em
    16/07/2026 23:59") e cortá-lo tiraria justamente o que se veio ler. */
+/* ---------- MODO SIGILOSO: a tarja ----------
+   Um MODO que muda o que sai da máquina não pode viver só num botão — o botão
+   diz "eu liguei isto"; o que se precisa é "eu ESTOU aqui". Daí a marca vestir o
+   painel inteiro (`.wrap.sigiloso`) em vez de acender só o controle.
+
+   MOLDURA, NUNCA SUPERFÍCIE. O §2 decidiu que "a conversa é branca e a lista é
+   que fica tingida", para o peso visual ficar onde está a leitura — tingir o
+   chat reverteria isso e brigaria com o texto da resposta, que é o trabalho.
+   Então a marca fica na CHROME: a faixa, o anel da janela e a borda do campo.
+
+   A TARJA vem do mundo do assunto, e não de um "estado verde" genérico: autos em
+   segredo de justiça carregam uma tarja na capa — uma faixa que se vê ANTES de
+   abrir o processo. O hachurado é o que a faz ler como marca de capa e não como
+   mais uma barra de status; sem ele, uma faixa lisa some entre o cabeçalho
+   escuro e o branco da conversa.
+
+   Cor: a família `--ok-*`, a mesma do selo. Aqui não é sucesso nem alerta — é
+   CONFIRMAÇÃO de que uma proteção está valendo, e em `--warn` ela competiria com
+   a `.sel-nota` e com o medidor de contexto, que sinalizam problema. Um estado
+   PERMANENTE em cor de alerta é o "tudo alerta com a mesma intensidade" do §2. */
+.sigbar {
+  flex: none;
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 16px;
+  border-bottom: 1px solid var(--ok-line);
+  /* O hachurado da tarja: passo de 8px (4 claros + 4 do tom), a −45°. Fino o
+     bastante para ler como textura de capa, largo o bastante para não cintilar
+     na rolagem. */
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--ok-bg) 0 4px,
+    var(--ok-tarja) 4px 8px
+  );
+}
+.sb-t {
+  font-size: var(--fs-nano); font-weight: 600; color: var(--ok-ink);
+  background: var(--surface); padding: 1px 7px; border-radius: var(--r-pill);
+  border: 1px solid var(--ok-line);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* A MOLDURA da janela. Duas rotas foram tentadas antes e as duas falham por um
+   motivo de plataforma — nenhum aparece no `getComputedStyle`, que reporta tudo
+   vivo e correto nos dois casos; só a captura de pixel mostra.
+
+   (1) `box-shadow: inset` é pintado no fundo do elemento, ABAIXO dos filhos: o
+   cabeçalho escuro e as duas colunas cobriam o anel inteiro. Mesmo eixo do
+   `box-shadow` da caixa 0x0 do tour.
+
+   (2) NÃO usar `::after` (nem `::before`) do `.panel`: os DOIS já têm dono
+   no modo livre — `::before` é a pega de arrastar do topo e `::after` é a alça de
+   redimensionar do canto. Um elemento tem um `::after` só, então as regras
+   disputam o MESMO pseudo, propriedade a propriedade: a de baixo no arquivo
+   vence onde declara e o resto da outra sobra. O resultado media 13x13 no canto
+   errado, com a alça de redimensionar destruída — e `getComputedStyle` reportava
+   a borda viva e correta, porque ela ESTAVA: no lugar errado.
+
+   A moldura é a borda que o painel JÁ TEM. Não custa elemento nem pseudo, não
+   colide com nada, acompanha o raio em todos os quatro modos de layout e — o que
+   um `::after` com `overflow: hidden` não faz — contorna também o cabeçalho
+   escuro, que é a metade da janela que mais se olha.
+
+   `--ok` e não `--ok-line`: medido no pixel, o `#cbe3d8` da linha some contra o
+   fundo da página do tribunal. Moldura que não se vê não é moldura. */
+.wrap.sigiloso .panel { border-color: var(--ok); }
+/* O CAMPO DE MENSAGEM é o lugar mais significativo da marca: é ali que se
+   escreve o que vai sair. O foco continua mandando (`--pje`), porque foco é
+   estado momentâneo e o modo é permanente — a borda do modo não pode engolir o
+   sinal de "estou digitando aqui". */
+.wrap.sigiloso .inrow { border-color: var(--ok); }
+.wrap.sigiloso .inrow:focus-within {
+  border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+}
+/* Em 420px a frase inteira não cabe ao lado do padding; ela trunca com ellipsis
+   (regra do `.sb-t`) e o hachurado sozinho já carrega o estado. */
+.wrap.estreito .sigbar { padding: 3px 10px; }
+
 /* CAIXA DE AUDITORIA do modo sigiloso. Herda a anatomia da `.movbox` (cabeçalho
    `.mv-hd`, lista `.mv-list`, vazio `.mv-vazio`) de propósito: é o MESMO gesto —
    um selo da metarow que abre um painel `fixed` — e dois desenhos para o mesmo
@@ -2262,7 +2342,7 @@ button > svg { flex: none; }
    Ícone SVG + rótulo, nunca emoji (DESIGN.md §5). O ícone é colorido por
    FUNÇÃO — a cor é a da categoria de peça que a ação produz ou consome — e o
    rótulo fica em --text-2, para a cor sinalizar sem gritar. */
-.tgl-search,
+.tgl-search, .tgl-sigilo,
 .btn-minuta, .btn-plib, .btn-mapa, .btn-mlib {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   height: 30px; padding: 0 var(--sp-3b);
@@ -2270,13 +2350,18 @@ button > svg { flex: none; }
   border-radius: var(--r-md); font-size: var(--fs-meta); font-weight: 500;
   cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
-.tgl-search svg, .btn-minuta svg, .btn-plib svg, .btn-mapa svg, .btn-mlib svg { flex: none; }
+.tgl-search svg, .tgl-sigilo svg,
+.btn-minuta svg, .btn-plib svg, .btn-mapa svg, .btn-mlib svg { flex: none; }
 .tgl-search svg { color: var(--pje); }
+/* O ícone é colorido por FUNÇÃO (a convenção acima). A função aqui é proteger,
+   e a cor da proteção neste produto é a família `--ok` — a mesma da tarja e do
+   selo, para o modo inteiro falar UMA cor. */
+.tgl-sigilo svg { color: var(--ok); }
 .btn-minuta svg { color: var(--cat-peticao); }
 .btn-mapa svg   { color: var(--cat-prova); }
 .btn-plib svg   { color: var(--cat-decisao); }
 .btn-mlib svg   { color: var(--cat-audiencia); }
-.tgl-search:hover,
+.tgl-search:hover, .tgl-sigilo:not(.on):hover,
 .btn-minuta:hover, .btn-plib:hover, .btn-mapa:hover, .btn-mlib:not(:disabled):hover {
   border-color: var(--line-focus); background: var(--hover-2); color: var(--pje-2);
 }
@@ -2286,6 +2371,16 @@ button > svg { flex: none; }
   background: var(--accent-bg); border-color: var(--line-focus);
   color: var(--pje-2); font-weight: 600;
 }
+/* O sigiloso acende na cor DELE, e não no `--accent-bg` dos outros. Não é
+   preciosismo: com o Jurisprudência e o Minutar acesos ao mesmo tempo, três
+   botões no mesmo tom não dizem qual modo muda o que SAI da máquina. A cor aqui
+   amarra botão, tarja e selo numa coisa só — o usuário aprende um sinal, não
+   três. */
+.tgl-sigilo.on {
+  background: var(--ok-bg); border-color: var(--ok-line);
+  color: var(--ok-ink); font-weight: 600;
+}
+.tgl-sigilo.on:hover { border-color: var(--ok); }
 /* Selo do MODO SIGILOSO. Usa os tokens --ok-*, e a escolha e' deliberada:
    sigiloso ligado nao e' aviso nem alerta, e' CONFIRMACAO de que uma protecao
    esta valendo. Pintado de --warn ele competiria com a .sel-nota e com o

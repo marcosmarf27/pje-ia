@@ -2685,6 +2685,25 @@ palavra da extensão — e a palavra da extensão não é auditoria. O sinal de 
 peça faltava estava no próprio código: `PSEUD.tabela()` existe com o comentário
 "a tabela que a caixa de auditoria mostra" e **não tinha um único consumidor**.
 
+**O MODO VESTE O PAINEL INTEIRO, não só o botão que o ligou** (classe
+`.wrap.sigiloso`, posta por `pintarSigilo`): tarja hachurada de lado a lado sob o
+cabeçalho, borda verde na janela e no campo de mensagem. Um botão aceso responde
+"eu liguei isto"; o que se precisa aqui é "eu **estou** aqui" — e o que muda é o
+que SAI da máquina. A marca fica toda na moldura e nunca no fundo do chat: o §2
+do DESIGN.md pôs o peso visual no texto da resposta, e tingir a conversa
+competiria com ela. Duas armadilhas de plataforma, as duas invisíveis fora de uma
+captura de pixel (`getComputedStyle` reporta tudo vivo e correto nas duas):
+
+- **`box-shadow: inset` pinta ABAIXO dos filhos** — o cabeçalho e as duas colunas
+  cobrem o anel inteiro. Mesmo eixo da caixa 0×0 do tour.
+- **`::after` e `::before` do `.panel` JÁ TÊM DONO** (a pega de arrastar e a alça
+  de redimensionar do modo livre). Um elemento tem um `::after` só, então as duas
+  regras disputam o mesmo pseudo propriedade a propriedade: a de baixo no arquivo
+  vence onde declara e o resto da outra SOBRA. O anel saiu 13×13 no canto errado
+  e a alça de redimensionar do modo livre foi destruída junto. Quem carrega a
+  moldura é a borda que o `.panel` já tem — sem elemento novo, sem pseudo, e ela
+  contorna também o cabeçalho escuro.
+
 O selo `🔒 sigiloso` da `.metarow` virou BOTÃO e abre a `.audbox`, espelhando a
 `.movbox` da linha do tempo (mesmo gesto, mesma anatomia — dois desenhos para o
 mesmo gesto divergiriam no primeiro ajuste). Três camadas, na ordem em que a

@@ -416,6 +416,52 @@ aviso secundário.
 > e, com especificidade maior, devolvia `flex-wrap: wrap` em repouso: a fileira
 > única existia no papel e não na tela.
 
+### Modo sigiloso: a tarja e a moldura da janela (`.wrap.sigiloso`)
+
+Um MODO que muda **o que sai da máquina** não pode viver só num botão. O botão
+responde "eu liguei isto"; o que se precisa é "eu **estou** aqui" — e essa é a
+diferença entre um controle e um ambiente. Por isso a classe veste o painel
+INTEIRO, e não só o controle que a ligou.
+
+**Moldura, nunca superfície.** O §2 decidiu que a conversa é branca e a lista é
+que fica tingida, para o peso visual ficar onde está a leitura. Tingir o fundo do
+chat reverteria isso e passaria a competir com o texto da resposta, que é o
+trabalho. Então a marca fica toda na *chrome*: a tarja, a borda da janela e a
+borda do campo de mensagem.
+
+**A tarja vem do mundo do assunto**, e não de um "estado verde" genérico: autos
+em segredo de justiça levam uma tarja na CAPA — uma faixa de lado a lado, vista
+antes de abrir o processo. Daí o hachurado (`--ok-tarja` sobre `--ok-bg`, passo
+de 8px a −45°): é ele que a faz ler como marca de capa em vez de mais uma barra
+de status. Com `--ok-line` no lugar do `--ok-tarja` os dois tons ficam quase
+iguais e a listra some — medido.
+
+**Ela é irmã do `.content`, não filha do `.main`.** Dentro da coluna do chat a
+faixa começava no meio da janela nos modos largos, e marca de estado que cobre
+parte da tela lê como cabeçalho de seção. Acima do `.content` ela atravessa as
+duas colunas e encosta no cabeçalho escuro, que é onde o olho já está.
+
+**A moldura é a borda que o painel JÁ TEM** (`.wrap.sigiloso .panel {
+border-color: var(--ok) }`), e as alternativas todas falham por um motivo de
+plataforma:
+
+- `box-shadow: inset` pinta abaixo dos filhos — o cabeçalho e as duas colunas o
+  cobrem inteiro e o anel simplesmente não aparece.
+- `::after`/`::before` do `.panel` **já têm dono**: no modo livre são a pega de
+  arrastar e a alça de redimensionar. Um elemento tem um `::after` só, então as
+  regras disputam o mesmo pseudo propriedade a propriedade — o resultado foi uma
+  caixa de 13×13 no canto errado com a alça destruída, e `getComputedStyle`
+  reportando a borda viva e correta, porque ela estava: no lugar errado.
+
+A borda própria não custa elemento nem pseudo, acompanha o raio nos quatro modos
+de layout e contorna também o cabeçalho escuro. **`--ok` e não `--ok-line`**:
+medido no pixel, o `#cbe3d8` some contra o fundo da página do tribunal, e moldura
+que não se vê não é moldura.
+
+**No campo de mensagem o foco continua mandando.** `.inrow` ganha a borda do modo,
+mas `:focus-within` volta para `--pje`: foco é estado momentâneo e o modo é
+permanente — a marca do modo não pode engolir o sinal de "estou digitando aqui".
+
 ### Modo sigiloso: toggle, selo e caixa de auditoria
 
 Três peças, e cada uma responde a uma pergunta diferente. Confundi-las foi o
