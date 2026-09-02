@@ -2127,6 +2127,17 @@ button > svg { flex: none; }
   font-family: var(--ff-mono); font-size: var(--fs-nano); line-height: 1.45;
   white-space: pre-wrap; word-break: break-word;
 }
+/* A MARCA no texto enviado. Ela é o ponto em que a caixa deixa de afirmar e
+   passa a mostrar: cada rótulo destacado no documento, com o valor original no
+   `title`. Usa `--accent-bg`/`--pje-2` (a mesma marca da extensão) e não os
+   tokens de estado: isto não é sucesso nem aviso, é uma anotação sobre o texto.
+   O `cursor: help` é o que anuncia que há algo por trás. */
+.aud-rot {
+  background: var(--accent-bg); color: var(--pje-2);
+  border-radius: var(--r-sm); padding: 0 2px; cursor: help;
+  font-weight: 600;
+}
+
 .aud-map {
   display: flex; gap: 8px; align-items: baseline; padding: 2px 10px;
   font-size: var(--fs-micro);
@@ -2143,9 +2154,24 @@ button > svg { flex: none; }
   border: 1px solid var(--line-focus); background: var(--accent-bg); color: var(--pje-2);
 }
 .aud-baixar:disabled { opacity: 0.5; cursor: default; }
-/* O selo virou BOTÃO (ele abre a auditoria): o cursor precisa dizer isso. */
-.selo-sigilo { cursor: pointer; }
+/* O selo virou BOTÃO (ele abre a auditoria): o cursor precisa dizer isso. E
+   ele leva ÍCONE, não emoji (§7) — daí o alinhamento explícito do par
+   ícone+rótulo, como nos botões da toolbar. */
+.selo-sigilo {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.selo-sigilo svg { flex: none; }
 .selo-sigilo:hover { border-color: var(--ok-ink); }
+/* Forma longa × curta, o mesmo mecanismo do `.g-full`/`.g-short` do medidor —
+   dois <span> no DOM, escolha no CSS, zero JS. Medido: com a forma longa (133px)
+   a `.metarow` de 420px quebrava em duas linhas e empurrava o selo do modelo
+   para baixo; com a curta ela volta a caber numa fileira. */
+.selo-sigilo .sl-s { display: none; }
+.wrap.estreito .selo-sigilo .sl-l { display: none; }
+.wrap.estreito .selo-sigilo .sl-s { display: inline; }
+/* O rodapé da caixa: ícone + rótulo centralizados, como o resto dos botões. */
+.aud-baixar { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.aud-baixar svg { flex: none; }
 
 .movbox {
   position: fixed; z-index: 2147483646;
@@ -2273,9 +2299,9 @@ button > svg { flex: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;
   font-weight: 600;
 }
-/* Na coluna estreita sobra o cadeado e o resto e' cortado pelo ellipsis acima --
-   o selo nunca empurra o medidor nem o custo para fora da linha. */
-.estreito .selo-sigilo { max-width: 34%; }
+/* Sem `max-width` de propósito: cortar "6 mascarado(s)" no meio com ellipsis
+   não informa nada. Quem resolve o aperto é a forma CURTA acima, que troca a
+   frase pelo número — o dado que de fato muda. */
 
 /* Selo do modelo ativo (fica à direita na barra de ferramentas) */
 .modelo-badge {
@@ -2891,10 +2917,18 @@ button > svg { flex: none; }
    nunca vira ícone mudo. Minutar é a ação primária da barra. O resto é ícone. */
 .wrap.estreito .btn-mapa .lbl,
 .wrap.estreito .btn-plib .lbl,
-.wrap.estreito .btn-mlib .lbl { display: none; }
+.wrap.estreito .btn-mlib .lbl,
+/* Sigiloso TAMBÉM vira ícone em 420px, apesar de ter estado. A exceção do
+   Jurisprudência ("o estado é o próprio rótulo") não se aplica aqui porque
+   este estado tem um SEGUNDO indicador, mais forte: o selo da `.metarow`, que
+   só existe quando o modo está ligado e diz quantos valores foram mascarados.
+   Com seis botões na barra, manter três rótulos quebraria a fileira — e a
+   regra 3 existe porque duas fileiras em 420px viram bagunça. */
+.wrap.estreito .tgl-sigilo .lbl { display: none; }
 .wrap.estreito .btn-mapa,
 .wrap.estreito .btn-plib,
-.wrap.estreito .btn-mlib { padding: 0 var(--sp-2b); }
+.wrap.estreito .btn-mlib,
+.wrap.estreito .tgl-sigilo { padding: 0 var(--sp-2b); }
 .wrap.estreito .tools { gap: var(--sp-1); }
 
 /* O cabeçalho do card de modelos passou a dividir a linha com TRÊS botões

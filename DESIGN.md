@@ -416,6 +416,68 @@ aviso secundário.
 > e, com especificidade maior, devolvia `flex-wrap: wrap` em repouso: a fileira
 > única existia no papel e não na tela.
 
+### Modo sigiloso: toggle, selo e caixa de auditoria
+
+Três peças, e cada uma responde a uma pergunta diferente. Confundi-las foi o
+primeiro erro do desenho: o selo sozinho anunciava um estado e não deixava
+CONFERIR nada.
+
+| Peça | Onde | Pergunta que responde |
+|---|---|---|
+| `.tgl-sigilo` | `.toolbar`, ao lado do `.tgl-search` | "como eu ligo?" |
+| `.selo-sigilo` | `.metarow` | "está ligado? quanto já foi mascarado?" |
+| `.audbox` | popover aberto pelo selo | "o que exatamente saiu daqui?" |
+
+**O toggle vai na `.toolbar` e não na `.docs-tip`** porque ele tem ESTADO — é
+irmão do `Jurisprudência`, não das ações de escopo "lista toda". Mas ele é o
+SEXTO botão da barra, e por isso o rótulo dele **sai no `.estreito`**, junto de
+mapa/prompts/modelos. A exceção do Jurisprudência ("o estado é o próprio
+rótulo") não se aplica: aqui o estado tem um segundo indicador, mais forte — o
+selo, que só existe quando o modo está ligado.
+
+**O selo usa `--ok-*`, nunca `--warn-*`.** Sigiloso ligado não é aviso: é
+CONFIRMAÇÃO de que uma proteção está valendo. Em `--warn` ele competiria com a
+`.sel-nota` e com o medidor de contexto, que sinalizam problema — e um estado
+permanente em cor de alerta é o "tudo alerta com a mesma intensidade" do §2.
+
+**Forma longa e curta** (`.sl-l` / `.sl-s`), o mesmo mecanismo do `.g-full` /
+`.g-short` do medidor — dois `<span>`, escolha no CSS, zero JS. O eixo aqui é
+`.estreito`, e não `.expanded`: medido, a forma longa (133px) fazia a `.metarow`
+de 420px quebrar em DUAS linhas e empurrava o selo do modelo para baixo. A forma
+curta troca a frase pelo número, que é o dado que muda.
+
+**A `.audbox` é enquadrada no PAINEL, não na viewport** — e é aí que ela se
+separa da `.movbox`, de quem herda a anatomia (`.mv-hd`, `.mv-list`,
+`.mv-vazio`). A `.movbox` é uma lista curta e a diferença nunca aparece; esta
+carrega o TEXTO DE UMA PEÇA, fica alta, e presa à viewport cobria a barra de
+título e transbordava a borda esquerda em 420px. Quem cede a altura é a lista,
+que já rola (`overflow-y: auto`), com piso de 120px — num painel muito baixo é
+melhor transbordar do que virar uma fresta.
+
+**A ordem das três camadas da caixa é a ordem da dúvida**: quanto (chips) → o
+quê, com o texto que saiu → a chave. A chave por último e com `--warn-*`: é a
+única linha da caixa que pede cuidado, porque ela desfaz a anonimização e por
+isso não acompanha o relatório.
+
+**As marcas no texto enviado (`.aud-rot`) são o que separa afirmar de mostrar.**
+Cada `[PESSOA_1]` aparece destacado no documento, com o valor original no
+`title` (`cursor: help` é o que anuncia isso). Usa `--accent-bg`/`--pje-2`, a
+marca da extensão, e não os tokens de estado: não é sucesso nem aviso, é uma
+anotação sobre o texto. O valor original fica no `title` e nunca na tela — visível
+ele transformaria a prova de anonimização num documento com os nomes de volta.
+
+**Os chips falam português, não `id2label`.** O modelo rotula `ORGANIZACAO`, sem
+cedilha e sem til, porque identificador de código não leva acento — na tela isso
+lê como erro de digitação. `NOME_TIPO` (panel.js) traduz e pluraliza; tipo novo
+cai no `else` e aparece cru, que é feio e honesto. Os rótulos DENTRO do texto
+(`[ORGANIZACAO_1]`) continuam técnicos: eles são a string literal que foi ao
+modelo.
+
+**Durante o trabalho a peça volta a girar** (estado `anon` no card de progresso,
+herdando o estilo do `upload`) e a nota CONTA (`Anonimizando 3 de 12`). Sem isso
+o card ficava em 100% durante a parte lenta — o "parecendo travado" que a v0.50.0
+do OCR já entregou uma vez.
+
 ### Aviso dentro do card de progresso (`.prep-nota`)
 Nota em aviso suave abaixo da barra, usada quando o download passa de 12 s por
 peça. Aparece **durante** a espera, que é quando a informação vale: o gargalo

@@ -935,7 +935,7 @@ var PjePanel = (function () {
                   <button class="linhatempo" hidden aria-expanded="false">
                     ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
                   </button>
-                  <button class="selo-sigilo" hidden aria-expanded="false"></button>
+                  <button class="selo-sigilo" hidden aria-expanded="false">${SVG.cadeado}<span class="sl-l"></span><span class="sl-s"></span></button>
                   <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
                   <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
                 </div>
@@ -1409,7 +1409,7 @@ var PjePanel = (function () {
         // aqui está descobrindo o assunto, e ligar um modo que muda o que sai da
         // máquina sem explicar antes é o oposto do que o aviso existe para
         // fazer. O guia explica e o botão da barra liga.
-        '<button type="button" class="hint-sigilo" title="Processo em segredo de justiça? A extensão pode anonimizar as peças no seu próprio computador antes de enviar: nomes, CPF, OAB, endereços e o número do processo viram rótulos, e o PDF não sai da máquina. Abre o guia; para ligar, use o botão 🔒 Sigiloso na barra de ferramentas.">' +
+        '<button type="button" class="hint-sigilo" title="Processo em segredo de justiça? A extensão pode anonimizar as peças no seu próprio computador antes de enviar: nomes, CPF, OAB, endereços e o número do processo viram rótulos, e o PDF não sai da máquina. Abre o guia; para ligar, use o botão Sigiloso na barra de ferramentas.">' +
         SVG.escudo +
         'Anonimizar dados sigilosos<span class="hs-sel">no seu PC</span></button>' +
         "</div>" +
@@ -1941,12 +1941,28 @@ var PjePanel = (function () {
       seloSigilo.hidden = !sigiloOn;
       if (sigiloOn) {
         const n = Number(quantos) || 0;
-        seloSigilo.textContent = n
-          ? "🔒 sigiloso · " + n + " mascarado(s)"
-          : "🔒 sigiloso";
+        // DUAS versões no DOM, escolha no CSS — o mesmo padrão do medidor e do
+        // custo (`.g-full`/`.g-short`). Em 420px o selo longo (133px) empurrava
+        // o selo do modelo para uma SEGUNDA linha na `.metarow`, e a regra do
+        // painel estreito é uma fileira: o que dobra de linha vira bagunça.
+        // O eixo aqui é `.estreito`, e não `.expanded`: na janela livre larga a
+        // barra tem espaço de sobra e a forma longa é a que informa.
+        //
+        // Escrevendo nos DOIS spans, nunca no botão: o <svg> é irmão deles, e
+        // um `textContent` no botão o apagaria no primeiro repinte.
+        seloSigilo.querySelector(".sl-l").textContent = n
+          ? "sigiloso · " + n + (n === 1 ? " dado" : " dados")
+          : "sigiloso";
+        // Na forma curta o ícone já diz "sigiloso"; o que falta é o NÚMERO, que
+        // é o que muda a cada peça e o que o usuário acompanha.
+        seloSigilo.querySelector(".sl-s").textContent = n ? String(n) : "";
         seloSigilo.title =
           "As peças vão como texto anonimizado; o arquivo original não sai desta máquina." +
-          (n ? " " + n + " valor(es) distinto(s) já substituído(s) por rótulo." : "") +
+          (n
+            ? n === 1
+              ? " 1 dado distinto já foi substituído por rótulo."
+              : " " + n + " dados distintos já foram substituídos por rótulo."
+            : "") +
           " Clique para AUDITAR: o que foi mascarado e o texto exato que foi enviado.";
       }
     }
@@ -1974,6 +1990,32 @@ var PjePanel = (function () {
     // A camada 3 fica SÓ NA TELA. Ela desfaz a anonimização — um relatório que a
     // carregasse seria o oposto do que ele existe para provar. O arquivo que se
     // baixa leva as camadas 1 e 2, e diz isso em voz alta.
+    // Do rótulo TÉCNICO para o português. `ORGANIZACAO` vem do `id2label` do
+    // modelo e não leva acento, porque identificador de código não leva — na
+    // tela isso lê como erro de digitação. Um tipo novo cai no `else` e aparece
+    // cru, que é feio mas honesto: melhor mostrar o identificador do que
+    // inventar um nome para uma categoria que ninguém decidiu como chamar.
+    const NOME_TIPO = {
+      PESSOA: ["pessoa", "pessoas"],
+      ORGANIZACAO: ["organização", "organizações"],
+      LOCAL: ["local", "locais"],
+      CPF: ["CPF", "CPFs"],
+      CNPJ: ["CNPJ", "CNPJs"],
+      RG: ["RG", "RGs"],
+      OAB: ["OAB", "OABs"],
+      PROCESSO: ["nº de processo", "nºs de processo"],
+      EMAIL: ["e-mail", "e-mails"],
+      TELEFONE: ["telefone", "telefones"],
+      CEP: ["CEP", "CEPs"],
+      NIT: ["NIT", "NITs"],
+      CONTA: ["conta", "contas"],
+    };
+    function nomeTipo(tipo, n) {
+      const par = NOME_TIPO[tipo];
+      if (!par) return n + " " + tipo;
+      return n + " " + par[n === 1 ? 0 : 1];
+    }
+
     let audDados = null;
     let audbox = null;
     let audBaixarCb = null;
@@ -1983,6 +2025,40 @@ var PjePanel = (function () {
       audbox.remove();
       audbox = null;
       seloSigilo.setAttribute("aria-expanded", "false");
+    }
+
+    // Escreve o texto enviado DESTACANDO cada rótulo, com o valor original no
+    // `title`. É o que transforma a lista numa prova inspecionável: lê-se a peça
+    // como o modelo a leu, e cada marca responde "o que estava aqui?".
+    //
+    // Construído com NÓS, nunca `innerHTML`: isto é conteúdo dos autos, e o
+    // `escapeHtml` do painel não escapa aspa simples. Um `<mark>` por rótulo e
+    // nós de texto para o resto — seguro por construção.
+    function pintarMarcas(el, texto) {
+      el.textContent = "";
+      const valorDe = new Map();
+      for (const it of (audDados && audDados.itens) || []) valorDe.set(it.rotulo, it.valor);
+      // Regex LOCAL: a do PSEUD é global e carrega `lastIndex` entre chamadas.
+      const re = /\[([A-Z][A-Z0-9]*)_(\d+)\]/g;
+      let ultimo = 0;
+      let m;
+      let n = 0;
+      while ((m = re.exec(texto)) !== null) {
+        if (m.index > ultimo) el.appendChild(document.createTextNode(texto.slice(ultimo, m.index)));
+        const mk = document.createElement("mark");
+        mk.className = "aud-rot";
+        mk.textContent = m[0];
+        const v = valorDe.get(m[0]);
+        // O valor original vai no `title`, não na tela: ele é o dado sensível, e
+        // deixá-lo visível transformaria a prova de anonimização num documento
+        // com os nomes de volta.
+        mk.title = v ? "Aqui estava: " + v : "Rótulo sem correspondência no mapa";
+        el.appendChild(mk);
+        ultimo = m.index + m[0].length;
+        n++;
+      }
+      if (ultimo < texto.length) el.appendChild(document.createTextNode(texto.slice(ultimo)));
+      return n;
     }
 
     function linhaAud(classe, texto) {
@@ -2004,7 +2080,11 @@ var PjePanel = (function () {
       const t = document.createElement("span");
       t.className = "mv-t";
       const d = audDados || { itens: [], pecas: [] };
-      t.textContent = "Anonimização — " + d.itens.length + " valor(es) mascarado(s)";
+      const q = d.itens.length;
+      t.textContent =
+        q === 0
+          ? "Anonimização"
+          : "Anonimização — " + q + (q === 1 ? " dado mascarado" : " dados mascarados");
       const x = document.createElement("button");
       x.type = "button";
       x.className = "mv-x";
@@ -2037,7 +2117,9 @@ var PjePanel = (function () {
         for (const [tipo, n] of [...porTipo].sort((a, b) => b[1] - a[1])) {
           const c = document.createElement("span");
           c.className = "aud-chip";
-          c.textContent = tipo + " " + n;
+          // Número ANTES do nome: é assim que se lê em voz alta ("3 pessoas"),
+          // e é o número que muda.
+          c.textContent = nomeTipo(tipo, n);
           res.appendChild(c);
         }
         lista.appendChild(res);
@@ -2055,7 +2137,11 @@ var PjePanel = (function () {
           nome.textContent = pe.titulo || String(pe.id);
           const meta = document.createElement("span");
           meta.className = "aud-pmeta";
-          meta.textContent = pe.chars + " caracteres";
+          // A contagem de SUBSTITUIÇÕES, e não só o tamanho: é ela que diz o
+          // quanto daquela peça foi tocado. Sai da contagem real das marcas.
+          const subs = (String(pe.texto || "").match(/\[[A-Z][A-Z0-9]*_\d+\]/g) || []).length;
+          meta.textContent =
+            pe.chars + " caracteres · " + subs + (subs === 1 ? " substituição" : " substituições");
           const ver = document.createElement("button");
           ver.type = "button";
           ver.className = "aud-ver";
@@ -2063,7 +2149,7 @@ var PjePanel = (function () {
           const corpo = document.createElement("pre");
           corpo.className = "aud-texto";
           corpo.hidden = true;
-          corpo.textContent = pe.texto || "";
+          pintarMarcas(corpo, pe.texto || "");
           ver.addEventListener("click", () => {
             corpo.hidden = !corpo.hidden;
             ver.textContent = corpo.hidden ? "ver o texto enviado" : "ocultar";
@@ -2107,7 +2193,12 @@ var PjePanel = (function () {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "aud-baixar";
-      btn.textContent = "⬇ Baixar relatório de conferência";
+      // Ícone do pacote (o mesmo do "Baixar .zip"), não emoji — DESIGN.md §7.
+      btn.innerHTML = SVG.zip;
+      const rot = document.createElement("span");
+      rot.className = "lbl";
+      rot.textContent = "Baixar relatório de conferência";
+      btn.appendChild(rot);
       btn.title =
         "Um arquivo .md com o que foi mascarado (por tipo) e o TEXTO EXATO que foi " +
         "enviado ao provedor, peça por peça. Não leva a tabela de reidentificação.";
@@ -2123,24 +2214,64 @@ var PjePanel = (function () {
       posicionarAud();
     }
 
-    // Mesma geometria da `.movbox`: `position: fixed` porque o `.wrap` é um
-    // container de tamanho ZERO, alinhada à direita do selo e ACIMA dele.
+    // `position: fixed` porque o `.wrap` é um container de tamanho ZERO — igual à
+    // `.movbox`. O que MUDA em relação a ela é o enquadramento: a `.movbox` é uma
+    // lista curta e se ancora na viewport sem consequência; esta caixa carrega o
+    // TEXTO DE UMA PEÇA, fica alta, e presa à viewport ela cobria a barra de
+    // título do painel e transbordava a borda esquerda em 420px. Um popover que
+    // cobre o cabeçalho do próprio dono lê como erro de posicionamento.
+    //
+    // Então ela é enquadrada no PAINEL: nunca acima do topo dele, nunca abaixo do
+    // fim, nunca fora das laterais. Quem cede é a altura da lista, que já rola.
     function posicionarAud() {
       if (!audbox) return;
       const pr = panelEl.getBoundingClientRect();
       const r = seloSigilo.getBoundingClientRect();
       const larg = Math.min(520, Math.max(300, pr.width - 24), window.innerWidth - 24);
       audbox.style.width = larg + "px";
+
+      // A moldura: o painel, com 8px de folga, e ainda dentro da janela.
+      const teto = Math.max(6, pr.top + 8);
+      const chao = Math.min(window.innerHeight - 6, pr.bottom - 8);
+
+      // A lista cede primeiro. Mede-se o cabeçalho + rodapé zerando-a, e o que
+      // sobra da moldura é o teto dela. O piso de 120px existe para a caixa não
+      // virar uma fresta num painel muito baixo — ali é melhor transbordar do
+      // que ficar ilegível.
       const lista = audbox.querySelector(".mv-list");
-      if (lista) lista.style.maxHeight = Math.min(420, window.innerHeight - 160) + "px";
+      if (lista) {
+        lista.style.maxHeight = "0px";
+        const semLista = audbox.offsetHeight;
+        lista.style.maxHeight = Math.max(120, chao - teto - semLista) + "px";
+      }
+
       const alt = audbox.offsetHeight;
       audbox.style.left =
-        Math.max(6, Math.min(r.right - larg, window.innerWidth - larg - 6)) + "px";
-      if (r.top - alt - 8 >= 6) audbox.style.top = r.top - alt - 8 + "px";
-      else audbox.style.top = Math.max(6, Math.min(r.bottom + 8, window.innerHeight - alt - 6)) + "px";
+        Math.max(
+          Math.max(6, pr.left + 6),
+          Math.min(r.right - larg, pr.right - larg - 6, window.innerWidth - larg - 6)
+        ) + "px";
+      // ACIMA do selo quando couber — é de lá que ela sai. Quando não couber,
+      // encosta no teto do painel em vez de sair por cima dele.
+      audbox.style.top = Math.max(teto, Math.min(r.top - alt - 8, chao - alt)) + "px";
     }
 
     seloSigilo.addEventListener("click", () => (audbox ? fecharAud() : abrirAud()));
+
+    // Esc fecha — e com `stopPropagation`, senão a cascata de Esc do painel
+    // (`/` -> `@` -> modal -> modo minuta) cancelaria outra coisa junto. Mesma
+    // disciplina do Esc da `.movbox` e do preview.
+    wrap.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && audbox) {
+          e.stopPropagation();
+          fecharAud();
+          seloSigilo.focus();
+        }
+      },
+      true
+    );
 
     // O clique fora fecha pelo DOCUMENT, não pelo `wrap`: nos modos lateral,
     // livre e flutuante a página do tribunal fica visível e CLICÁVEL ao lado, e
