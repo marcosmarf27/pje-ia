@@ -99,6 +99,12 @@ caso — sem depender da extensão para lê-lo depois.
 
 - **⬇ Baixar as peças em `.zip`** — o processo inteiro num pacote, uma peça por arquivo, nomeadas `NNN_Titulo_ID.ext`: o número é a **posição cronológica**, então a ordem alfabética da pasta é a ordem dos autos, e o **id fica no nome** porque é o único metadado que sobrevive a sair da ferramenta. Vem com `LEIA-ME.md`, `indice.txt` e `indice.json` — a ficha do processo, quem juntou cada peça, quantas páginas tem, e o formato de citação para usar depois.
 - **📄 Extrair só o texto** — o mesmo processo em **texto puro**, para alimentar outra ferramenta sem carregar PDF. Dois formatos, no menu do `⬇`: **um `.md` só** com o processo inteiro (`# peça` / `## Página N`), ou **um `.md` por peça** dentro de um `.zip`, com `indice.md` (tabela com link para cada arquivo), `indice.json` e identificação em cada peça — este último é o que permite pedir *"leia só a contestação"* em vez de carregar os autos completos. O pacote leva o arquivo único **junto**, então escolher um formato nunca custa o outro.
+- **Modo sigiloso: anonimização local** 🔒 — em processo em segredo de justiça, ligue o
+  botão e as peças passam a viajar como **texto com os dados pessoais mascarados**, lidos e
+  reconhecidos **no seu próprio computador**; o PDF não sai da máquina. Datas, prazos e
+  legislação são preservados. Antes de cada envio a extensão confere o que sairia e recusa
+  se algo escapou — ver [Processo em segredo de justiça](#️-processo-em-segredo-de-justiça-anonimize-antes).
+
 - **OCR local nas páginas digitalizadas** — na extração, a folha que **não tem camada de texto** passa por um reconhecimento que roda **no seu computador** (PP-OCRv6 sobre ONNX Runtime; a extensão mede WebGPU e WebAssembly na primeira página e fica com o mais rápido). Anexo em foto ou print também passa. Nenhum byte vai para serviço de OCR nenhum. Cada página reconhecida vem **marcada no arquivo, com a confiança** — OCR erra, e quem assina precisa saber o que conferir.
 - **📦 Pacote de carta precatória** — para cada carta precatória **expedida**, uma pasta com a carta, a peça de **origem** da ação e a **decisão que a fundamenta**, no **PDF oficial** do tribunal (com timbre e assinatura), pronta para virar um envio de malote digital. A escolha é feita pelo **movimento processual** — vocabulário CNJ, controlado — e não pelo título da peça, que costuma ser o nome do arquivo que alguém subiu; e a extensão **mostra o que encontrou para você conferir** antes de gerar o pacote.
 - **`pje`, pela linha de comando** — para baixar autos em lote fora do navegador, passando números CNJ. Ver [`cli/README.md`](cli/README.md).
@@ -415,15 +421,34 @@ origem. Esta extensão é solução privada e externa (usa a sua chave de uma AP
 então, nesses processos, o caminho é anonimizar o documento **antes** de ele sair do seu
 computador.
 
-Para isso existe o **[TecJustiça Sigilo](https://github.com/marcosmarf27/tecjustica-sigilo)**,
-um programa separado e gratuito que mascara nomes, CPF, CNPJ, RG, número do processo, OAB,
-telefone, e-mail, endereço e conta bancária — **100% local**, sem enviar nada para servidor
-nenhum. Ele grava um `.txt` anonimizado, e esse arquivo entra aqui pelo **clipe de anexo**:
-com um anexo e nenhuma peça marcada, a conversa passa a ser sobre aquele arquivo.
+Desde a **v0.55 isso é da própria extensão**: ligue o botão **🔒 Sigiloso** na barra de
+ferramentas do painel e as peças passam a ser **lidas e anonimizadas no seu computador**
+antes de qualquer envio. Nomes, CPF, CNPJ, RG, OAB, e-mail, telefone, CEP e o número do
+processo viram rótulos estáveis (`[PESSOA_1]`, `[CPF_2]` — a mesma pessoa tem o mesmo rótulo
+em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o texto mascarado.
 
-Ele não é infalível (precisão de ~91% em texto jurídico) e traz uma tela de revisão que é
-**parte do trabalho**, não formalidade. O passo a passo completo está no guia da extensão,
-em **Segredo de justiça: anonimizar antes de enviar**.
+- **Duas camadas.** Detectores determinísticos (CPF e CNPJ conferidos pelo **dígito
+  verificador**, OAB, e-mail, telefone, CEP com âncora de contexto, mais os nomes das partes
+  lidos da própria ficha do processo) e um **modelo de reconhecimento de nomes que roda no
+  seu navegador** (BERT em português treinado no LeNER-Br, embutido no pacote). Nenhum
+  serviço externo é consultado para anonimizar.
+- **Datas, prazos, legislação e jurisprudência são preservados**, de propósito: mascará-los
+  destruiria a utilidade jurídica do documento sem proteger ninguém.
+- **Barreira final.** Antes de cada envio a extensão **confere o que sairia** e recusa o
+  envio se algum valor original tiver escapado — o turno inteiro é bloqueado, nada vai pela
+  metade.
+- **A tabela que desfaz a anonimização** fica só no seu computador, por processo, e nunca
+  sai dele.
+
+**Limite dito com honestidade:** nenhum anonimizador automático é perfeito, e o que escapar
+da detecção vai inteiro para o provedor. A conferência final cobre o que a extensão
+reconheceu; ela não inventa o que não detectou. **A revisão do que sai continua sendo sua.**
+
+O **[TecJustiça Sigilo](https://github.com/marcosmarf27/tecjustica-sigilo)** — programa
+separado e gratuito, 100% local — continua útil para o que está **fora** dos autos: ele grava
+um `.txt` anonimizado que entra aqui pelo **clipe de anexo** (com um anexo e nenhuma peça
+marcada, a conversa passa a ser sobre aquele arquivo). O passo a passo completo está no guia
+da extensão, em **Segredo de justiça: anonimizar antes de enviar**.
 
 ## 🗺️ Roadmap
 

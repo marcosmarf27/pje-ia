@@ -44,6 +44,243 @@ import {
   podarAgressivo,
 } from "./casodb.js";
 
+// Os dois IIFE abaixo publicam `globalThis.PSEUD` e `globalThis.TRAVA`, e são os
+// MESMOS arquivos que rodam no content script. Importá-los aqui não é
+// comodidade: é o que faz a normalização da guarda ser byte a byte a que
+// mascarou o texto. Se as duas divergirem, "JOÃO" no corpo escapa de "joão" na
+// lista e a defesa vira carimbo — o próprio `pseudonimos.js` diz isso, e é por
+// isso que ele tem UM dono.
+import "./pseudonimos.js";
+import "./trava.js";
+
+// ---------------------------------------------------------------------------
+// GUARDA DE SAÍDA (modo sigiloso)
+//
+// A última barreira antes da rede, e ela mede o RESULTADO em vez de garantir o
+// processo — a justificativa inteira está no cabeçalho de `src/trava.js`.
+// Aqui ficam só as decisões que são deste arquivo:
+//
+// POR QUE NO `fetch`, E NÃO EM CADA CLIENTE. São quatro clientes hoje, e um
+// deles é declarado INTOCADO em três notas do CLAUDE.md. Quatro é uma LISTA, e
+// o quinto provedor vazaria em silêncio. A guarda no `fetch` do worker é
+// impossível de contornar de dentro dele e cobre de graça o `countTokens`, o
+// `upload` e o cliente que ninguém escreveu ainda.
+//
+// POR QUE POR HOST. Instalada uma vez, ela decide por `new URL(...).host`: só
+// os quatro hosts de provedor entram no caminho caro. Todo o resto — inclusive
+// o PJe, que o worker nem chama — passa sem custo nenhum.
+//
+// POR QUE CADA REQUISIÇÃO CARREGA UMA CHAVE DE PROCESSO. Sem ela, o turno
+// NORMAL de outra aba seria conferido contra a lista de proibidos de um
+// processo que não é o dele — e barrado, ou pior, teria o `file_id` recusado
+// pela regra de binários. O `CAB_CTX` resolve, e a falha é para o lado seguro:
+// requisição a host de provedor SEM a chave, havendo sigilo armado, é
+// BLOQUEADA. A lista de clientes ainda pode envelhecer; agora ela envelhece
+// para o lado da recusa, nunca para o do vazamento.
+const HOSTS_PROVEDOR = new Set([
+  "api.anthropic.com",
+  "generativelanguage.googleapis.com",
+  "api.openai.com",
+  "openrouter.ai",
+]);
+
+// Chave do caso -> {proibidos, isentas}. É um Map e não uma variável: duas abas
+// em dois processos, uma em modo sigiloso e outra não, é o caso comum.
+const sigilo = new Map();
+
+// ...E ELE PRECISA SOBREVIVER À MORTE DO WORKER. O Chrome mata o service worker
+// MV3 a cada ~30 s de ociosidade — o mesmo fato que obrigou o `manterVivo` dos
+// turnos longos e a memória do `safety_settings` do Gemini. Com o Map só em
+// memória, o worker renascia VAZIO e o atalho `if (!sigilo.size)` liberava toda
+// requisição sem inspeção: a anonimização do content continuava acontecendo,
+// mas a última barreira simplesmente não existia — e um caminho que não
+// re-armasse (um upload, a triagem) sairia sem conferência nenhuma.
+//
+// `session` e não `local`, pela mesma razão do `safety_settings`: sobrevive ao
+// worker (que é o problema) e morre com o navegador, que é a granularidade
+// certa — sigilo é decisão de sessão de trabalho, não estado permanente no
+// disco. E o que se grava aqui são os valores ORIGINAIS: `storage.session` NÃO
+// vai ao disco (o Chrome o mantém em memória) e some ao fechar o navegador,
+// que é o mesmo ciclo de vida do próprio modo.
+const CHAVE_SIGILO = "sigiloArmado";
+let sigiloRestaurado = null;
+
+function restaurarSigilo() {
+  if (sigiloRestaurado) return sigiloRestaurado;
+  sigiloRestaurado = (async () => {
+    try {
+      const r = await chrome.storage.session.get(CHAVE_SIGILO);
+      const g = (r && r[CHAVE_SIGILO]) || null;
+      if (g) for (const k of Object.keys(g)) if (!sigilo.has(k)) sigilo.set(k, g[k]);
+    } catch {
+      // Best-effort dos dois lados: sem `chrome.storage` (é assim que a guarda é
+      // testada fora do navegador) degrada para o comportamento de antes.
+    }
+  })();
+  return sigiloRestaurado;
+}
+
+function persistirSigilo() {
+  try {
+    const plano = {};
+    for (const [k, v] of sigilo) plano[k] = v;
+    chrome.storage.session.set({ [CHAVE_SIGILO]: plano });
+  } catch {
+    /* sem storage: a guarda segue valendo nesta vida do worker */
+  }
+}
+
+// Chave usada pelos caminhos que NÃO carregam dado de processo nenhum (testar
+// chave, por exemplo). Ela nunca entra no Map de sigilo, então passa sempre —
+// e existe para esses caminhos não caírem na recusa por falta de atribuição.
+const CTX_CONFIG = "config";
+
+function hostDe(entrada) {
+  try {
+    return new URL(typeof entrada === "string" ? entrada : entrada.url).host;
+  } catch {
+    return "";
+  }
+}
+
+// Lê e REMOVE o cabeçalho de atribuição: ele é conversa interna e não pode
+// chegar ao provedor.
+function tirarCtx(init) {
+  const h = init && init.headers;
+  if (!h) return undefined;
+  if (typeof h.get === "function") {
+    const v = h.get(TRAVA.CAB_CTX);
+    if (v != null) h.delete(TRAVA.CAB_CTX);
+    return v == null ? undefined : v;
+  }
+  const v = h[TRAVA.CAB_CTX];
+  if (v !== undefined) delete h[TRAVA.CAB_CTX];
+  return v;
+}
+
+function ehRequest(x) {
+  return typeof Request !== "undefined" && x instanceof Request;
+}
+
+// O cabeçalho de atribuição também pode vir dentro de um `Request`. Ele é lido
+// e REMOVIDO ali também — senão viajaria para o provedor.
+function tirarCtxDoRequest(entrada) {
+  if (!ehRequest(entrada) || !entrada.headers) return undefined;
+  const v = entrada.headers.get(TRAVA.CAB_CTX);
+  if (v == null) return undefined;
+  try {
+    entrada.headers.delete(TRAVA.CAB_CTX);
+  } catch {
+    /* headers imutáveis (Request já usado): o valor ainda serve para atribuir */
+  }
+  return v;
+}
+
+function ehBinario(c) {
+  return (
+    (typeof FormData !== "undefined" && c instanceof FormData) ||
+    (typeof Blob !== "undefined" && c instanceof Blob) ||
+    c instanceof ArrayBuffer ||
+    ArrayBuffer.isView(c) ||
+    (typeof ReadableStream !== "undefined" && c instanceof ReadableStream)
+  );
+}
+
+function erroVazamento(msg) {
+  const e = new Error(msg);
+  e.name = "VazamentoBloqueadoError";
+  e.vazamento = true;
+  // NUNCA `retryable`: `executarTurno` re-tenta 429/5xx e queda de rede, e
+  // re-tentar um bloqueio é o mesmo bloqueio com o custo do backoff. O filtro é
+  // determinístico pelo conteúdo — a segunda tentativa daria exatamente igual.
+  e.retryable = false;
+  return e;
+}
+
+function instalarGuardaDeSaida() {
+  if (globalThis.__pjeGuardaSaida) return;
+  globalThis.__pjeGuardaSaida = true;
+  const original = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = async function (entrada, init) {
+    // Fora dos hosts de provedor a guarda não existe.
+    if (!HOSTS_PROVEDOR.has(hostDe(entrada))) return original(entrada, init);
+    // ANTES de qualquer decisão: o worker pode ter acabado de renascer, e o Map
+    // em memória estaria vazio. Sem esta espera, `!sigilo.size` liberaria a
+    // requisição justamente na janela em que a guarda mais precisa existir.
+    await restaurarSigilo();
+    // O cabeçalho pode vir no `init` OU dentro de um `Request` passado como
+    // primeiro argumento — os dois são removidos.
+    const ctx = tirarCtx(init) ?? tirarCtxDoRequest(entrada);
+    // Nada armado em processo nenhum: o caminho caro nem começa. Um turno de
+    // autos é grande e a verificação é O(n·m) sobre o corpo inteiro.
+    if (!sigilo.size) return original(entrada, init);
+    if (ctx === undefined) {
+      throw erroVazamento(
+        "uma requisição saiu para a API sem dizer de que processo é, e há processo " +
+          "em modo sigiloso nesta sessão; nada foi enviado"
+      );
+    }
+    const s = sigilo.get(ctx);
+    if (!s) return original(entrada, init); // este processo não está em sigilo
+    // O corpo pode estar no `init` OU dentro do `Request`. Ler do Request exige
+    // clonar (o corpo de uma Response/Request só é consumido uma vez) — a mesma
+    // regra que o `lerCorpoErroGemini` já registra para o lado da resposta.
+    let corpo = init && init.body;
+    if (corpo === undefined && ehRequest(entrada)) {
+      try {
+        corpo = await entrada.clone().text();
+      } catch {
+        throw erroVazamento(
+          "não foi possível inspecionar o corpo desta requisição; nada foi enviado"
+        );
+      }
+    }
+    // ESTRUTURAL antes de textual: no modo sigiloso a peça viaja como texto e o
+    // arquivo não sai da máquina. Um corpo binário aqui significa que o gancho a
+    // montante falhou — e é melhor o turno morrer com nome do que o arquivo sair.
+    if (ehBinario(corpo)) {
+      throw erroVazamento(
+        "o modo sigiloso monta o request só com texto mascarado, e esta requisição " +
+          "leva um corpo binário; nada foi enviado"
+      );
+    }
+    // A URL também é conferida, e DECODIFICADA antes: um nome em rota ou query
+    // viaja percent-encoded (`Elioneudo%20Evaristo`), e a normalização da trava
+    // colapsa espaço em branco — não `%20`. Sem decodificar, o valor passava.
+    // `decodeURIComponent` lança em sequência malformada; aí vale o texto cru,
+    // que é melhor que não conferir nada.
+    const alvoUrl = String(typeof entrada === "string" ? entrada : entrada.url);
+    let urlLegivel = alvoUrl;
+    try {
+      urlLegivel = decodeURIComponent(alvoUrl);
+    } catch {
+      /* sequência malformada: fica o cru */
+    }
+    TRAVA.verificarSaida(urlLegivel, s.proibidos, s.isentas);
+    if (typeof corpo === "string" && corpo.length) {
+      let obj;
+      try {
+        obj = JSON.parse(corpo);
+      } catch {
+        // Corpo que não dá para inspecionar não pode ser liberado por não dar
+        // para inspecionar. Falha fechada.
+        throw erroVazamento("o corpo desta requisição não é JSON e não pôde ser conferido; nada foi enviado");
+      }
+      TRAVA.verificar(obj, s.proibidos, { isentas: s.isentas });
+    } else if (corpo !== undefined && corpo !== null && corpo !== "") {
+      // Sobra o que não é string nem binário reconhecido — `URLSearchParams` é o
+      // caso concreto. Liberar por não reconhecer é o oposto de falhar fechado:
+      // a regra deste arquivo é que corpo não inspecionado não sai.
+      throw erroVazamento(
+        "esta requisição leva um corpo de tipo que a verificação não sabe inspecionar; nada foi enviado"
+      );
+    }
+    return original(entrada, init);
+  };
+}
+
+instalarGuardaDeSaida();
+
 // Capacidades por modelo. Governam limites de páginas/contexto, as versões das
 // ferramentas web, a configuração de thinking/effort aceita por cada um e o
 // preço (US$ por 1M de tokens, tabela pública da Anthropic — Sonnet 5 usa o
@@ -619,6 +856,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 "https://api.anthropic.com/v1/models",
                 { "x-api-key": key, "anthropic-version": "2023-06-01" },
               ];
+    // CTX_CONFIG nunca entra no Map de sigilo: este caminho nao leva nada dos
+    // autos, e sem atribuicao ele cairia na recusa por falta de ctx.
+    req[1][TRAVA.CAB_CTX] = CTX_CONFIG;
     fetch(req[0], { headers: req[1] })
       .then((r) =>
         r.ok
@@ -677,6 +917,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "upload") {
     (async () => {
       try {
+        // No modo sigiloso a peca viaja como TEXTO mascarado e o arquivo nao sai
+        // da maquina. Recusar aqui e a rede de seguranca a montante: a guarda de
+        // saida barraria o FormData de todo jeito, mas so depois de o base64 ter
+        // sido montado e a chave posta no cabecalho.
+        if (msg.chaveCaso && sigilo.has(msg.chaveCaso)) {
+          return sendResponse({
+            error:
+              "modo sigiloso ligado neste processo: as pecas vao como texto mascarado, " +
+              "e nada e enviado a Files API.",
+          });
+        }
         const cfg = await getCfg();
         const provider = providerDe(cfg.model);
         const apiKey = chaveDe(cfg, provider);
@@ -719,6 +970,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             filename: msg.payload.filename,
             b64: msg.payload.b64,
             mime: msg.payload.mime,
+            // Sem a atribuição, um upload LEGÍTIMO (outro processo, modo normal)
+            // seria bloqueado pela guarda por falta de ctx sempre que QUALQUER
+            // aba tivesse sigilo armado — o cliente cairia no base64 e um PDF
+            // grande estouraria o teto. A recusa do modo sigiloso já aconteceu
+            // acima, por `sigilo.has(msg.chaveCaso)`.
+            ctx: msg.chaveCaso || "sem-caso",
           });
           if (key) await sessSet(key, { uri: r.fileUri, exp: r.expiraEm });
           return sendResponse({
@@ -743,6 +1000,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             filename: msg.payload.filename,
             b64: msg.payload.b64,
             mime: msg.payload.mime,
+            ctx: msg.chaveCaso || "sem-caso",
           });
           if (key) await sessSet(key, fileId);
           return sendResponse({ fileId, provider, chaveHash });
@@ -757,6 +1015,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           filename: msg.payload.filename,
           b64: msg.payload.b64,
           mime: msg.payload.mime,
+          ctx: msg.chaveCaso || "sem-caso",
         });
         if (key) await sessSet(key, fileId);
         sendResponse({ fileId, provider, chaveHash });
@@ -800,6 +1059,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             model,
             system: msg.payload.system,
             messages: msg.payload.messages,
+            ctx: msg.payload.chaveCaso || "sem-caso",
           });
         } else if (provider === "openai") {
           tokens = await countTokensOpenAI({
@@ -808,6 +1068,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             system: msg.payload.system,
             messages: msg.payload.messages,
             tools: msg.payload.tools,
+            ctx: msg.payload.chaveCaso || "sem-caso",
           });
         } else {
           tokens = await countTokens({
@@ -817,6 +1078,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             messages: msg.payload.messages,
             tools: msg.payload.tools,
             betas: msg.payload.betas,
+            ctx: msg.payload.chaveCaso || "sem-caso",
           });
         }
         sendResponse({ tokens, contextTokens: capsDe(model).contextTokens });
@@ -831,6 +1093,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // Vai por storage.session (some ao fechar o navegador, não polui o local) e
   // é o worker quem grava: a página é contexto confiável e lê direto, e o
   // content script não precisa de acesso à área session.
+  // ARMAR / DESARMAR o modo sigiloso de um processo.
+  //
+  // `proibidos` sao os valores ORIGINAIS de tudo o que foi mascarado (o que nao
+  // pode aparecer no que sai) e `isentas` sao as regioes de texto CONSTANTE do
+  // proprio programa -- sem elas, bastaria o detector rotular "Brasil" ou
+  // "Justica" numa peca para a trava encontrar o valor DENTRO do nosso proprio
+  // system prompt e bloquear um turno que nao revela ninguem.
+  //
+  // A lista viaja a cada turno, e nao uma vez so, porque ela CRESCE: cada peca
+  // nova mascarada acrescenta nomes. Mandar so no inicio deixaria a guarda
+  // conferindo uma lista velha, que e o mesmo que nao conferir.
+  if (msg.type === "sigiloArmar") {
+    if (!msg.chave) return sendResponse({ ok: false, erro: "sem chave de processo" });
+    sigilo.set(msg.chave, {
+      proibidos: Array.isArray(msg.proibidos) ? msg.proibidos : [],
+      isentas: Array.isArray(msg.isentas) ? msg.isentas : [],
+    });
+    persistirSigilo();
+    return sendResponse({ ok: true, quantos: sigilo.get(msg.chave).proibidos.length });
+  }
+  if (msg.type === "sigiloDesarmar") {
+    if (msg.chave) {
+      sigilo.delete(msg.chave);
+      persistirSigilo();
+    }
+    return sendResponse({ ok: true });
+  }
+
   if (msg.type === "guardarMapa") {
     (async () => {
       try {
@@ -903,6 +1193,53 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } finally {
         parar();
       }
+    })();
+    return true;
+  }
+
+  // NER local (anonimização). Mesma ponte do OCR: o worker não tem `new Worker`
+  // nem isolamento cross-origin, então quem hospeda o modelo é o documento
+  // offscreen — ver o cabeçalho do bloco de NER em ocr-offscreen.js.
+  if (msg.type === "nerDetectar") {
+    (async () => {
+      // Uma peça longa passa de trinta segundos, e o Chrome mata o worker MV3
+      // após ~30 s sem eventos — o mesmo cuidado do OCR e dos turnos longos.
+      const parar = manterVivo();
+      try {
+        await garantirOffscreen();
+        const r = await chrome.runtime.sendMessage({
+          alvo: "ocrOffscreen",
+          tipo: "nerDetectar",
+          texto: msg.payload.texto,
+          opts: msg.payload.opts,
+          backend: "wasm",
+        });
+        if (!r || !r.ok) {
+          const e = new Error((r && r.erro) || "o NER não respondeu");
+          e.diag = (r && r.diag) || [];
+          throw e;
+        }
+        sendResponse({ ok: true, spans: r.spans, ms: r.ms, backend: r.backend });
+      } catch (e) {
+        sendResponse({ error: String((e && e.message) || e), diag: (e && e.diag) || [] });
+      } finally {
+        parar();
+      }
+    })();
+    return true;
+  }
+
+  // Encerra o worker do NER e devolve a memória do WASM. Vale a pena chamar ao
+  // fim de um lote: o documento offscreen também hospeda o OCR, e o BERT
+  // residente ali o deixaria mais lento (medido, 1,48x, no app irmão).
+  if (msg.type === "nerFechar") {
+    (async () => {
+      try {
+        await chrome.runtime.sendMessage({ alvo: "ocrOffscreen", tipo: "nerFechar" });
+      } catch {
+        /* offscreen já morreu: não há o que fechar */
+      }
+      sendResponse({ ok: true });
     })();
     return true;
   }
@@ -1308,6 +1645,10 @@ async function executarTurno(port, payload) {
     model,
     system: payload.system,
     max_tokens: payload.maxTokens || MAX_TOKENS_CHAT,
+    // Atribuicao para a guarda de saida. `"sem-caso"` cobre o processo sem
+    // chave (o PJe KZ, por exemplo): ele nao pode estar em sigilo, porque o Map
+    // e indexado pela chave -- entao passar e o correto, e nao um furo.
+    ctx: payload.chaveCaso || "sem-caso",
   };
   if (payload.tools && payload.tools.length) baseReq.tools = payload.tools;
   if (provider === "gemini") {

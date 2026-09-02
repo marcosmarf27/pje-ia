@@ -353,12 +353,112 @@ async function medirBackends(buf, msWasm, resWasm) {
   return { res: resWasm, ms: msWasm };
 }
 
+// --- NER (anonimizacao local) -------------------------------------------------
+//
+// POR QUE O NER MORA AQUI, e nao no content script nem no service worker. Ele
+// precisa de `crossOriginIsolated` para o ORT usar threads -- e o ganho nao e
+// marginal: o OCR mediu 21x no mesmo eixo. Isolamento cross-origin so existe em
+// PAGINA de extensao, declarado no manifest (COEP/COOP), e o service worker nao
+// tem `new Worker`. Sobra o documento offscreen.
+//
+// POR QUE UM WORKER PROPRIO, E POR QUE ELE MORRE. `InferenceSession.create()`
+// copia os pesos para dentro da `WebAssembly.Memory` do ORT, e essa memoria
+// CRESCE E NUNCA ENCOLHE: criar a sessao do BERT no mesmo modulo WASM que
+// hospeda o PP-OCRv6 comprometeria centenas de MB pela vida deste documento --
+// inclusive durante o OCR das pecas seguintes. `session.release()` devolve a
+// memoria ao alocador do ORT, nao ao sistema. O unico ponto de liberacao
+// deterministica que a plataforma oferece e `Worker.terminate()`.
+//
+// MAS NAO A CADA PECA. Terminar depois de cada texto recarregaria 109 MB toda
+// vez; manter para sempre e o que a nota acima proibe. O meio-termo e encerrar
+// por OCIOSIDADE, com fechamento explicito quando o chamador diz que acabou.
+let nerWorker = null;
+let nerPronto = null;
+let nerOcioso = null;
+let nerSeq = 0;
+const nerPendentes = new Map();
+const NER_OCIOSO_MS = 45000;
+
+function nerEncerrar(motivo) {
+  if (nerOcioso) { clearTimeout(nerOcioso); nerOcioso = null; }
+  if (!nerWorker) return;
+  try { nerWorker.terminate(); } catch {}
+  nerWorker = null;
+  nerPronto = null;
+  // Quem estava esperando resposta precisa saber que ela nao vem -- uma promise
+  // pendente para sempre prende o turno sem erro nenhum, que e pior que falhar.
+  for (const [, p] of nerPendentes) p.rej(new Error("o NER foi encerrado: " + motivo));
+  nerPendentes.clear();
+  d("NER encerrado (" + motivo + ")");
+}
+
+function nerAdiarFim() {
+  if (nerOcioso) clearTimeout(nerOcioso);
+  nerOcioso = setTimeout(() => nerEncerrar("ociosidade"), NER_OCIOSO_MS);
+}
+
+function nerPerguntar(msg) {
+  return new Promise((res, rej) => {
+    const id = ++nerSeq;
+    nerPendentes.set(id, { res, rej });
+    nerWorker.postMessage(Object.assign({ id }, msg));
+  });
+}
+
+async function nerGarantir(backend) {
+  if (nerPronto) return nerPronto;
+  nerWorker = new Worker(chrome.runtime.getURL("src/ner-worker.js"), { type: "module" });
+  nerWorker.onmessage = (ev) => {
+    const m = ev.data || {};
+    // `diag` e `progresso` sao fluxo, nao resposta: nao resolvem ninguem.
+    if (m.tipo === "diag") return d("[ner] " + m.msg);
+    if (m.tipo === "progresso") return;
+    const p = m.id != null && nerPendentes.get(m.id);
+    if (!p) return;
+    nerPendentes.delete(m.id);
+    if (m.tipo === "erro") p.rej(new Error(m.erro || "erro no NER"));
+    else p.res(m);
+  };
+  // Falha de carregamento do MODULO nao chega pelo onmessage: sem isto, um
+  // import quebrado deixaria a primeira promise pendente para sempre.
+  nerWorker.onerror = (e) => nerEncerrar("erro no worker: " + ((e && e.message) || "desconhecido"));
+  nerPronto = nerPerguntar({ tipo: "carregar", backend: backend || "wasm" });
+  try {
+    return await nerPronto;
+  } catch (e) {
+    nerEncerrar("falha ao carregar");
+    throw e;
+  }
+}
+
 // --- canal -------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
   if (!msg || msg.alvo !== "ocrOffscreen") return false;
 
   if (msg.tipo === "ping") {
     responder({ ok: true, diag: tirarDiag() });
+    return true;
+  }
+
+  if (msg.tipo === "nerDetectar") {
+    (async () => {
+      try {
+        await nerGarantir(msg.backend);
+        const r = await nerPerguntar({ tipo: "detectar", texto: msg.texto, opts: msg.opts });
+        nerAdiarFim();
+        responder({ ok: true, spans: r.spans, ms: r.ms, backend: r.backend, diag: tirarDiag() });
+      } catch (e) {
+        // NUNCA repassar o texto analisado: ele e o conteudo dos autos, e um
+        // erro que carrega o dado e um vazamento com outro nome.
+        responder({ ok: false, erro: String((e && e.message) || e), diag: tirarDiag() });
+      }
+    })();
+    return true;
+  }
+
+  if (msg.tipo === "nerFechar") {
+    nerEncerrar("pedido pelo chamador");
+    responder({ ok: true });
     return true;
   }
 

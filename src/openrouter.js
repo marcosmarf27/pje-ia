@@ -71,13 +71,22 @@ const APP_NOME = "TecJustica PJe";
 export const ENGINE_PDF_NATIVO = "native";
 export const ENGINE_PDF_CONVERSOR = "cloudflare-ai";
 
-function headersOpenRouter(apiKey) {
-  return {
+// Espelha `CAB_CTX` de src/trava.js. A duplicacao e deliberada: este e um ES
+// module do worker e aquele e um IIFE que tambem roda no content script. Ha
+// teste que confere que as cinco copias batem -- divergir aqui faz a guarda de
+// saida nao achar a atribuicao e BLOQUEAR o turno.
+const CAB_CTX = "x-pje-ctx";
+
+function headersOpenRouter(apiKey, ctx) {
+  const h = {
     "content-type": "application/json",
     authorization: "Bearer " + apiKey,
     "HTTP-Referer": APP_URL,
     "X-OpenRouter-Title": APP_NOME,
   };
+  // A guarda de saida do worker le e REMOVE este cabecalho.
+  if (ctx) h[CAB_CTX] = ctx;
+  return h;
 }
 
 // O id do modelo no storage leva o prefixo "or:" (ver providerDe em
@@ -270,7 +279,7 @@ export async function* streamOpenRouter(req) {
 
   const resp = await fetch(API + "/chat/completions", {
     method: "POST",
-    headers: headersOpenRouter(req.apiKey),
+    headers: headersOpenRouter(req.apiKey, req.ctx),
     body: JSON.stringify(body),
   });
   if (!resp.ok) {

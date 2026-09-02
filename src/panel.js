@@ -327,6 +327,7 @@ var PjePanel = (function () {
     mapa: '<circle cx="12" cy="12" r="3"/><path d="M12 9V5"/><path d="M14.5 13.5l3 2.5"/><path d="M9.5 13.5l-3 2.5"/>',
     prompts: '<path d="M12 4l1.8 4.2L18 10l-4.2 1.8L12 16l-1.8-4.2L6 10l4.2-1.8z"/><path d="M18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z"/>',
     modelos: '<path d="M4 6h7v14H4z"/><path d="M13 6h7v14h-7z"/>',
+    cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     // mesmo desenho do botão "Importar de .docx" da página modelos.html: as
     // duas portas de entrada da importação precisam mostrar o mesmo ícone
     importar: '<path d="M12 20V9"/><path d="M7 13l5-5 5 5"/><path d="M5 4h14"/>',
@@ -399,6 +400,7 @@ var PjePanel = (function () {
     mapa: ic(P.mapa, 13, 1.9),
     prompts: ic(P.prompts, 13, 1.9),
     modelos: ic(P.modelos, 13, 1.9),
+    cadeado: ic(P.cadeado, 13, 1.9),
     importar: ic(P.importar, 13, 1.9),
     importarG: ic(P.importar, 24, 1.4), // grande: traço mais fino (DESIGN.md §5)
     // --- demais ---
@@ -916,6 +918,7 @@ var PjePanel = (function () {
               <div class="toolbar">
                 <div class="tools">
                   <button class="tgl-search" aria-pressed="false" title="Liga/desliga a busca de jurisprudência e legislação em fontes oficiais (STF, STJ, Planalto…). Com a busca ligada, escreva a pergunta e use o botão Enviar normalmente.">${SVG.juris}<span class="lbl">Jurisprudência</span></button>
+                  <button class="tgl-sigilo" aria-pressed="false" title="Modo sigiloso: as peças deixam de ser enviadas como ARQUIVO e passam a ser enviadas como texto com nomes, CPF, OAB, endereços e o número do processo substituídos por rótulos ([PESSOA_1]). Todo o reconhecimento acontece no seu computador; o PDF não sai da máquina. Exigido pelo art. 19, §3º, IV da Resolução CNJ 615/2025 para processo em segredo de justiça.">${SVG.cadeado}<span class="lbl">Sigiloso</span></button>
                   <button class="btn-minuta" title="Liga o modo minuta: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar minuta” — a resposta abre num editor de texto, em nova aba, de onde você copia para o PJe, baixa em Word (.docx) ou imprime.">${SVG.minuta}<span class="lbl">Minutar</span></button>
                   <button class="btn-mapa" title="Liga o modo mapa mental: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar mapa” — a resposta abre num mapa mental interativo, em nova aba.">${SVG.mapa}<span class="lbl">Mapa mental</span></button>
                   <button class="btn-plib" title="Seus prompts salvos: crie instruções reutilizáveis (título + texto) e insira-as na conversa digitando “/” no início do campo de mensagem. Sincronizam entre navegadores logados na mesma conta Google.">${SVG.prompts}<span class="lbl">Prompts</span></button>
@@ -932,6 +935,7 @@ var PjePanel = (function () {
                   <button class="linhatempo" hidden aria-expanded="false">
                     ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
                   </button>
+                  <span class="selo-sigilo" hidden role="note"></span>
                   <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
                   <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
                 </div>
@@ -1393,16 +1397,19 @@ var PjePanel = (function () {
           : "") +
         // Anonimização na origem (art. 19, §3º, IV da Res. CNJ 615): a extensão
         // manda as peças marcadas direto à API de um provedor privado, e o
-        // guia já ENUNCIA esse dever sem oferecer caminho nenhum. O caminho é o
-        // TecJustiça Sigilo — programa separado, 100% local — e o arquivo que
-        // ele produz volta pelo 📎, que já aceita .txt e já sabe conversar sem
-        // peça marcada (`soAnexosNoContexto`). Nada muda no caminho de dados:
-        // o que faltava era DESCOBERTA.
+        // guia já ENUNCIA esse dever sem oferecer caminho nenhum.
         //
-        // O clique abre o guia, não o GitHub: o instalador é de ~660 MB, só
-        // Windows x64, e baixa mais 1,7 GB de modelo na primeira execução —
-        // avisar depois do download é avisar depois do estrago.
-        '<button type="button" class="hint-sigilo" title="Processo em segredo de justiça? O TecJustiça Sigilo mascara nomes, CPF, endereços e números de processo no seu próprio computador; o arquivo anonimizado entra aqui pelo clipe de anexo. Programa gratuito e separado — abre o guia">' +
+        // ATÉ A v0.54 O CAMINHO ERA UM PROGRAMA SEPARADO (o TecJustiça Sigilo), e
+        // esta dica dizia isso. Deixou de ser verdade: a anonimização passou a
+        // ser NATIVA (botão 🔒 Sigiloso na barra). Uma frase que ERA verdade é o
+        // modo de falha que este projeto já registrou duas vezes — por isso ela
+        // mudou junto com a feature, e não depois.
+        //
+        // O clique continua abrindo o GUIA, e não ligando o modo: quem chega
+        // aqui está descobrindo o assunto, e ligar um modo que muda o que sai da
+        // máquina sem explicar antes é o oposto do que o aviso existe para
+        // fazer. O guia explica e o botão da barra liga.
+        '<button type="button" class="hint-sigilo" title="Processo em segredo de justiça? A extensão pode anonimizar as peças no seu próprio computador antes de enviar: nomes, CPF, OAB, endereços e o número do processo viram rótulos, e o PDF não sai da máquina. Abre o guia; para ligar, use o botão 🔒 Sigiloso na barra de ferramentas.">' +
         SVG.escudo +
         'Anonimizar dados sigilosos<span class="hs-sel">no seu PC</span></button>' +
         "</div>" +
@@ -1904,6 +1911,46 @@ var PjePanel = (function () {
       statusEl.textContent = searchOn
         ? "Busca de jurisprudência ligada: as próximas perguntas enviadas poderão consultar STF, STJ, Planalto e outras fontes oficiais."
         : "Busca de jurisprudência desligada.";
+    });
+
+    // MODO SIGILOSO. Toggle com ESTADO, irmão do de jurisprudência — mas com uma
+    // diferença que não pode ser apagada: este muda O QUE SAI DA MÁQUINA. Por
+    // isso o estado aparece em DOIS lugares (o botão e o selo da metarow) e o
+    // status escreve o que passou a valer, em vez de só confirmar o clique.
+    const tglSigilo = $(".tgl-sigilo");
+    const seloSigilo = $(".selo-sigilo");
+    let sigiloOn = false;
+    let sigiloCb = null;
+
+    // Pintar é SEPARADO de alternar: o content script também precisa pintar
+    // (ao retomar um processo que já estava em modo sigiloso), e sem a separação
+    // ele teria de simular um clique — que dispararia o callback e ligaria o
+    // modo de novo, do lado de lá.
+    function pintarSigilo(ligado, quantos) {
+      sigiloOn = !!ligado;
+      tglSigilo.setAttribute("aria-pressed", String(sigiloOn));
+      tglSigilo.classList.toggle("on", sigiloOn);
+      // SÓ o rótulo — o <svg> é irmão dele. Escrever no textContent do botão
+      // apagaria o ícone no primeiro clique, sem erro nenhum.
+      rotulo(tglSigilo, sigiloOn ? "Sigiloso ligado" : "Sigiloso");
+      seloSigilo.hidden = !sigiloOn;
+      if (sigiloOn) {
+        const n = Number(quantos) || 0;
+        seloSigilo.textContent = n
+          ? "🔒 sigiloso · " + n + " dado(s) mascarado(s)"
+          : "🔒 sigiloso";
+        seloSigilo.title =
+          "As peças vão como texto anonimizado; o arquivo original não sai desta máquina." +
+          (n ? " " + n + " valor(es) distinto(s) já substituído(s) por rótulo." : "");
+      }
+    }
+
+    tglSigilo.addEventListener("click", () => {
+      pintarSigilo(!sigiloOn);
+      statusEl.textContent = sigiloOn
+        ? "Modo sigiloso LIGADO: as peças passam a ser lidas e anonimizadas no seu computador antes do envio — a primeira análise demora mais, porque cada peça é lida (e as digitalizadas passam por OCR)."
+        : "Modo sigiloso desligado: as peças voltam a ser enviadas como arquivo.";
+      if (sigiloCb) sigiloCb(sigiloOn);
     });
 
     // Geração de MINUTA por modo explícito: o clique no botão liga o modo — a
@@ -6490,6 +6537,17 @@ var PjePanel = (function () {
       startPrep,
       setPrepState,
       endPrep,
+      isSigiloso() {
+        return sigiloOn;
+      },
+      onSigiloso(cb) {
+        sigiloCb = cb;
+      },
+      // Pinta sem disparar o callback — é o que o content usa ao retomar um
+      // processo que já estava em modo sigiloso.
+      setSigiloso(ligado, quantos) {
+        pintarSigilo(ligado, quantos);
+      },
       isSearchOn() {
         return searchOn;
       },

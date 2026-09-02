@@ -55,11 +55,20 @@ const API = "https://api.openai.com/v1";
 // ao resumo de raciocínio (o máximo dos modelos 5.6 é 128.000).
 const MAX_OUTPUT_TOKENS = 65536;
 
-function headersOpenAI(apiKey) {
-  return {
+// Espelha `CAB_CTX` de src/trava.js. A duplicacao e deliberada: este e um ES
+// module do worker e aquele e um IIFE que tambem roda no content script. Ha
+// teste que confere que as cinco copias batem -- divergir aqui faz a guarda de
+// saida nao achar a atribuicao e BLOQUEAR o turno.
+const CAB_CTX = "x-pje-ctx";
+
+function headersOpenAI(apiKey, ctx) {
+  const h = {
     "content-type": "application/json",
     authorization: "Bearer " + apiKey,
   };
+  // A guarda de saida do worker le e REMOVE este cabecalho.
+  if (ctx) h[CAB_CTX] = ctx;
+  return h;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +195,7 @@ export async function* streamOpenAI(req) {
 
   const resp = await fetch(API + "/responses", {
     method: "POST",
-    headers: headersOpenAI(req.apiKey),
+    headers: headersOpenAI(req.apiKey, req.ctx),
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
@@ -390,7 +399,7 @@ async function* sseEvents(resp) {
 // arquivos persistem na conta (sem expiração por padrão), então o chamador
 // guarda só o id no cache de sessão — sem validação de expiração.
 // ---------------------------------------------------------------------------
-export async function uploadFileOpenAI({ apiKey, filename, b64, mime }) {
+export async function uploadFileOpenAI({ apiKey, filename, b64, mime, ctx }) {
   const mimeType = mime || "application/pdf";
   const blob = await (await fetch("data:" + mimeType + ";base64," + b64)).blob();
   const fd = new FormData();
@@ -399,7 +408,9 @@ export async function uploadFileOpenAI({ apiKey, filename, b64, mime }) {
   fd.append("file", blob, filename || "documento.pdf");
   const resp = await fetch(API + "/files", {
     method: "POST",
-    headers: { authorization: "Bearer " + apiKey }, // sem content-type: FormData define o boundary
+    // Atribuição para a guarda de saída (ver CAB_CTX). Sem content-type: o
+    // FormData define o boundary do multipart.
+    headers: Object.assign({ authorization: "Bearer " + apiKey }, ctx ? { [CAB_CTX]: ctx } : {}),
     body: fd,
   });
   if (!resp.ok) throw new Error(await friendlyHttpErrorOpenAI(resp));
@@ -413,7 +424,7 @@ export async function uploadFileOpenAI({ apiKey, filename, b64, mime }) {
 // do /responses). Conta exatamente entrada + arquivos/imagens + schemas das
 // tools. A guarda de 90% da janela e o usage pós-turno usam este número.
 // ---------------------------------------------------------------------------
-export async function countTokensOpenAI({ apiKey, model, system, messages, tools }) {
+export async function countTokensOpenAI({ apiKey, model, system, messages, tools, ctx }) {
   const body = {
     model,
     instructions: system,
@@ -422,7 +433,7 @@ export async function countTokensOpenAI({ apiKey, model, system, messages, tools
   if (tools && tools.length) body.tools = tools;
   const resp = await fetch(API + "/responses/input_tokens", {
     method: "POST",
-    headers: headersOpenAI(apiKey),
+    headers: headersOpenAI(apiKey, ctx),
     body: JSON.stringify(body),
   });
   if (!resp.ok) throw new Error(await friendlyHttpErrorOpenAI(resp));

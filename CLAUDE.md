@@ -2568,6 +2568,320 @@ em `content.js`.
   seguinte leva 400. "Nova conversa" resolve. Se for tratar: os bytes do anexo estão
   sempre em memória, basta re-subir e reescrever o `file_id` no bloco — sem download.
 
+## Modo sigiloso — anonimização LOCAL (`trava.js`, `pseudonimos.js`, `anonimizar.js`, `tokenizador.js`, `ner-nucleo.js`, `ner-worker.js`)
+
+O que a seção seguinte apontava para um programa separado passou a existir
+DENTRO da extensão. Com o botão `🔒 Sigiloso` ligado, a peça **deixa de viajar
+como arquivo** e vai como TEXTO com os dados pessoais substituídos por rótulos
+estáveis (`[PESSOA_1]`, `[CPF_2]`). Todo o reconhecimento acontece na máquina do
+usuário; o PDF não sai dela. É o caminho do art. 19, §3º, IV da Res. CNJ 615
+("salvo anonimização na origem") sem depender de um segundo programa.
+
+**Duas camadas de detecção, na ordem do Presidio — nenhum detector isolado vale
+como verdade absoluta.** Primeiro os DETERMINÍSTICOS (`anonimizar.js`): regex
+com dígito verificador (CPF, CNPJ, CNJ, NIT), OAB, e-mail, telefone, CEP com
+âncora de contexto, e — o de maior retorno e custo zero — o **gazetteer da
+ficha**, que sai do `PJE.lerCabecalhoProcesso()` e traz nome, documento e OAB de
+cada parte e de cada advogado. Depois o **NER** por cima, para o que só um modelo
+acha (nomes de terceiros no meio do texto). `ANON.fundir` junta os dois e
+`PSEUD._resolverSobreposicao` desempata — mais longo; empate, maior score — pela
+**união** dos intervalos, nunca pela substituição, que descobriria texto no meio.
+
+- **O DV trabalha nos DOIS sentidos**: candidato com dígito verificador inválido
+  é DESCARTADO (`1.234.567.890-12` num contrato não é CPF de ninguém) e o válido
+  tem o score ELEVADO a 0,98, o que o faz vencer o NER na resolução por empate.
+- **A política preserva três classes**, e isso não é detalhe: `TEMPO`
+  (prazo e prescrição são o eixo do produto), `LEGISLACAO` e `JURISPRUDENCIA`
+  ("art. 5º da CF" é a fundamentação). `LOCAL` fica opcional — endereço
+  identifica, comarca não. `conferirPolitica` **lança** se o modelo devolver um
+  rótulo que a política não conhece: modelo novo vira recusa explícita, nunca um
+  mapa silenciosamente incompleto.
+- **A deny list é ESTRUTURAL, não polimento** (`src/config/deny-list.json`):
+  mascarar "Ministério Público" ou "Banco do Brasil" não protege ninguém e
+  arruína a leitura jurídica. **LIMITAÇÃO CONHECIDA**: ela casa o valor INTEIRO
+  normalizado, então `"Ministério Público do Estado do Ceará"` — a forma que
+  aparece nos autos — NÃO casa e é mascarada. Erra na direção segura; alargar
+  (prefixo com fronteira de palavra, exigindo ≥ 2 palavras no termo, senão
+  `"ac"`/`"ce"` negariam demais) mexe no envelope de segurança e é decisão a
+  tomar com medição.
+
+**O mapa de pseudônimos é a CHAVE DE REIDENTIFICAÇÃO** — o artefato mais
+sensível que a extensão produz. `[PESSOA_1]` tem de ser a MESMA pessoa em todas
+as peças: numerando por peça, juntar a inicial e a procuração entrega ao modelo
+um texto em que o mesmo rótulo designa duas pessoas, e a resposta sai bem
+escrita, plausível e trocando as pessoas. Por isso ele vive no **`casodb`, por
+processo** (IndexedDB no WORKER — nunca na origem da página do tribunal, onde
+qualquer script do PJe o leria) e **NUNCA em `chrome.storage.sync`**, que
+trafega pela conta Google. `hidratar` **preserva a numeração gravada**; ver
+"Duas passadas" abaixo.
+
+- **DUAS PASSADAS em `mascarar`, e fundi-las é o bug clássico**: numerar na ordem
+  de LEITURA (para `[PESSOA_1]` ser a primeira pessoa que aparece) e substituir
+  de TRÁS PARA FRENTE (para não deslocar os offsets ainda não aplicados).
+- **`hidratar` NÃO renumera** e `rotular` usa **maior + 1**, nunca `size + 1`.
+  Medido antes da correção: um mapa `{n:1, n:3}` voltava como `{1, 2}`,
+  `[PESSOA_3]` deixava de resolver e `[PESSOA_2]` — um rótulo que nunca existiu —
+  passava a devolver o nome de quem era o 3. Num texto já mascarado, restaurar
+  isso insere o nome da pessoa ERRADA num documento que vai ao PJe assinado. A
+  correção tem de ser DUPLA: preservar o `n` sozinho faria a próxima pessoa
+  nascer com um número já ocupado.
+- **Offset inválido LANÇA** (`mascarar`): `slice` é permissivo e devolveria
+  string vazia, de modo que a máscara simplesmente não aconteceria — sem erro.
+  Um anonimizador que segue em frente com o detector quebrado entrega documento
+  não anonimizado com cara de anonimizado.
+
+**A GUARDA DE SAÍDA é a última barreira, e ela MEDE O RESULTADO em vez de
+garantir o processo** (`trava.js` + `instalarGuardaDeSaida` em background.js).
+O payload tem TREZE canais que carregam PII — conteúdo da peça, `title` de cada
+bloco, CNJ, ficha (que manda os titulares de cada polo no system, em TODO
+turno), inventário das não marcadas, datas das peças, linha do tempo (cujo
+`textoFinalExterno` traz nomes), texto digitado, tese da minuta, `customPrompt`,
+biblioteca de prompts, peças-modelo e anexos. Filtrar treze canais é uma LISTA,
+e lista envelhece: o décimo quarto que alguém acrescentar em 2027 vaza em
+silêncio. Uma pós-condição sobre o corpo serializado não envelhece.
+
+- **POR QUE NO `fetch`, e não em cada cliente.** São quatro clientes, um deles
+  declarado INTOCADO em três notas deste arquivo — e quatro também é uma lista:
+  o quinto provedor vazaria calado. A guarda no `fetch` do worker é impossível
+  de contornar de dentro dele e cobre de graça o `countTokens`, o `upload` e o
+  cliente que ninguém escreveu ainda. **Por HOST**: só os quatro hosts de
+  provedor entram no caminho caro; o resto passa sem custo.
+- **CADA REQUISIÇÃO CARREGA A CHAVE DO PROCESSO** (`CAB_CTX`, `x-pje-ctx`, que a
+  guarda lê e REMOVE antes do envio real). Sem ela, o turno NORMAL de outra aba
+  seria conferido contra a lista de um processo que não é o dele — e barrado
+  pela regra de binários. Requisição a host de provedor **SEM** a chave, havendo
+  sigilo armado, é BLOQUEADA: a lista de clientes ainda pode envelhecer, mas
+  agora ela envelhece para o lado da recusa, nunca para o do vazamento.
+  A constante está espelhada em CINCO arquivos e há teste que confere que batem.
+- **`casoChave` NÃO pode depender da memória de caso.** Ela nasce da URL, na
+  declaração. Enquanto era atribuída dentro de `iniciarMemoria`, um `CASO`
+  indisponível deixava `armarSigilo` sair na primeira linha — a anonimização
+  continuava funcionando e a ÚLTIMA BARREIRA simplesmente não existia, sem nada
+  na tela dizendo.
+- **A guarda é RE-ARMADA depois do mascaramento** (fim de `anonimizarLote`), e
+  não só no início do turno: naquele instante o mapa só tem o que foi mascarado
+  ANTES, e nada das peças daquele turno. Medido no teste de ponta a ponta: ia
+  armada com UM valor enquanto o request levava três. Rede de segurança com a
+  lista pela metade é pior que nenhuma, porque parece completa.
+- **Recusa ESTRUTURAL antes da textual**: corpo binário (`FormData`, `Blob`,
+  `ArrayBuffer`) para host de provedor sob sigilo é bloqueado **sem olhar
+  dentro**; e corpo que não dá para inspecionar (não-JSON) também, porque não
+  dar para inspecionar não é razão para liberar. A URL é conferida
+  **DECODIFICADA** — `Elioneudo%20Evaristo` não casa `elioneudo evaristo`,
+  porque a normalização colapsa espaço em branco e não `%20`.
+- **O erro NUNCA mostra o valor encontrado** (só o tipo e a posição) e **nunca é
+  `retryable`** — explicitamente `false`, não por `undefined` ser falsy: o filtro
+  é determinístico pelo conteúdo, e re-tentar é o mesmo bloqueio com o custo do
+  backoff.
+- **`isentas`**: as regiões de texto CONSTANTE do próprio programa (os dois
+  system prompts). Sem elas, bastaria o detector rotular "Brasil" ou "Justiça"
+  numa peça para a guarda encontrar o valor DENTRO do nosso próprio system e
+  bloquear um turno que não revela ninguém. Isentar é seguro porque a região é
+  definida pela ocorrência LITERAL de uma constante daqui.
+
+**O QUE A REVISÃO PROFUNDA MUDOU** (advisor + Codex, 11 achados; os que mais
+importam, porque nenhum tinha sintoma):
+
+- **A guarda vivia só na memória do worker MV3 — que morre a cada ~30 s de
+  ociosidade.** Ele renascia com o Map VAZIO e o atalho `if (!sigilo.size)`
+  liberava toda requisição sem inspeção: a anonimização do content continuava
+  acontecendo e a última barreira simplesmente não existia. Hoje o estado é
+  persistido em `chrome.storage.session` (mesma disciplina do `safety_settings`
+  do Gemini: sobrevive ao worker, morre com o navegador) e a guarda é
+  **assíncrona** — ela ESPERA a restauração antes de decidir.
+- **`entradaDoc` falha FECHADA sob sigilo.** Ela caía no original quando não
+  havia versão mascarada, e isso acontecia sempre com ANEXOS (que não passam por
+  `baixarSelecionadas`) — era o único caminho pelo qual o arquivo chegaria a
+  `montarBlocos` com o modo ligado. Hoje devolve só o mascarado; a peça sem
+  máscara é PULADA e reportada. Os anexos passaram a ser anonimizados junto.
+- **`entradaParaMedir` é o irmão de MEDIÇÃO, e a distinção é a mesma do par
+  `precisaBaixar`/`temBytes`**: "o que VAI no request?" não é "quanto isto
+  OCUPA?". Sem ela, a falha fechada acima fazia a estimativa local contar ZERO e
+  o medidor de contexto SUMIR da tela até a primeira peça ser mascarada —
+  justamente na fase em que o usuário está marcando peças.
+- **`count_tokens` não roda sob sigilo enquanto houver peça sem máscara.** Ele é
+  uma requisição ao PROVEDOR com o corpo do request dentro; mandá-lo para "só
+  contar" seria o mesmo vazamento. A camada local continua, que é de graça.
+- **MEDIÇÃO NÃO PODE MUTAR ESTADO.** `refinarContexto` roda no debounce de 900 ms
+  de TODA mudança de seleção e montava o system com `mascararCurto(ficha)` — que
+  chama `mapa.rotular()`. O usuário ligava o modo, clicava numa peça e o
+  artefato mais sensível da extensão ia ao disco por um caminho que ele não
+  acionou. Hoje há `medindoSemGravar`, que mascara num mapa EFÊMERO (o texto sai
+  igualmente anonimizado; nada é gravado), ligado só durante uma chamada
+  SÍNCRONA — não há janela `await` com ele ligado.
+- **Guarda que não armou = modo que não pode ficar ligado.** `rpc` REJEITA com o
+  worker morto, e sem tratamento o handler morria com unhandled rejection: o
+  modo já estava ligado, o selo pintado, e a barreira ausente. Hoje o modo volta
+  atrás e o status diz por quê. E `seqSigilo` serializa cliques rápidos — o
+  primeiro gesto não pode pintar "ligado" depois de o segundo ter desligado.
+- **Histórico legado**: conversa gravada antes desta versão não tem
+  `conversaSigilosa`, e `!== null` deixava LIGAR o modo por cima de um histórico
+  cheio de `file_id`. Hoje é `(conversaSigilosa ?? false)`.
+- **A guarda inspeciona o `Request`**: corpo e cabeçalho podem vir dentro dele
+  (`fetch(new Request(url, {body}))`), e ali `init.body` é `undefined`. Corpo de
+  tipo não reconhecido (`URLSearchParams`) é RECUSADO — liberar por não
+  reconhecer é o oposto de falhar fechado.
+- **Uploads do modo NORMAL levam a atribuição.** Sem ela, com sigilo armado em
+  QUALQUER aba, um upload legítimo de outro processo caía na recusa por falta de
+  ctx, o cliente voltava para base64 e um PDF grande estourava o teto.
+- **`conferirPolitica` não tinha CHAMADOR** — a falha fechada que ela implementa
+  nunca acontecia. Hoje `ner-worker.js` a chama ao carregar o config.
+- **RG tinha promessa e não tinha detector.** `POLITICA_PADRAO` declarava
+  `RG: true` e a documentação pública afirmava que RG era mascarado; não havia
+  padrão nenhum. Hoje existe, e é o ÚNICO **ancorado na palavra** — RG não tem
+  dígito verificador padronizado e o número cru é indistinguível de qualquer
+  outro de 7 a 9 dígitos, então sem o rótulo por perto não há como afirmar que é
+  RG. **Limitação dita**: um RG sem âncora ("portador do 12.345.678-9") não é
+  detectado; se for de uma parte, o gazetteer da ficha o pega.
+- **Canais que ficavam de fora e hoje passam pela máscara**: `customPrompt` (vai
+  em TODO request), a **tese da minuta** (texto de quem assina, que quase sempre
+  nomeia as partes — sem isso TODA minuta seria bloqueada), as **peças-modelo**
+  (documentos REAIS de outros processos, com nomes de terceiros que a guarda nem
+  reconheceria), os títulos e datas da minuta e do mapa, e o objetivo e a lista
+  da triagem. **A máscara é aplicada só nas partes DINÂMICAS**, nunca sobre as
+  constantes do programa: passar o `SUFIXO_MINUTA` pela máscara adulteraria a
+  própria instrução se o detector tivesse rotulado uma palavra dela numa peça.
+
+**LACUNAS CONHECIDAS, não resolvidas nesta versão:** duas abas no MESMO processo
+mantêm cópias independentes do mapa e a última gravação vence (podem criar
+`[PESSOA_1]` para pessoas diferentes); e desligar o modo numa aba desarma a
+guarda da outra, cujo botão continua aceso. O caso comum — uma aba por processo
+— não é afetado.
+
+**Onde o mascaramento acontece, e por que ali.** O gancho vive DENTRO de
+`baixarSelecionadas`, no mesmo funil da bomba de upload e pela mesma razão que o
+arquivo já dá para ela: são três pares baixar→subir idênticos (chat, minuta e
+mapa), e nos call sites seria fácil esquecer um — e esquecer UM significa mandar
+o PDF de um processo sigiloso para a API.
+
+- **O texto mascarado vai para um cache SEPARADO** (`sigiloCache`), e
+  `entradaDoc` o prefere quando o modo está ligado. Sobrescrever o `docsCache`
+  faria o **preview** desenhar texto no lugar do PDF e a **exportação `.zip`**
+  gravar as peças anonimizadas — dois consumidores que querem o documento
+  ORIGINAL porque não mandam nada para lugar nenhum. Mesmo eixo do par
+  `precisaBaixar`/`temBytes`.
+- **`precisaUpload` sai na PRIMEIRA linha no modo sigiloso**, e a guarda tem de
+  estar ali e não no chamador: aquele predicado lê o `docsCache` **direto**, não
+  o `entradaDoc`, então enxergaria a entrada ORIGINAL e mandaria o PDF para a
+  Files API — o arquivo sairia por um caminho que não passa por `montarBlocos`,
+  que é onde toda a atenção estava. O handler `upload` do worker recusa como
+  rede de segurança.
+- Os quatro predicados fazem o certo com `kind:"text"` **por construção**:
+  `podeAnexar` exige `d.text`, `precisaUpload` só olha `pdf`, `temBytes` idem.
+  Foi isso que permitiu a integração não tocar em `montarBlocos`.
+- **Quem numera primeiro é a FICHA, não a peça — e isso é aceito.**
+  `refinarContexto` roda no clique da peça, muito antes de qualquer turno, e
+  monta um request prospectivo com `systemPromptAtual()` — que passa a ficha por
+  `mascararCurto`. As partes saem numeradas na ordem do CABEÇALHO (polo ativo,
+  depois passivo). É a ordem do REQUEST (o system precede as peças) e é a ordem
+  CANÔNICA do processo, estável entre sessões — pela ordem da primeira peça, as
+  mesmas pessoas ganhariam rótulos diferentes conforme qual peça o usuário
+  marcasse primeiro. `[PESSOA_1]` = polo ativo é ainda mais legível.
+- **Os canais CURTOS passam por `mascararCurto`** (só os detectores
+  determinísticos, síncrono, com o MESMO mapa): `title` do bloco `document`, a
+  ficha e o CNJ do system, o inventário, a linha do tempo e **o texto que o
+  usuário digitou** — ele escreve "o que o João alegou na fl. 12?" e derrubaria
+  o próprio turno na guarda. A bolha do usuário mostra o texto MASCARADO, de
+  propósito: é o que foi à API, e a conversa não pode exibir uma coisa e enviar
+  outra.
+- O texto da peça sai de `lerPdfNoFrame` (pdf.js no iframe) + OCR das folhas
+  digitalizadas. **NÃO reusa o laço de `onExtrairTexto`**: aquele monta o `.md`
+  com front-matter, índice e meia dúzia de acumuladores presos num closure — o
+  que se quer aqui é a string. Mesma escolha do `rtfParaTexto` copiado em
+  `docx-importar.js`.
+- **Peça que não dá para anonimizar NÃO vai como arquivo**: fica de fora e entra
+  no relatório de falhas do chat. Deixá-la seguir pelo caminho normal seria o
+  único jeito de o PDF escapar.
+- **Falha do NER DERRUBA a peça.** Sem ele os determinísticos ainda valem, mas
+  nomes de terceiros no meio do texto passariam — e seguir em silêncio seria
+  prometer uma anonimização que não aconteceu.
+
+**Troca de modo no meio da conversa é BLOQUEADA** (`conversaSigilosa`, irmão de
+`conversaProvider`): o histórico não pode misturar os dois, porque a mesma peça
+apareceria duas vezes — uma com nomes e outra com rótulos — e os blocos binários
+do histórico derrubariam o request na guarda. Alerta no toggle e guarda DURA no
+envio; "Nova conversa" resolve. **`zerarEstadoDaConversa` NÃO desliga o modo nem
+apaga o mapa**: o botão promete zerar o chat, não esquecer que o processo corre
+em segredo de justiça — e apagar o mapa quebraria a reidentificação de uma
+minuta já gerada.
+
+**O NER roda num Web Worker do documento OFFSCREEN, e ele MORRE ao fim do lote.**
+Ele precisa de `crossOriginIsolated` para o ORT usar threads (o OCR mediu 21× no
+mesmo eixo), e isolamento cross-origin só existe em página de extensão; o service
+worker não tem `new Worker`. E `InferenceSession.create()` copia os pesos para
+dentro da `WebAssembly.Memory` do ORT, que **cresce e nunca encolhe**: o BERT
+residente ao lado do PP-OCRv6 deixou a extração 1,48× mais lenta no app irmão.
+`Worker.terminate()` é o único ponto de liberação determinística que a plataforma
+oferece — mas terminar a cada peça recarregaria 109 MB toda vez, então o desenho
+é encerrar por **ociosidade** (45 s), com fechamento explícito ao fim do lote.
+
+**O modelo** é `pierreguillou/ner-bert-base-cased-pt-lenerbr` (LeNER-Br, 13
+rótulos BIO), exportado para ONNX na revisão fixada e **quantizado para INT8**.
+Procedência, contrato, comando de exportação e as três armadilhas de ambiente
+estão em `vendor/ner-modelo/PROCEDENCIA.md`. O `.onnx` **não é versionado** (109
+MB, e o GitHub recusa blob acima de 100 MB sem LFS): `empacotar.ps1` confere o
+SHA-256 contra o `PROCEDENCIA.md` — fonte única — e RECUSA gerar o pacote se o
+arquivo faltar ou divergir.
+
+- **INT8 foi MEDIDO, não suposto**: FP32 são 434 MB que praticamente não
+  comprimem (93% no ZIP, pacote publicado saltaria de 13,9 MB para ~416 MB); o
+  INT8 é 109 MB, comprime para 65 e é **23% mais rápido**. E — o que decide —
+  **produz as mesmas entidades**: os logits diferem em TODOS os valores medidos
+  (máx. 2,85) e o teste de ponta a ponta dá 71/71 nos dois.
+- **O critério de aceitação MUDA com a quantização, e é aí que engana.** Contra
+  o PyTorch, o FP32 tinha de bater em 5e-05. O INT8 não bate e não precisa: a
+  pergunta deixou de ser "os logits são iguais?" e passou a ser "as mesmas
+  entidades saem?". Ao trocar de modelo ou de esquema de quantização, **regravar
+  os logits e rodar aquele teste** — comparar logits não diz nada aqui.
+
+**O tokenizador é escrito à mão** (`tokenizador.js`, WordPiece do BERT com
+offsets de caractere) porque a extensão não tem build step e o Transformers.js
+traria o PRÓPRIO ONNX Runtime, duplicando os 27 MB de `vendor/ort/`. A fidelidade
+aqui é de SEGURANÇA, não de estilo: um token a mais ou a menos desloca o rótulo
+previsto, e o efeito de um rótulo deslocado num anonimizador é **um nome que não
+foi mascarado**. Ele é conferido contra a implementação **Rust do HuggingFace**
+(`tokenizers`), ids **e** offsets — escritor conferido pelo próprio escritor não
+prova nada, a mesma regra do `ZipW`/`zipfile` e do QR/`jsQR`.
+
+- O contrato vem do modelo, não da memória: `do_lower_case: false`,
+  `strip_accents: null` — **cased e COM acento**, o oposto do reflexo do resto
+  do projeto (o `norm()` do painel tira acento em toda classificação de peça).
+  `conferirConfig` LANÇA na divergência. A armadilha: `strip_accents` tem default
+  `null`, que significa "siga o `do_lower_case`" — lê-lo como `false` sem olhar o
+  outro campo é o erro que a função existe para impedir.
+- **A normalização é NFC e acontece UMA vez, na entrada.** Em `content.js` ela é
+  feita inline (`normalize("NFC")`) e não por `Tokenizador.paraCanonico`, porque
+  `tokenizador.js` NÃO é content script — roda no Web Worker, do outro lado da
+  ponte, e carregá-lo em toda página `jus.br` por uma linha seria caro à toa.
+  **NFC e nunca NFKC**: a compatibilidade reescreve ligaduras, frações e formas
+  de largura, e o que sai daqui é o texto do documento. (No `pseudonimos.js` é o
+  oposto — NFKD, porque ali o objetivo é COMPARAR, e um OCR que devolve a
+  ligadura `ﬁ` precisa casar `fi` no gazetteer.)
+- **INVARIANTE: `JANELA_OVER` tem de ser MAIOR que a entidade mais longa, EM
+  TOKENS.** Abaixo disso a entidade sobre a fronteira não é vista inteira por
+  NENHUMA das duas janelas, e a regra `naBorda` não salva — não há o que marcar.
+  "ELIONEUDO EVARISTO" são DOZE tokens (o WordPiece parte nome próprio em pedaços
+  de uma letra) e com `over: 8` a detecção some por completo. Os 64 do arquivo
+  dão folga de 5×. Há teste que **passa por falhar**, fixando esse custo.
+- **A unidade de decisão é a PALAVRA, nunca o subtoken** (`agregarPalavras`), e
+  **"O" só vence quando TODOS os subtokens dizem O**: com "Jo" = B-PESSOA (0,70)
+  e "##ão" = O (0,80), o máximo puro faria a palavra virar O e o NOME SUMIR. Num
+  anonimizador o erro caro é o falso NEGATIVO.
+- **Sequência BIO malformada é o caso NORMAL**: `I-X` sem `B-X` antes ABRE a
+  entidade em vez de descartar — descartar por malformação é perder uma pessoa
+  em silêncio.
+- **A detecção na borda é MARCADA, não descartada** (`naBorda` +
+  `fundirJanelas`): a versão truncada só cai quando existe uma FIRME cobrindo o
+  mesmo trecho. A janela vizinha pode simplesmente não disparar ali, e descartar
+  apagaria a ÚNICA detecção que existia.
+
+**Testado com 448 verificações** no scratchpad: o tokenizador contra o oráculo
+Rust (28 casos, ids e offsets, com 9 mutantes pegos), os quatro módulos de
+lógica, a guarda de saída extraída do fonte real e rodada em `vm`, a fiação
+(constantes duplicadas, manifest, ponte offscreen), a cadeia inteira com os
+**logits REAIS do modelo** sobre texto jurídico, e **um turno completo em jsdom
+nos DOIS modos** — o de modo desligado é o que prova a não-regressão.
+
 ## Anonimização na origem — o ponteiro para o TecJustiça Sigilo
 
 O `help.html` já ENUNCIAVA o art. 19, §3º, IV da Res. CNJ 615 (vedado usar IA privada ou

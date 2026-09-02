@@ -377,7 +377,11 @@
     } catch {
       /* página sem número identificável — segue sem ele */
     }
-    return (
+    // A FICHA VAI NO SYSTEM EM TODO TURNO, com os titulares de cada polo -- e o
+    // numero CNJ identifica o processo e, por ele, as partes. No modo sigiloso
+    // os dois passam pela mascara: sem isso a guarda de saida bloquearia o
+    // PRIMEIRO turno num nome escrito pela propria extensao.
+    return mascararCurto(
       s + resumoFicha(soAnexos) + " Hoje é " + new Date().toLocaleDateString("pt-BR") + "."
     );
   }
@@ -397,7 +401,11 @@
       base +
       " Instruções adicionais definidas pelo usuário desta extensão (perfil e " +
       "preferências dele — siga-as no que não conflitar com as regras acima): " +
-      customPrompt
+      // TAMBÉM MASCARADO. Ele é texto livre do usuário e vai em TODO request:
+      // "sou o juiz do caso de Fulano" basta para a guarda bloquear o turno —
+      // ou, pior, para um nome de OUTRO processo (que não está no mapa deste)
+      // sair em claro.
+      mascararCurto(customPrompt)
     );
   }
 
@@ -517,7 +525,7 @@
   function tetoTextoDe(ids) {
     let n = 0;
     for (const id of ids) {
-      const d = entradaDoc(id);
+      const d = entradaParaMedir(id);
       if (d && d.kind === "text" && d.text) n++;
     }
     return tetoTextoChars(n);
@@ -626,6 +634,38 @@
 
   const docsCache = new Map(); // id -> {kind:"pdf",b64,size,pages,fileId?} | {kind:"text",text}
 
+  // ------------------------------------------------------------ MODO SIGILOSO
+  // Anonimização na origem (Res. CNJ 615, art. 19, §3º, IV): a peça deixa de
+  // viajar como ARQUIVO e passa a viajar como TEXTO com os dados pessoais
+  // substituídos por rótulos estáveis (`[PESSOA_1]`). O PDF não sai da máquina.
+  //
+  // O ESTADO MORA AQUI, no topo, junto do `docsCache`, e não perto de onde é
+  // usado: o content.js registra callbacks no painel centenas de linhas antes de
+  // declarar o estado que eles leem, e `refresh()` roda `panel.setDocs` de forma
+  // SÍNCRONA no meio. Um `let` declarado depois disso lança "Cannot access
+  // before initialization" DENTRO do setDocs e leva junto o resto do arquivo.
+  let modoSigiloso = false;
+  // Mapa de pseudônimos do processo. É a CHAVE DE REIDENTIFICAÇÃO — o artefato
+  // mais sensível que a extensão produz. Nunca vai num request e nunca vai para
+  // `chrome.storage.sync` (que sai da máquina pela conta Google): mora no
+  // casodb, por processo.
+  let mapaSigilo = null;
+  // Predicado da deny list, carregado de src/config/deny-list.json. `null` até a
+  // primeira carga; `() => false` se o arquivo falhar (mascara mais, que é o
+  // lado seguro).
+  let negadoSigilo = null;
+  // id -> {kind:"text", fmt, text, pages} com o texto JÁ MASCARADO.
+  //
+  // SEPARADO do `docsCache`, e isto não é organização. O preview desenha pixels
+  // e a exportação `.zip` grava o arquivo ORIGINAL — nenhum dos dois manda nada
+  // para lugar nenhum, e os dois querem o documento como ele é. Sobrescrever a
+  // entrada original faria o preview mostrar texto mascarado no lugar do PDF e o
+  // `.zip` sair com as peças anonimizadas, em silêncio. Mesma distinção do par
+  // `precisaBaixar`/`temBytes`: a pergunta parece uma e são duas.
+  const sigiloCache = new Map();
+  // Peças que já passaram pelo mascaramento nesta sessão (evita refazer OCR).
+  const sigiloFeitas = new Set();
+
   // ANEXOS DO INPUT — arquivos que o usuário anexa na própria caixa de mensagem
   // (PDF, TXT, MD), para conversar sobre eles junto das peças do processo, ou
   // sozinhos. Vivem SÓ na sessão, de propósito: ao contrário das peças, não têm
@@ -644,7 +684,33 @@
 
   // A entrada de conteúdo de um id, seja peça (docsCache) ou anexo. Ponto único
   // para `montarBlocos`, `paginasDe` e afins não precisarem saber a origem.
+  // O irmão de MEDIÇÃO do `entradaDoc`, e a distinção entre os dois é a mesma do
+  // par `precisaBaixar`/`temBytes`: uma pergunta parece uma e são duas.
+  //
+  //   `entradaDoc`      -> "o que VAI no request?"  Sob sigilo, só o mascarado.
+  //   `entradaParaMedir`-> "quanto isto OCUPA?"     Nunca sai da máquina.
+  //
+  // Sem esta separação, a estimativa local passava a contar ZERO com o modo
+  // ligado (o `entradaDoc` falha fechado enquanto a peça não foi mascarada) e o
+  // medidor de contexto sumia da tela até o primeiro turno — justamente na fase
+  // em que o usuário está marcando peças e precisa dele.
+  function entradaParaMedir(id) {
+    return sigiloCache.get(id) || docsCache.get(id) || anexos.get(id);
+  }
+
   function entradaDoc(id) {
+    // No modo sigiloso o que vai ao modelo é o texto mascarado, nunca o
+    // arquivo. O `docsCache` continua intacto por baixo — é dele que vivem o
+    // preview e a exportação, que não mandam nada para fora.
+    if (modoSigiloso) {
+      // FALHA FECHADA. Se não há versão mascarada, NÃO se devolve a original:
+      // quem consome isto é `montarBlocos`, e devolver o PDF ali era o único
+      // caminho pelo qual o arquivo sairia com o modo ligado. Sem entrada, a
+      // peça é PULADA e reportada em `semConteudo` — ruidoso, e do lado certo.
+      // (O `docsCache` continua intacto por baixo: é dele que vivem o preview e
+      // a exportação, que não mandam nada para fora.)
+      return sigiloCache.get(id);
+    }
     return docsCache.get(id) || anexos.get(id);
   }
 
@@ -754,6 +820,11 @@
   // TEXTO do histórico é portável entre modelos, e por isso a troca ali é
   // permitida de propósito.
   let conversaProvider = null;
+  // Em que MODO o histórico desta conversa foi construído. `null` = ainda não há
+  // histórico. Irmão de `conversaProvider`, e pela mesma razão: o que foi
+  // enviado como arquivo não convive com o que vai como texto mascarado.
+  let conversaSigilosa = null;
+  let alertaSigiloLigado = false;
   let alertaTrocaLigado = false; // o alerta atual é o de troca de provedor
   let busy = false;
   // Estimativa dinâmica de contexto (dispara quando a seleção muda): timer de
@@ -773,6 +844,12 @@
     "O contexto da IA encheu: a conversa e as peças ocupam quase todo o limite do modelo. " +
     "Novas mensagens não serão aceitas — desmarque peças na lista para liberar espaço " +
     "(elas saem do contexto na hora) ou comece uma nova conversa.";
+  const ALERTA_TROCA_SIGILO =
+    "Você ligou (ou desligou) o modo sigiloso no meio da conversa. O histórico não " +
+    "pode misturar os dois: as peças já enviadas foram como arquivo, e as próximas " +
+    "iriam como texto anonimizado — a mesma peça apareceria duas vezes, com nomes " +
+    "numa e rótulos na outra. Clique em ⟲ Nova conversa para continuar no modo novo, " +
+    "ou volte o botão 🔒 Sigiloso para como estava.";
   const ALERTA_TROCA_PROVEDOR =
     "Você trocou de provedor de IA no meio da conversa (entre Claude, Gemini, OpenAI e " +
     "OpenRouter) — o histórico de um não é compatível com o outro (raciocínio assinado pelo " +
@@ -820,7 +897,23 @@
   // Identidade do processo (host|grau|idProcesso). null = página sem idProcesso:
   // a memória fica desligada nesta aba em vez de inventar uma chave que
   // agruparia processos distintos.
-  let casoChave = null;
+  // A chave do processo (host|grau|idProcesso). Derivada JÁ NA DECLARAÇÃO, e não
+  // dentro de `iniciarMemoria`, porque ela deixou de ser um detalhe da memória de
+  // caso: é ela que ATRIBUI cada requisição à guarda de saída do modo sigiloso.
+  //
+  // Enquanto vivia lá dentro, um `CASO` indisponível (o IIFE não carregou, ou o
+  // harness de teste não o forneceu) deixava `casoChave` nula — e `armarSigilo`
+  // saía na primeira linha. O efeito era o pior possível para uma defesa: a
+  // anonimização continuava funcionando e a ÚLTIMA BARREIRA simplesmente não
+  // existia, sem nada na tela dizendo. É função pura da URL; não há motivo para
+  // depender de outro subsistema.
+  let casoChave = (() => {
+    try {
+      return PJE.chaveDoCaso();
+    } catch {
+      return null;
+    }
+  })();
   // TRAVA DE GRAVAÇÃO, e o bug nº 1 desta rodada mora aqui: o `refresh()` do
   // boot roda setDocs → syncSelection → selChangeCb ANTES de qualquer leitura,
   // com a lista de peças ainda vazia. Sem esta trava, a primeira gravação
@@ -983,6 +1076,7 @@
       selecao: selecaoEfetiva(),
       custoConversaUsd,
       conversaProvider,
+      conversaSigilosa,
       buscaNaConversa,
       ultimoTotalExato,
     };
@@ -1362,6 +1456,77 @@
     } catch {
       avisarContextoPerdido();
     }
+  });
+
+  // MODO SIGILOSO — ligar/desligar.
+  //
+  // Ligar NAO mascara nada agora: quem mascara e' o proximo envio, dentro de
+  // `baixarSelecionadas`. Aqui so se prepara o terreno (mapa, deny list, guarda
+  // do worker) e se avisa quando o historico ficou incompativel.
+  // Sequência do último gesto. Dois cliques rápidos: o primeiro fica esperando
+  // `carregarDeny()`, o segundo desliga tudo, e o primeiro retomava e pintava
+  // "ligado" — a interface afirmando proteção com o modo interno desligado. Só
+  // o gesto MAIS RECENTE tem direito de aplicar o resultado dele.
+  let seqSigilo = 0;
+  panel.onSigiloso(async (ligado) => {
+    const meuSeq = ++seqSigilo;
+    modoSigiloso = ligado;
+    if (ligado) {
+      if (!mapaSigilo) mapaSigilo = PSEUD.criarMapa(casoChave);
+      // A deny list é carregada AGORA, e não no primeiro envio: se o arquivo
+      // faltar, o usuário descobre ao ligar o modo e não no meio de um turno.
+      await carregarDeny();
+      // GUARDA QUE NÃO ARMOU = MODO QUE NÃO PODE FICAR LIGADO. `rpc` REJEITA
+      // quando o worker está morto ou o contexto se perdeu, e sem este
+      // tratamento o handler morria com unhandled rejection: o modo já estava
+      // ligado, o selo já estava pintado — e a última barreira não existia.
+      // Ligar a anonimização sem a conferência final é pior que não ligar,
+      // porque o usuário passa a confiar no que não está protegido.
+      try {
+        await armarSigilo();
+      } catch (e) {
+        if (meuSeq !== seqSigilo) return; // outro clique já mandou
+        modoSigiloso = false;
+        panel.setSigiloso(false, mapaSigilo ? mapaSigilo.quantos() : 0);
+        panel.setStatus(
+          "O modo sigiloso NÃO foi ligado: a verificação de saída não pôde ser armada (" +
+            ((e && e.message) || e) + "). Recarregue a página do processo e tente de novo."
+        );
+        return;
+      }
+    } else {
+      // Desligar NAO apaga o mapa. Ele e' a chave de reidentificacao: uma minuta
+      // ja gerada com `[PESSOA_1]` continua precisando dele para o botao de
+      // restaurar nomes funcionar. O que sai e' a guarda do worker.
+      await desarmarSigilo();
+      // O cache de texto mascarado tambem fica: a peca nao mudou, e refazer
+      // OCR de duzentas folhas por causa de um clique seria caro a toa.
+    }
+    if (meuSeq !== seqSigilo) return; // um clique mais novo já decidiu por nós
+    panel.setSigiloso(ligado, mapaSigilo ? mapaSigilo.quantos() : 0);
+    salvarMapaSigilo();
+    // O historico construido num modo nao roda no outro (a mesma peca apareceria
+    // duas vezes, com nomes numa e rotulos na outra). Mesma disciplina do
+    // `conversaProvider`: avisa aqui e BLOQUEIA no envio.
+    if (conversation.length && (conversaSigilosa ?? false) !== ligado) {
+      panel.setAlerta(ALERTA_TROCA_SIGILO);
+      alertaSigiloLigado = true;
+    } else if (alertaSigiloLigado) {
+      panel.setAlerta(null);
+      alertaSigiloLigado = false;
+    }
+    // O que vai no request mudou de FORMA: uma peça de 40 páginas medida como
+    // PDF (≈ 2000 tokens/página) e medida como texto dão números muito
+    // diferentes. Zerar a chave força a próxima mudança de seleção a re-medir, e
+    // a estimativa local é repintada agora para o medidor não ficar mostrando o
+    // retrato do modo anterior.
+    //
+    // `mostrarEstimativaLocal`, e NÃO o handler de seleção: aquele é um callback
+    // registrado no painel (`panel.onSelectionChange`), não uma função deste
+    // escopo — chamá-lo pelo nome seria `ReferenceError`, e `node --check` não
+    // pega isso (é a armadilha do `no-undef` que o CLAUDE.md registra).
+    ultimaChaveEst = "";
+    if (modelCaps) mostrarEstimativaLocal(comAnexos(selecaoEfetiva()));
   });
 
   panel.onReset(async () => {
@@ -2835,6 +3000,343 @@
     return d;
   }
 
+  // ---------------------------------------------------------------------------
+  // MODO SIGILOSO — mascarar antes de sair
+  //
+  // A ordem das camadas é a do Presidio, que o guia toma como referência:
+  // nenhum detector isolado vale como verdade absoluta. Primeiro os
+  // DETERMINÍSTICOS (regex com dígito verificador e o gazetteer da ficha do
+  // processo, que é o de maior retorno e custa zero), depois o NER por cima
+  // para o que só um modelo acha — nomes de terceiros no meio do texto —, e a
+  // fusão resolve as sobreposições.
+  //
+  // TUDO AQUI FALHA PARA O LADO DE MASCARAR DEMAIS. Máscara sobrando custa
+  // legibilidade e aparece na caixa de auditoria; máscara faltando deixa dado
+  // pessoal sair. E há a rede final: a guarda de saída do worker confere o
+  // corpo serializado e recusa o envio se algum valor original aparecer — o que
+  // for esquecido aqui vira turno BLOQUEADO, nunca vazamento.
+
+  // Teto por peça. Acima disso o NER levaria minutos numa peça só (as janelas de
+  // 384 tokens são sequenciais) e o usuário não teria como saber por quê.
+  const MAX_CHARS_SIGILO = 400000;
+  // Páginas de OCR desta rodada — só para o teto de tempo da PRIMEIRA, que paga
+  // o warm-up do motor e o duelo de backends.
+  let pagsOcrSigilo = 0;
+
+  async function carregarDeny() {
+    if (negadoSigilo) return negadoSigilo;
+    try {
+      const r = await fetch(chrome.runtime.getURL("src/config/deny-list.json"));
+      negadoSigilo = ANON.prepararDeny(await r.json());
+    } catch (e) {
+      // Sem a lista, "Ministério Público" e "Banco do Brasil" viram máscara: o
+      // documento fica pior de ler e ninguém fica menos protegido. É o lado
+      // seguro de errar, e vai ao console para ser diagnosticável.
+      console.warn("[PJe IA] deny list não carregou; seguindo sem ela:", (e && e.message) || e);
+      negadoSigilo = () => false;
+    }
+    return negadoSigilo;
+  }
+
+  // A ficha alimenta o gazetteer: `lerCabecalhoProcesso` já devolve,
+  // estruturados, o nome, o CPF/CNPJ e a OAB de CADA parte e de CADA advogado —
+  // exatamente as pessoas que mais aparecem nos autos, e as que o modelo pode
+  // errar quando o nome vem em caixa alta partida.
+  function fichaParaSigilo() {
+    if (fichaCache === undefined) {
+      try {
+        fichaCache = PJE.lerCabecalhoProcesso();
+      } catch {
+        fichaCache = null;
+      }
+    }
+    const f = fichaCache ? Object.assign({}, fichaCache) : {};
+    try {
+      const num = PJE.getNumeroProcesso();
+      if (num) f.numero = num;
+    } catch {
+      /* sem número: o gazetteer segue com o resto */
+    }
+    return f;
+  }
+
+  // Máscara SÍNCRONA, só com os detectores determinísticos. Vale para as strings
+  // CURTAS que também carregam PII e não justificam uma ida ao modelo: o título
+  // da peça, a ficha no system, o inventário, a linha do tempo e o texto que o
+  // usuário digitou. Usa o MESMO mapa das peças, então o nome do autor é
+  // `[PESSOA_1]` no título e no corpo — que é a razão de o mapa existir.
+  //
+  // Um erro aqui não derruba o turno pelo caminho da medição: `refinarContexto`
+  // tem `try/catch` e a estimativa apenas não acontece.
+  // Ligado SÓ durante a montagem SÍNCRONA do request de MEDIÇÃO. Enquanto vale,
+  // `mascararCurto` mascara num mapa EFÊMERO em vez do mapa do processo — o
+  // texto sai igualmente anonimizado (a guarda de saída procura os valores
+  // ORIGINAIS, e eles não estão lá), mas nada é gravado.
+  //
+  // Não há janela `await` com ele ligado: quem o usa chama `systemPromptAtual()`
+  // de forma síncrona, guarda a string e desliga antes de qualquer espera.
+  let medindoSemGravar = false;
+
+  function mascararCurto(texto) {
+    if (!modoSigiloso || !mapaSigilo || !texto) return texto;
+    const bruto = String(texto);
+    try {
+      const achados = ANON.detectar(bruto, {
+        ficha: fichaParaSigilo(),
+        negado: negadoSigilo || (() => false),
+      });
+      if (!achados.length) return bruto;
+      return PSEUD.mascarar(bruto, achados, medindoSemGravar ? PSEUD.criarMapa(null) : mapaSigilo);
+    } catch (e) {
+      // Falhar aqui não pode derrubar o turno em silêncio, mas também não pode
+      // devolver o texto CRU — que é o que a máscara existe para impedir.
+      // Lançar é a saída certa: a guarda de saída bloquearia esse texto de todo
+      // jeito, e um erro nomeado agora é melhor que um bloqueio críptico depois.
+      throw new Error("não foi possível anonimizar um trecho do contexto: " + ((e && e.message) || e));
+    }
+  }
+
+  // O texto de uma peça, para o modo sigiloso.
+  //
+  // Reusa `lerPdfNoFrame` (o pdf.js do iframe) e o motor de OCR, mas NÃO reusa o
+  // laço de `onExtrairTexto`: aquele monta o `.md` com front-matter, índice e
+  // meia dúzia de acumuladores presos num closure. O que se quer aqui é a
+  // string, e só. A duplicação é a mesma escolha do `rtfParaTexto` copiado em
+  // `docx-importar.js`: dois contextos, trabalho parecido, e fundi-los custaria
+  // mais que separá-los.
+  async function textoDaPecaParaSigilo(id, c, rotulo) {
+    if (c.kind === "text") return (c.text || "").trim();
+    if (c.kind === "img") {
+      const o = await comTeto(
+        rpc({
+          type: "ocrReconhecer",
+          payload: { img: "data:image/" + (c.fmt || "jpeg") + ";base64," + c.b64 },
+        }),
+        OCR_TIMEOUT_1A_MS,
+        "o reconhecimento do anexo em imagem"
+      );
+      pagsOcrSigilo++;
+      return ((o.resultado && o.resultado.texto) || "").trim();
+    }
+    if (c.kind !== "pdf" || !c.b64) return "";
+    if (c.b64.length > MAX_B64_EXTRACAO) {
+      throw new Error("peça grande demais para anonimizar (" + fmtMB((c.b64.length * 3) / 4) + ")");
+    }
+    const res = await comTeto(lerPdfNoFrame(c.b64, true), 180000, "a leitura do PDF");
+    const partes = [];
+    for (const f of res.folhas) {
+      let corpo = f.texto || "";
+      if (f.img) {
+        // Página digitalizada: só o OCR tem o texto dela. Falhar numa folha não
+        // derruba a peça, mas a folha sai MARCADA — uma folha que o OCR não leu
+        // é uma folha cujo conteúdo o modelo não vai ver, e isso muda a resposta.
+        try {
+          panel.setPrepNota("Anonimizando — OCR da fl. " + f.p + " · " + rotulo);
+          const o = await comTeto(
+            rpc({ type: "ocrReconhecer", payload: { img: f.img } }),
+            pagsOcrSigilo === 0 ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
+            "o reconhecimento de texto"
+          );
+          pagsOcrSigilo++;
+          corpo = (o.resultado && o.resultado.texto) || "";
+          if (!corpo) corpo = "_[página sem texto reconhecível]_";
+        } catch (e) {
+          corpo = "_[o reconhecimento de texto falhou nesta página]_";
+          console.warn("[PJe IA sigilo] OCR falhou em", id, "fl." + f.p, "->", (e && e.message) || e);
+        }
+        delete f.img; // solta o data URL antes da próxima
+      }
+      partes.push("## Página " + f.p + "\n\n" + (corpo || "_[página em branco]_"));
+    }
+    return partes.join("\n\n");
+  }
+
+  // Anonimiza UMA peça e guarda o resultado no `sigiloCache`.
+  async function anonimizarPeca(id) {
+    if (sigiloFeitas.has(id)) return;
+    const c = docsCache.get(id) || anexos.get(id);
+    if (!c) return;
+    const rotulo = (metaDe(id).titulo || String(id)).slice(0, 40);
+    panel.setPrepNota("Anonimizando — " + rotulo);
+    // NFC UMA vez, na entrada: a string canônica é a que se tokeniza, a que se
+    // mascara e a que vai ao modelo. Sem isso haveria dois sistemas de
+    // coordenadas — o offset que o NER devolve apontaria para outra string, e o
+    // sintoma seria máscara no lugar errado, não uma exceção.
+    //
+    // A normalização é feita AQUI, e não por `Tokenizador.paraCanonico`, porque
+    // `tokenizador.js` NÃO é content script: ele roda no Web Worker do NER, do
+    // outro lado da ponte. Carregá-lo em toda página `jus.br` por causa de uma
+    // linha seria caro à toa. O CONTRATO é o mesmo e está escrito no cabeçalho
+    // dele: **NFC, nunca NFKC** — a compatibilidade reescreve ligaduras, frações
+    // e formas de largura, e o que sai daqui é o texto do documento. Há teste
+    // que confere que os dois lados usam a mesma forma.
+    const bruto = String(await textoDaPecaParaSigilo(id, c, rotulo) || "").normalize("NFC");
+    if (!bruto) {
+      // Peça sem texto extraível (PDF só de imagem cujo OCR não leu nada). Ela
+      // NÃO pode ir como arquivo — é o que o modo existe para impedir —, então
+      // entra como aviso explícito. Silêncio faria o modelo responder sobre um
+      // conjunto de peças diferente do que o usuário marcou.
+      sigiloCache.set(id, {
+        kind: "text",
+        fmt: "texto",
+        text: "_[esta peça não teve texto extraível; no modo sigiloso o arquivo original não é enviado]_",
+      });
+      sigiloFeitas.add(id);
+      return;
+    }
+    const texto = bruto.length > MAX_CHARS_SIGILO ? bruto.slice(0, MAX_CHARS_SIGILO) : bruto;
+    const cortada = texto.length < bruto.length;
+
+    const negado = await carregarDeny();
+    const doRegex = ANON.detectar(texto, { ficha: fichaParaSigilo(), negado });
+    let doNer = [];
+    try {
+      const r = await rpc({ type: "nerDetectar", payload: { texto } });
+      doNer = (r && r.spans) || [];
+    } catch (e) {
+      // O NER é a SEGUNDA camada. Sem ele os detectores determinísticos ainda
+      // valem (CPF, CNPJ, OAB, e-mail e — o de maior retorno — os nomes das
+      // partes, que vêm da ficha), mas nomes de terceiros no meio do texto
+      // passariam. Seguir em silêncio seria prometer uma anonimização que não
+      // aconteceu: isto DERRUBA a peça, e o motivo vai ao chat.
+      throw new Error(
+        "o reconhecimento de nomes não rodou nesta peça (" + ((e && e.message) || e) + ")"
+      );
+    }
+    const achados = ANON.fundir(doNer, doRegex, { texto, negado });
+    const mascarado = PSEUD.mascarar(texto, achados, mapaSigilo);
+    // PÓS-CONDIÇÃO por peça, barata: nenhum valor recém-mascarado pode ter
+    // sobrado. A guarda do worker continua existindo porque esta não vê os
+    // outros doze canais.
+    const conf = PSEUD.conferir(mascarado, mapaSigilo);
+    if (!conf.ok) {
+      throw new Error(
+        "a anonimização desta peça não ficou completa (um valor do tipo " + conf.tipo + " sobrou)"
+      );
+    }
+    sigiloCache.set(id, {
+      kind: "text",
+      fmt: "texto",
+      text:
+        mascarado +
+        (cortada ? "\n\n_[texto truncado em " + MAX_CHARS_SIGILO + " caracteres]_" : ""),
+      pages: c.pages,
+    });
+    sigiloFeitas.add(id);
+  }
+
+  // Anonimiza o lote. Uma peça que não dá para anonimizar NÃO derruba o turno:
+  // fica de fora e é reportada no chat — a mesma regra da tolerância a falha de
+  // download.
+  async function anonimizarLote(ids) {
+    const falhas = [];
+    const ok = [];
+    for (const id of ids) {
+      try {
+        await anonimizarPeca(id);
+        ok.push(id);
+      } catch (e) {
+        falhas.push({ id, titulo: metaDe(id).titulo, erro: (e && e.message) || String(e) });
+      }
+    }
+    panel.setPrepNota("");
+    // O worker do NER segura ~109 MB de WASM, e o documento offscreen também
+    // hospeda o OCR: o BERT residente ali deixa a extração mais lenta (medido,
+    // 1,48x, no app irmão). Fechado assim que o lote acaba.
+    try {
+      await rpc({ type: "nerFechar" });
+    } catch {
+      /* best-effort: se o offscreen já morreu, não há o que fechar */
+    }
+    salvarMapaSigilo();
+    // RE-ARMA a guarda com a lista COMPLETA, e este ponto e' o que importa.
+    // O turno arma cedo (logo apos `garantirCaps`), mas naquele instante o mapa
+    // so tem o que foi mascarado ANTES -- o texto que o usuario digitou, e nada
+    // das pecas deste turno. Medido no teste de ponta a ponta: a guarda ia
+    // armada com UM valor enquanto o request levava tres. Uma rede de seguranca
+    // com a lista pela metade e' pior que nenhuma, porque parece completa.
+    await armarSigilo();
+    return { ok, falhas };
+  }
+
+  // O texto CONSTANTE do próprio programa. Sem estas isenções bastaria o
+  // detector rotular "Brasil" ou "Justiça" numa peça para a guarda de saída
+  // encontrar o valor DENTRO do nosso próprio system prompt — que não veio do
+  // usuário e não revela ninguém — e bloquear o turno. Isentar é seguro porque
+  // a região é definida pela ocorrência LITERAL de uma constante daqui.
+  function isentasDoSistema() {
+    return [SYSTEM_PROMPT, SYSTEM_PROMPT_CIT_TEXTUAL, PROMPT_SO_ANEXOS.join(" ")];
+  }
+
+  // Arma a guarda de saída do worker para ESTE processo, com a lista atual. Ela
+  // CRESCE a cada peça mascarada, então vai a cada turno: mandar só no início
+  // deixaria a guarda conferindo uma lista velha, que é o mesmo que não conferir.
+  async function armarSigilo() {
+    if (!modoSigiloso || !mapaSigilo || !casoChave) return;
+    await rpc({
+      type: "sigiloArmar",
+      chave: casoChave,
+      proibidos: mapaSigilo.proibidos(),
+      isentas: isentasDoSistema(),
+    });
+  }
+
+  // O MAPA VAI PARA O CASODB, e a escolha de onde ele mora e' deliberada.
+  //
+  // Ele e' a CHAVE DE REIDENTIFICACAO: quem o tem desfaz a anonimizacao. Por
+  // isso NUNCA em `chrome.storage.sync`, que trafega pela conta Google e sairia
+  // da maquina; e nunca dentro de um request. O casodb ja e' IndexedDB no
+  // WORKER (nao na origem da pagina do tribunal, onde qualquer script do PJe o
+  // leria), ja e' por processo e ja sobrevive ao fechar a aba -- que e'
+  // exatamente o que a reidentificacao no editor precisa.
+  //
+  // O campo NAO entra em CAMPOS_DE_SESSAO: ele e' do PROCESSO, como as pecas.
+  // Duas abas no mesmo processo compartilham o mapa, e isso e' o correto --
+  // `[PESSOA_1]` tem de ser a mesma pessoa nas duas.
+  function salvarMapaSigilo() {
+    if (!memoriaDisponivel || !casoChave || !mapaSigilo || memoriaMorta) return;
+    try {
+      CASO.salvar(casoChave, {
+        sigilo: { ligado: modoSigiloso, mapa: mapaSigilo.serializar() },
+      });
+    } catch (e) {
+      console.warn("[PJe IA] não deu para gravar o mapa de sigilo:", (e && e.message) || e);
+    }
+  }
+
+  // Retoma o mapa gravado. `hidratar` PRESERVA a numeracao, e isso e' o ponto:
+  // renumerar faria o `[PESSOA_3]` de uma minuta ja escrita apontar para outra
+  // pessoa -- e o texto mascarado nao pode ser reescrito, ele ja saiu.
+  function hidratarSigilo(caso) {
+    const g = caso && caso.sigilo;
+    if (!g) return;
+    try {
+      mapaSigilo = PSEUD.hidratar(g.mapa || { processo: casoChave, itens: [] });
+      modoSigiloso = !!g.ligado;
+      if (modoSigiloso) {
+        // As pecas mascaradas NAO sao gravadas (so o mapa): o texto mascarado se
+        // reconstroi da peca original, e guardar duas versoes do mesmo documento
+        // no disco do usuario e' o oposto do que este modo existe para fazer.
+        // Ao reabrir, a primeira analise refaz o mascaramento -- o que tambem e'
+        // o correto se a peca mudou.
+        panel.setSigiloso(true, mapaSigilo.quantos());
+        armarSigilo();
+      }
+    } catch (e) {
+      console.warn("[PJe IA] mapa de sigilo ilegível; começando um novo:", (e && e.message) || e);
+      mapaSigilo = PSEUD.criarMapa(casoChave);
+    }
+  }
+
+  async function desarmarSigilo() {
+    if (!casoChave) return;
+    try {
+      await rpc({ type: "sigiloDesarmar", chave: casoChave });
+    } catch {
+      /* worker morto: ele nasce sem sigilo armado de todo jeito */
+    }
+  }
+
   // Baixa as peças com concorrência limitada (3 por vez), com progresso por
   // peça no card de preparo (spinner -> check + barra de progresso).
   //
@@ -3036,6 +3538,25 @@
         PJE.contadorAtivacoes(true) + " ativação(ões), " +
         Math.round((Date.now() - t0) / 1000) + "s" + (telaMorta ? " — TELA MORTA" : "")
     );
+    // MODO SIGILOSO: a peça vira TEXTO MASCARADO aqui, antes de qualquer coisa
+    // montar bloco. Fica neste funil pela MESMA razão que a bomba de upload —
+    // são três pares baixar→subir idênticos (chat, minuta e mapa), e nos call
+    // sites seria fácil esquecer um. Esquecer UM significa mandar o PDF de um
+    // processo sigiloso para a API.
+    //
+    // Vem DEPOIS do `await cadeiaUpload` de propósito: no modo sigiloso o
+    // upload nem acontece (`precisaUpload` sai na primeira linha), e esperar a
+    // cadeia mantém a invariante de que ninguém sai daqui com upload em voo.
+    if (modoSigiloso) {
+      const anon = await anonimizarLote(ok);
+      // Peça que não deu para anonimizar NÃO vai como arquivo: fica de fora e
+      // entra no relatório, como uma falha de download. Deixá-la seguir pelo
+      // caminho normal seria o único jeito de o PDF escapar — exatamente o que
+      // este modo existe para impedir.
+      for (const f of anon.falhas) falhas.push(f);
+      const perdidasAnon = new Set(anon.falhas.map((f) => f.id));
+      return { ok: ok.filter((id) => !perdidasAnon.has(id)), falhas };
+    }
     return { ok, falhas };
   }
 
@@ -3046,6 +3567,15 @@
   // fase pela frente. Duplicar isso garantiria divergência — `fileProvider` já
   // é sutil o bastante.
   function precisaUpload(id) {
+    // MODO SIGILOSO: nada sobe. E esta guarda tem de vir ANTES de tudo, e aqui e
+    // não no chamador, porque este predicado lê o `docsCache` DIRETO — não o
+    // `entradaDoc`, que é quem prefere o texto mascarado. Sem ela, `subirPecas`
+    // enxergaria a entrada ORIGINAL (o PDF, que continua no cache para o preview
+    // e a exportação) e o mandaria para a Files API: o arquivo sairia da máquina
+    // por um caminho que não passa por `montarBlocos`, que é onde toda a
+    // atenção estava. O worker recusa o upload como rede de segurança; esta é a
+    // barreira que faz a chamada nem acontecer.
+    if (modoSigiloso) return false;
     // Provedor SEM Files API no fluxo de chat (OpenRouter): não há o que subir —
     // a peça viaja inline no próprio request. Por CAP e não por nome de
     // provedor, como todo o resto: no dia em que ele aceitar arquivo por
@@ -3282,6 +3812,10 @@
         try {
           const r = await rpc({
             type: "upload",
+            // Rede de segurança: é por esta chave que o worker reconhece um
+            // processo em modo sigiloso e RECUSA o upload. A barreira principal
+            // é `precisaUpload`, que nem chega aqui.
+            chaveCaso: casoChave || "sem-caso",
             payload: {
               filename: "peca-" + id + ".pdf",
               b64: d.b64,
@@ -3327,6 +3861,11 @@
   // memória, então basta re-subir e reescrever o `file_id` no bloco — sem
   // download, que é o passo caro no caso das peças.
   async function subirAnexos(ids) {
+    // MODO SIGILOSO: nada sobe, pela mesma razão de `precisaUpload` — e aqui a
+    // guarda também precisa vir antes de tudo, porque este filtro lê `anexos`
+    // DIRETO, não o `entradaDoc`, e enxergaria o PDF original do arquivo que o
+    // usuário soltou na caixa.
+    if (modoSigiloso) return;
     const provAtual = (modelCaps && modelCaps.provider) || "anthropic";
     const pend = ids.filter((id) => {
       const d = anexos.get(id);
@@ -3345,6 +3884,7 @@
         try {
           const r = await rpc({
             type: "upload",
+            chaveCaso: casoChave || "sem-caso",
             payload: {
               filename: d.nome || "anexo-" + id + ".pdf",
               b64: d.b64,
@@ -3448,6 +3988,10 @@
         system: (opts && opts.system) || systemPromptAtual(),
         messages,
         betas: (opts && opts.betas) || BETAS_CHAT,
+        // ATRIBUIÇÃO para a guarda de saída do worker: é por ela que a guarda
+        // sabe de que processo é a requisição. Sem isto, com sigilo armado em
+        // QUALQUER processo, o pré-voo seria bloqueado por falta de ctx.
+        chaveCaso: casoChave || "sem-caso",
       };
       if (opts && opts.tools) payload.tools = opts.tools;
       // Idem para o MODELO: sem ele o worker mede na janela do modelo do chat.
@@ -4135,6 +4679,17 @@
   // Cada bloco carrega __pecaId (campo INTERNO, removido em prepararEnvio antes
   // de qualquer request) — é o que permite desmarcar uma peça e liberá-la do
   // contexto de verdade, filtrando o bloco no reenvio do histórico.
+  // O `title` do bloco `document` e' o UNICO canal pelo qual o id da peca viaja
+  // ao modelo -- e ele carrega o titulo dos autos, que pode ser "Depoimento de
+  // JOAO DA SILVA". No modo sigiloso ele passa pela mesma mascara do corpo, com
+  // o MESMO mapa, entao o nome vira o mesmo rotulo nos dois lugares.
+  function tituloParaEnvio(id) {
+    // O `|| "Peça " + id` é cinto: hoje `metaDe` sempre devolve título (ela tem
+    // esse mesmo fallback), mas `mascararCurto(undefined)` devolveria
+    // `undefined`, e um `title: undefined` num bloco `document` é 400 da API.
+    return mascararCurto(metaDe(id).titulo || "Peça " + id);
+  }
+
   function montarBlocos(ids) {
     const blocks = [];
     let totalB64 = 0;
@@ -4177,7 +4732,7 @@
           blocks.push({
             type: "document",
             source: { type: "file", file_id: d.fileId },
-            title: metaDe(id).titulo,
+            title: tituloParaEnvio(id),
             citations: { enabled: true },
             __pecaId: id,
           });
@@ -4187,7 +4742,7 @@
           blocks.push({
             type: "document",
             source: { type: "base64", media_type: "application/pdf", data: d.b64 },
-            title: metaDe(id).titulo,
+            title: tituloParaEnvio(id),
             citations: { enabled: true },
             __pecaId: id,
           });
@@ -4226,7 +4781,7 @@
         totalB64 += d.b64.length;
         blocks.push({
           type: "text",
-          text: "[Peça anexada como imagem: " + metaDe(id).titulo + "]",
+          text: "[Peça anexada como imagem: " + tituloParaEnvio(id) + "]",
           __pecaId: id,
         });
         blocks.push({
@@ -4247,7 +4802,7 @@
             media_type: "text/plain",
             data: cortado ? d.text.slice(0, tetoTexto) + marcaTruncado(tetoTexto) : d.text,
           },
-          title: metaDe(id).titulo,
+          title: tituloParaEnvio(id),
           citations: { enabled: true },
           __pecaId: id,
         });
@@ -4321,7 +4876,14 @@
     // processo, depois quando cada peça anexada entrou, por último o que existe
     // e não foi lido. Todos são voláteis pelo mesmo motivo (a timeline muda), e
     // por isso viajam juntos, no texto do turno e só na cópia enviada.
-    const txt = linhaDoTempoProcessual() + datasDasPecas(idsAnexados) + inventarioNaoMarcadas(idsAnexados);
+    // Os TRES blocos carregam PII: a linha do tempo traz nomes no
+    // `textoFinalExterno` ("Decorrido prazo de FULANO..."), e o inventario e as
+    // datas trazem o titulo de cada peca. No modo sigiloso passam pela mesma
+    // mascara, com o MESMO mapa -- entao o nome que e' `[PESSOA_1]` no corpo da
+    // peca e' `[PESSOA_1]` aqui tambem.
+    const txt = mascararCurto(
+      linhaDoTempoProcessual() + datasDasPecas(idsAnexados) + inventarioNaoMarcadas(idsAnexados)
+    );
     if (!txt || !msgs.length) return msgs;
     const i = msgs.length - 1;
     const ultima = msgs[i];
@@ -4496,7 +5058,13 @@
         port.postMessage({
           type: tipo || "chat",
           payload: Object.assign(
-            { system: systemPromptAtual(), messages, betas: BETAS_CHAT },
+            {
+              system: systemPromptAtual(),
+              messages,
+              betas: BETAS_CHAT,
+              // Atribuição para a guarda de saída (ver o pré-voo, acima).
+              chaveCaso: casoChave || "sem-caso",
+            },
             opts || {}
           ),
         });
@@ -4691,7 +5259,9 @@
     const tokensPagina =
       (modelCaps && modelCaps.tokensPagina) || TOKENS_POR_PAGINA_PDF;
     for (const id of ids) {
-      const d = entradaDoc(id); // peça (docsCache) ou anexo do input
+      // MEDIÇÃO local: nunca sai da máquina, então usa o original quando a
+      // versão mascarada ainda não existe (ver `entradaParaMedir`).
+      const d = entradaParaMedir(id); // peça (docsCache) ou anexo do input
       // peça ainda não baixada: entra na conta quando o download chegar.
       // Contá-la como 0 seria pior — o gauge afirmaria um tamanho que não é o
       // do envio (por isso o gauge também mostra quantas ficaram sem medir).
@@ -4891,6 +5461,16 @@
     // no meio dela. `telaMorta` porque, depois da view expirar, todo download é
     // só mais um POST inútil.
     if (busy || exportando || carregandoTimeline || telaMorta) return;
+    // MODO SIGILOSO: o refinamento pela rede é um `count_tokens` — uma
+    // requisição ao PROVEDOR, com o corpo do request dentro. Enquanto houver
+    // peça marcada ainda não mascarada, mandá-la para "só contar" seria o
+    // mesmo vazamento que o modo existe para impedir (e a guarda de saída a
+    // bloquearia, enchendo o console de erro a cada clique). A camada 1, a
+    // estimativa LOCAL, continua rodando: ela é de graça e não sai da máquina.
+    if (modoSigiloso && ids.some((id) => !sigiloCache.has(id))) {
+      panel.setStatus("");
+      return;
+    }
     // O conjunto MEDIDO inclui os anexos do input; o conjunto BAIXADO, não (ver
     // `comAnexos`). A chave da memoização é a do medido: anexar ou soltar um
     // arquivo muda o request e precisa re-medir, exatamente como marcar uma peça.
@@ -4982,9 +5562,21 @@
       // exata); nos demais o pré-voo mede o request de verdade e o campo é
       // ignorado. Vai nos QUATRO chamadores para a guarda não depender de qual
       // caminho pediu a medição.
+      // O system é montado AQUI, com `medindoSemGravar` ligado, e vai pronto em
+      // `opts.system`. Sem isso, `estimarContexto` o montaria lá dentro e a
+      // ficha seria mascarada contra o mapa REAL — gravando pessoas no artefato
+      // de reidentificação a cada clique de checkbox, sem envio nenhum. O flag
+      // fica ligado só nesta chamada síncrona; nenhum `await` acontece no meio.
+      let systemMedicao;
+      medindoSemGravar = true;
+      try {
+        systemMedicao = systemPromptAtual();
+      } finally {
+        medindoSemGravar = false;
+      }
       const est = await estimarContexto(
         msgs,
-        Object.assign(optsDoTurno(), { ids: idsMedidos })
+        Object.assign(optsDoTurno(), { ids: idsMedidos, system: systemMedicao })
       );
       if (seq !== estSeq || busy) return;
       panel.setStatus("");
@@ -5058,8 +5650,23 @@
     return false;
   }
 
-  panel.onSend(async (text, selectedIdsDoPainel) => {
+  panel.onSend(async (textCru, selectedIdsDoPainel) => {
     if (busy || ocupadoJsf()) return;
+    // O QUE O USUARIO DIGITOU TAMBEM E' UM CANAL. Ele escreve "o que o Joao
+    // alegou na fl. 12?", e esse nome sai no corpo do request como qualquer
+    // outro -- e derrubaria o proprio turno na guarda de saida. Mascarado com o
+    // MESMO mapa, o nome vira o mesmo rotulo que o corpo da peca ja usa, entao
+    // a pergunta continua fazendo sentido para o modelo.
+    //
+    // A BOLHA DO USUARIO mostra o texto MASCARADO, de proposito: e' o que foi
+    // a API, e a conversa nao pode exibir uma coisa e enviar outra.
+    let text = textCru;
+    try {
+      text = mascararCurto(textCru);
+    } catch (e) {
+      panel.setStatus("Não foi possível anonimizar a sua mensagem: " + ((e && e.message) || e));
+      return false;
+    }
     // A seleção do turno é a EFETIVA (checkboxes + peças restauradas cuja row a
     // timeline lazy ainda não criou) — ver `selecaoEfetiva`.
     const selectedIds = selecaoEfetiva().length
@@ -5090,6 +5697,22 @@
     // aplicarCapsNaUI já liga o alerta na troca do modelo; esta é a guarda
     // dura para o caso de o envio chegar antes do refresh de caps.
     const provTurno = (modelCaps && modelCaps.provider) || "anthropic";
+    // O historico de um modo nao roda no outro: as pecas ja enviadas foram como
+    // ARQUIVO e as proximas iriam como TEXTO mascarado -- a mesma peca
+    // apareceria duas vezes, uma com nomes e outra com rotulos, e a guarda de
+    // saida bloquearia o request por causa dos blocos binarios do historico.
+    // Guarda DURA, como a de provedor: o alerta do toggle pode ter sido posto
+    // antes de as caps chegarem.
+    // `?? false` e não `!== null`: conversa gravada ANTES desta versão não tem o
+    // campo, e histórico não vazio significa que ela rodou no caminho de sempre
+    // — com blocos de arquivo dentro. Tratá-la como "indefinida" deixava ligar o
+    // modo por cima dela, e o request sairia misturando peça anonimizada com
+    // `file_id` do histórico.
+    if (conversation.length && (conversaSigilosa ?? false) !== modoSigiloso) {
+      panel.setAlerta(ALERTA_TROCA_SIGILO);
+      alertaSigiloLigado = true;
+      return;
+    }
     if (conversation.length && conversaProvider && provTurno !== conversaProvider) {
       panel.setAlerta(ALERTA_TROCA_PROVEDOR);
       alertaTrocaLigado = true;
@@ -5125,6 +5748,11 @@
 
     try {
       await garantirCaps(); // limites do modelo antes de qualquer validação
+      // A guarda de saida do worker e' armada a cada turno, e nao uma vez so: a
+      // lista de proibidos CRESCE a cada peca mascarada, e uma lista velha
+      // deixaria passar exatamente os nomes que acabaram de entrar.
+      await armarSigilo();
+
       // Movimentações do processo (linha do tempo PROCESSUAL). Vai junto porque
       // é o eixo do tempo que as peças não têm — sem ele, pergunta de prazo
       // volta como "não é possível determinar". Custa ~77 ms de rede e nenhuma
@@ -5185,6 +5813,16 @@
         // request pelo histórico).
         paginas = guardaPaginas([...selectedIds, ...anexos.keys()]);
         await subirPecas(anexadas);
+        // ANEXOS TAMBÉM SÃO ANONIMIZADOS. Eles não passam por
+        // `baixarSelecionadas` (não vêm do PJe), então o gancho de lá não os
+        // alcança — e desde que `entradaDoc` passou a falhar fechado, um anexo
+        // não mascarado simplesmente SUMIRIA do request, em silêncio. O arquivo
+        // que o usuário solta na caixa é do mesmo processo e merece o mesmo
+        // tratamento: `anonimizarPeca` já lê `anexos` além do `docsCache`.
+        if (modoSigiloso && anexosNovos.length) {
+          const anonAnexos = await anonimizarLote(anexosNovos);
+          if (anonAnexos.falhas.length) panel.mostrarFalhasPecas(anonAnexos.falhas);
+        }
         await subirAnexos(anexosNovos);
         stripOldCacheControl();
         userContent = [...montarBlocos(idsNovosParaBlocos), { type: "text", text }];
@@ -5334,6 +5972,10 @@
       // só as que REALMENTE entraram: peça que falhou no download precisa
       // continuar elegível na próxima tentativa
       for (const id of anexadas) pecasNaConversa.add(id);
+      // O MODO do historico e' fixado no primeiro turno que de fato vai, junto
+      // do provedor e pela mesma razao: e' a partir daqui que a forma dos blocos
+      // esta decidida.
+      if (conversaSigilosa === null) conversaSigilosa = modoSigiloso;
       if (!conversaProvider) {
         conversaProvider = (modelCaps && modelCaps.provider) || "anthropic";
       }
@@ -5543,6 +6185,9 @@
         // futuro em OUTRO provedor herdaria o rótulo velho e a guarda de
         // troca deixaria passar um histórico misto)
         if (!conversation.length) conversaProvider = null;
+        // O mesmo vale para o MODO: com o rotulo velho, um turno futuro no modo
+        // oposto herdaria "sigiloso" (ou "normal") e a guarda deixaria passar.
+        if (!conversation.length) conversaSigilosa = null;
         panel.setStatus("O modelo não retornou texto. Tente novamente.");
       }
     } catch (e) {
@@ -5578,6 +6223,7 @@
       for (const id of anexadas) pecasNaConversa.delete(id); // peças do turno desfeito
       // conversa esvaziou: o rótulo de provedor cai junto (ver ramo acima)
       if (!conversation.length) conversaProvider = null;
+      if (!conversation.length) conversaSigilosa = null;
     } finally {
       busy = false;
       panel.lockInput(false);
@@ -5905,12 +6551,16 @@
       const lista = listaParaIA(docs);
       const texto =
         "OBJETIVO: escolher, na lista de peças abaixo, quais precisam ser lidas para " +
-        alvo + ".\n\n" +
+        // O objetivo é o que o usuário digitou; a lista traz título, tipo e
+        // QUEM JUNTOU cada peça — três canais de nome. A triagem pode rodar
+        // ANTES de qualquer peça ser anonimizada, então nada disso estaria no
+        // mapa e a guarda não os reconheceria.
+        mascararCurto(alvo) + ".\n\n" +
         REGRAS_ESCOLHA + "\n\n" +
         SUFIXO_ESCOLHA + "\n\n" +
         "LISTA DE PEÇAS (" + docs.length + " no total, em ordem cronológica; critério: " +
         lista.criterio + "):\n" +
-        lista.linhas.join("\n");
+        mascararCurto(lista.linhas.join("\n"));
 
       const validos = new Set(docs.map((d) => d.id));
       let acc = "";
@@ -6084,7 +6734,10 @@
   // cacheado — a orientação muda a cada request, ao contrário dos modelos.
   function blocoOrientacao(ato) {
     if (!ato || ato.regime === "livre" || !ato.tese) return "";
-    const limpo = String(ato.tese).replace(/<\/?orientacao_decisoria\b[^>]*>/gi, "");
+    // A tese é texto livre de quem assina e quase sempre NOMEIA as partes
+    // ("julgo procedente o pedido de Fulano"). Sem a máscara, o modo sigiloso
+    // bloquearia toda minuta na guarda de saída — e a tese é obrigatória.
+    const limpo = mascararCurto(String(ato.tese)).replace(/<\/?orientacao_decisoria\b[^>]*>/gi, "");
     return (
       "\n\n<orientacao_decisoria>\n" +
       "ESPÉCIE DO ATO: " + (ato.rotulo || ato.especie) + "\n" +
@@ -6185,10 +6838,18 @@
   // não quebrar a moldura.
   function molduraModelos(modelos) {
     if (!Array.isArray(modelos) || !modelos.length) return null;
-    const limpar = (t) => String(t).replace(/<\/?modelos?(_de_referencia)?\b[^>]*>/gi, "");
+    // As peças-modelo são documentos REAIS de OUTROS processos — carregam nomes,
+    // CPF e OAB de terceiros. No modo sigiloso elas passam pela mesma máscara:
+    // o que se quer delas é a FORMA, e a forma sobrevive inteira à substituição
+    // dos nomes por rótulos. (Sem isto, esses valores sairiam em claro E a
+    // guarda não os reconheceria, porque não pertencem ao mapa deste processo.)
+    const limpar = (t) =>
+      mascararCurto(String(t)).replace(/<\/?modelos?(_de_referencia)?\b[^>]*>/gi, "");
     const partes = modelos.map((m, i) => {
       const cat = m.categoria ? ' categoria="' + String(m.categoria).replace(/"/g, "") + '"' : "";
-      const tit = m.titulo ? ' titulo="' + String(m.titulo).replace(/"/g, "'") + '"' : "";
+      const tit = m.titulo
+        ? ' titulo="' + mascararCurto(String(m.titulo)).replace(/"/g, "'") + '"'
+        : "";
       return '<modelo n="' + (i + 1) + '"' + cat + tit + ">\n" + limpar(m.texto) + "\n</modelo>";
     });
     const varios = modelos.length > 1;
@@ -6307,6 +6968,11 @@
       // worker cai no modelo do chat), sem nada na tela dizendo. Resolve
       // imediato quando as caps já chegaram, que é o caminho normal.
       await garantirCaps();
+      // A guarda de saida do worker e' armada a cada turno, e nao uma vez so: a
+      // lista de proibidos CRESCE a cada peca mascarada, e uma lista velha
+      // deixaria passar exatamente os nomes que acabaram de entrar.
+      await armarSigilo();
+
       // Peça que falha no download não derruba a minuta: seguimos com o que
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
       const dl = await baixarSelecionadas(selectedIds);
@@ -6373,15 +7039,25 @@
                   regraDaOrientacao(ato) +
                   reforcoModelo +
                   " Peças anexadas, use exatamente estes ids: " +
-                  dl.ok.map((id) => metaDe(id).titulo).join("; ") +
+                  // `tituloParaEnvio`, não `metaDe(...).titulo`: o título dos
+                  // autos carrega nome ("Depoimento de JOÃO DA SILVA"), e esta
+                  // lista é o único canal pelo qual o id chega ao modelo.
+                  dl.ok.map((id) => tituloParaEnvio(id)).join("; ") +
                   "." +
                   // O ato a redigir depende do que JÁ ACONTECEU: prazo
                   // decorrido, parte intimada, data da publicação. Nada disso
                   // está no texto das peças, e um relatório de sentença escrito
                   // sem essas datas sai incompleto ou inventado.
-                  datasDasPecas(dl.ok) +
-                  linhaDoTempoProcessual() +
-                  blocoInstrucao(instrucao) +
+                  // Os TRÊS carregam PII: as datas trazem o título de cada
+                  // peça, a linha do tempo traz nomes no `textoFinalExterno`
+                  // ("Decorrido prazo de FULANO...") e a instrução é texto livre
+                  // de quem vai assinar. Mascarados um a um, e não em bloco: o
+                  // `SUFIXO_MINUTA` acima é constante NOSSA, e passá-lo pela
+                  // máscara adulteraria a própria instrução se o detector
+                  // tivesse rotulado uma palavra dela numa peça.
+                  mascararCurto(datasDasPecas(dl.ok)) +
+                  mascararCurto(linhaDoTempoProcessual()) +
+                  blocoInstrucao(mascararCurto(instrucao)) +
                   // A tese continua por ÚLTIMO: é a decisão de quem assina.
                   blocoOrientacao(ato),
               },
@@ -6735,12 +7411,15 @@
                   instrucao +
                   SUFIXO_MAPA +
                   " Peças anexadas, use exatamente estes ids: " +
-                  dl.ok.map((id) => metaDe(id).titulo).join("; ") +
+                  // `tituloParaEnvio`, não `metaDe(...).titulo`: o título dos
+                  // autos carrega nome ("Depoimento de JOÃO DA SILVA"), e esta
+                  // lista é o único canal pelo qual o id chega ao modelo.
+                  dl.ok.map((id) => tituloParaEnvio(id)).join("; ") +
                   "." +
                   // O mapa tem eixos de PRAZOS e de situação atual, que sem as
                   // datas dos atos saem vazios ou adivinhados.
-                  datasDasPecas(dl.ok) +
-                  linhaDoTempoProcessual(),
+                  mascararCurto(datasDasPecas(dl.ok)) +
+                  mascararCurto(linhaDoTempoProcessual()),
               },
             ],
           },
@@ -6867,7 +7546,6 @@
   // ---------------------------------------------------------------------------
   async function iniciarMemoria() {
     if (!memoriaDisponivel) return;
-    casoChave = PJE.chaveDoCaso();
     if (!casoChave) return; // página sem idProcesso: memória desligada nesta aba
     try {
       // ESPERAR os caps é obrigatório, e a razão não é óbvia: `fileIdValido`
@@ -6876,6 +7554,10 @@
       // descartaria em silêncio todo fileId do Gemini — que é o provedor
       // PADRÃO da extensão. O recurso pareceria simplesmente não funcionar.
       await garantirCaps();
+      // A guarda de saida do worker e' armada a cada turno, e nao uma vez so: a
+      // lista de proibidos CRESCE a cada peca mascarada, e uma lista velha
+      // deixaria passar exatamente os nomes que acabaram de entrar.
+      await armarSigilo();
       const { caso, desligado } = await CASO.ler(casoChave);
       // O usuário desligou a memória nas opções. Não basta deixar de hidratar:
       // sem `memoriaMorta`, cada clique na lista custaria uma ida ao worker só
@@ -6897,6 +7579,10 @@
       else if (caso) {
         hidratarPecas(caso.pecas);
         hidratarGrid(caso.grid);
+        // ANTES de retomar a conversa: `retomarConversa` repinta o transcript, e
+        // se o modo estiver ligado o selo precisa estar de pé quando isso
+        // acontece.
+        hidratarSigilo(caso);
         retomarConversa(caso);
         conversasDoCaso = caso.conversas || [];
         panel.setConversas(conversasDoCaso, convAtual);
@@ -6970,6 +7656,12 @@
     anexosPendentes.length = 0;
     custoConversaUsd = 0;
     conversaProvider = null;
+    // O MODO do historico volta a ser indefinido -- mas `modoSigiloso` e
+    // `mapaSigilo` FICAM. O botao promete zerar a conversa, nao esquecer que o
+    // processo corre em segredo de justica; e apagar o mapa quebraria a
+    // reidentificacao de uma minuta ja gerada.
+    conversaSigilosa = null;
+    alertaSigiloLigado = false;
     buscaNaConversa = false;
     ultimoTotalExato = 0;
     ultimaChaveEst = "";
@@ -7079,6 +7771,10 @@
     pecasNaConversa = new Set(caso.pecasNaConversa || []);
     custoConversaUsd = caso.custoConversaUsd || 0;
     conversaProvider = caso.conversaProvider || null;
+    // `?? null` e nao `|| null`: `false` e' um valor VALIDO aqui (conversa que
+    // rodou com o modo desligado), e o `||` o transformaria em "indefinido" --
+    // o que faria a guarda deixar passar uma troca de modo no meio.
+    conversaSigilosa = caso.conversaSigilosa ?? null;
     buscaNaConversa = !!caso.buscaNaConversa;
     ultimoTotalExato = caso.ultimoTotalExato || 0;
 
@@ -7133,6 +7829,18 @@
     pecasSujas.clear();
     try {
       await CASO.esquecer(casoChave);
+      // O que está NA ABA também. O botão promete apagar, e o mapa de
+      // reidentificação é justamente o artefato mais sensível que sobreviveria:
+      // o banco esvaziava e a aba continuava com os nomes. Desliga o modo
+      // junto — mantê-lo ligado sem mapa faria a próxima peça começar uma
+      // numeração nova, com rótulos que não batem com nada já enviado.
+      await desarmarSigilo();
+      modoSigiloso = false;
+      mapaSigilo = null;
+      sigiloCache.clear();
+      sigiloFeitas.clear();
+      conversaSigilosa = null;
+      panel.setSigiloso(false, 0);
       // A segunda frase não é enfeite: `memoriaMorta` desliga a gravação até o
       // fim desta sessão, de propósito (senão a conversa em andamento seria
       // regravada segundos depois e o botão pareceria não ter funcionado). Sem

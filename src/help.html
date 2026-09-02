@@ -369,6 +369,36 @@
       </div>
 
       <h1 class="serif" id="sigilo">Segredo de justiça: anonimizar antes de enviar</h1>
+      <div class="card ok" style="margin:16px 0">
+        <p><strong>Novidade da v0.55: a anonimização agora é da própria extensão.</strong>
+        Ligue o botão <strong>🔒 Sigiloso</strong> na barra de ferramentas do painel e as
+        peças passam a ser lidas e mascaradas <strong>no seu computador</strong> antes de
+        qualquer envio — nomes, CPF, CNPJ, OAB, e-mail, telefone, CEP e o número do processo
+        viram rótulos (<code>[PESSOA_1]</code>, <code>[CPF_2]</code>), e o
+        <strong>PDF não sai da máquina</strong>.</p>
+        <p>Datas, prazos, legislação e jurisprudência são <strong>preservados</strong> de
+        propósito: mascará-los destruiria a utilidade jurídica do documento sem proteger
+        ninguém.</p>
+        <p><strong>Como funciona por dentro.</strong> Duas camadas: detectores
+        determinísticos (CPF e CNPJ com dígito verificador, OAB, e-mail, telefone, CEP, mais
+        os nomes das partes lidos da própria ficha do processo) e um modelo de reconhecimento
+        de nomes que roda no seu navegador. Antes de cada envio, a extensão ainda
+        <strong>confere o que sairia</strong> e recusa o envio se algum valor original tiver
+        escapado — o turno inteiro é bloqueado, nada vai pela metade.</p>
+        <p><strong>O que esperar.</strong> A primeira análise de cada peça demora mais,
+        porque o documento é lido inteiro (e as páginas digitalizadas passam por OCR). Depois
+        disso o texto fica em memória e as perguntas seguintes são normais. Como as peças vão
+        como texto, não há upload de arquivo — e as citações passam a ser por trecho, não por
+        folha.</p>
+        <p><strong>Limite dito com honestidade:</strong> nenhum anonimizador automático é
+        perfeito. O que escapar da detecção vai inteiro para o provedor. A conferência final
+        cobre o que a extensão reconheceu; ela não inventa o que não detectou.
+        <strong>A revisão do que sai continua sendo sua.</strong></p>
+      </div>
+      <p>O <strong>TecJustiça Sigilo</strong>, descrito abaixo, continua útil e válido: ele é
+      um programa separado, trabalha sobre arquivos fora do PJe e produz um <code>.txt</code>
+      que você anexa aqui pelo clipe 📎. Use-o quando o documento não estiver nos autos, ou
+      quando quiser anonimizar antes de levar o texto para outra ferramenta.</p>
       <p class="lead">
         A extensão manda as peças que você marcar <strong>direto para a API de um provedor
         privado</strong> (Anthropic, Google ou OpenAI). Em processo sigiloso, a norma do CNJ

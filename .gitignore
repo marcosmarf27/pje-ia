@@ -55,3 +55,14 @@ autos-pje/
 
 # saida dos testes do CLI (gerada, nao e fonte)
 _saida-teste/
+
+# Modelo de NER (anonimização local). O `model.onnx` em FP32 tem ~433 MB e o
+# GitHub RECUSA blob acima de 100 MB — `vendor/**` é versionado sem LFS
+# (.gitattributes:25), então commitá-lo faz o `git push` falhar depois de tudo
+# pronto. Ele é INSUMO DE BUILD, não fonte: o repositório guarda a revisão
+# fixada, o SHA-256 e o comando de exportação em vendor/ner-modelo/PROCEDENCIA.md,
+# e `empacotar.ps1` confere o hash antes de compactar. Os arquivos PEQUENOS do
+# modelo (vocab.txt, config.json, tokenizer_config.json) CONTINUAM versionados:
+# são o contrato que `Tokenizador.conferirConfig` valida em runtime.
+vendor/ner-modelo/model.onnx
+vendor/ner-modelo/*.onnx_data

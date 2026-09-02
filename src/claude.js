@@ -21,7 +21,13 @@ export const BETA_FILES = "files-api-2025-04-14";
 
 const API = "https://api.anthropic.com/v1";
 
-function headers(apiKey, betas) {
+// Espelha `CAB_CTX` de src/trava.js. A duplicacao e deliberada: este e um ES
+// module do worker e aquele e um IIFE que tambem roda no content script. Ha
+// teste que confere que as cinco copias batem -- divergir aqui faz a guarda de
+// saida nao achar a atribuicao e BLOQUEAR o turno.
+const CAB_CTX = "x-pje-ctx";
+
+function headers(apiKey, betas, ctx) {
   const h = {
     "content-type": "application/json",
     "x-api-key": apiKey,
@@ -30,6 +36,9 @@ function headers(apiKey, betas) {
     "anthropic-dangerous-direct-browser-access": "true",
   };
   if (betas && betas.length) h["anthropic-beta"] = betas.join(",");
+  // A guarda de saida do worker le e REMOVE este cabecalho; ele nunca chega
+  // a API. E por ele que ela sabe de que processo e a requisicao.
+  if (ctx) h[CAB_CTX] = ctx;
   return h;
 }
 
@@ -50,7 +59,7 @@ export async function* streamClaude(req) {
 
   const resp = await fetch(API + "/messages", {
     method: "POST",
-    headers: headers(req.apiKey, req.betas),
+    headers: headers(req.apiKey, req.betas, req.ctx),
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
@@ -189,7 +198,7 @@ async function* sseEvents(resp) {
 
 // Sobe um arquivo para a Files API e devolve o file_id. O conteúdo passa a ser
 // referenciado por id nas mensagens (payloads pequenos, sem teto de 24 MB).
-export async function uploadFile({ apiKey, filename, b64, mime }) {
+export async function uploadFile({ apiKey, filename, b64, mime, ctx }) {
   // decodificação nativa do base64 (rápida mesmo para PDFs grandes)
   const blob = await (await fetch("data:" + (mime || "application/pdf") + ";base64," + b64)).blob();
   const fd = new FormData();
@@ -201,6 +210,10 @@ export async function uploadFile({ apiKey, filename, b64, mime }) {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "anthropic-beta": BETA_FILES,
+      // Atribuição para a guarda de saída (ver CAB_CTX). Sem ela um upload
+      // legítimo de OUTRO processo seria bloqueado por falta de ctx sempre
+      // que qualquer aba tivesse sigilo armado.
+      ...(ctx ? { [CAB_CTX]: ctx } : {}),
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: fd,
@@ -258,7 +271,7 @@ export async function countTokens(req) {
   if (req.tools && req.tools.length) body.tools = req.tools;
   const resp = await fetch(API + "/messages/count_tokens", {
     method: "POST",
-    headers: headers(req.apiKey, req.betas),
+    headers: headers(req.apiKey, req.betas, req.ctx),
     body: JSON.stringify(body),
   });
   if (!resp.ok) throw new Error(await friendlyHttpError(resp));

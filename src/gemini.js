@@ -54,12 +54,21 @@ const API_UPLOAD = "https://generativelanguage.googleapis.com/upload/v1beta";
 // num request que chegaria à API depois de expirado.
 const UPLOAD_TTL_MS = 47 * 60 * 60 * 1000;
 
-function headersGemini(apiKey) {
-  return {
+// Espelha `CAB_CTX` de src/trava.js. A duplicacao e deliberada: este e um ES
+// module do worker e aquele e um IIFE que tambem roda no content script. Ha
+// teste que confere que as cinco copias batem -- divergir aqui faz a guarda de
+// saida nao achar a atribuicao e BLOQUEAR o turno.
+const CAB_CTX = "x-pje-ctx";
+
+function headersGemini(apiKey, ctx) {
+  const h = {
     "content-type": "application/json",
     "x-goog-api-key": apiKey,
     "Api-Revision": "2026-05-20",
   };
+  // A guarda de saida do worker le e REMOVE este cabecalho.
+  if (ctx) h[CAB_CTX] = ctx;
+  return h;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +311,7 @@ export async function* streamGemini(req) {
   const enviar = (incluiSafety) =>
     fetch(API + "/interactions", {
       method: "POST",
-      headers: headersGemini(req.apiKey),
+      headers: headersGemini(req.apiKey, req.ctx),
       body: prepararCorpo(incluiSafety),
     });
 
@@ -604,7 +613,7 @@ async function* sseEvents(resp) {
 // o arquivo ficar ACTIVE. Devolve {fileUri, expiraEm} — o chamador guarda a
 // expiração no cache (48 h oficiais; usamos 47 h de margem).
 // ---------------------------------------------------------------------------
-export async function uploadFileGemini({ apiKey, filename, b64, mime }) {
+export async function uploadFileGemini({ apiKey, filename, b64, mime, ctx }) {
   const mimeType = mime || "application/pdf";
   const blob = await (await fetch("data:" + mimeType + ";base64," + b64)).blob();
 
@@ -618,6 +627,10 @@ export async function uploadFileGemini({ apiKey, filename, b64, mime }) {
       "X-Goog-Upload-Header-Content-Length": String(blob.size),
       "X-Goog-Upload-Header-Content-Type": mimeType,
       "content-type": "application/json",
+      // Atribuição para a guarda de saída (ver CAB_CTX): sem ela um upload
+      // legítimo de OUTRO processo seria bloqueado por falta de ctx sempre
+      // que qualquer aba tivesse sigilo armado.
+      ...(ctx ? { [CAB_CTX]: ctx } : {}),
     },
     body: JSON.stringify({ file: { display_name: filename || "documento.pdf" } }),
   });
@@ -631,6 +644,10 @@ export async function uploadFileGemini({ apiKey, filename, b64, mime }) {
     headers: {
       "X-Goog-Upload-Offset": "0",
       "X-Goog-Upload-Command": "upload, finalize",
+      // Atribuição para a guarda de saída (ver CAB_CTX): sem ela um upload
+      // legítimo de OUTRO processo seria bloqueado por falta de ctx sempre
+      // que qualquer aba tivesse sigilo armado.
+      ...(ctx ? { [CAB_CTX]: ctx } : {}),
     },
     body: blob,
   });
@@ -668,7 +685,7 @@ export async function uploadFileGemini({ apiKey, filename, b64, mime }) {
 // opacos (x-gemini-item) são serializados como texto. A guarda de 90% da
 // janela absorve a imprecisão; o usage pós-turno corrige de graça.
 // ---------------------------------------------------------------------------
-export async function countTokensGemini({ apiKey, model, system, messages }) {
+export async function countTokensGemini({ apiKey, model, system, messages, ctx }) {
   const contents = [];
   if (system) contents.push({ role: "user", parts: [{ text: system }] });
   for (const turn of messages || []) {
@@ -716,7 +733,7 @@ export async function countTokensGemini({ apiKey, model, system, messages }) {
   }
   const resp = await fetch(API + "/models/" + model + ":countTokens", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    headers: headersGemini(apiKey, ctx),
     body: JSON.stringify({ contents }),
   });
   if (!resp.ok) throw new Error(await friendlyHttpErrorGemini(resp));

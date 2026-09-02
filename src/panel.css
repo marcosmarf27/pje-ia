@@ -2190,6 +2190,23 @@ button > svg { flex: none; }
   background: var(--accent-bg); border-color: var(--line-focus);
   color: var(--pje-2); font-weight: 600;
 }
+/* Selo do MODO SIGILOSO. Usa os tokens --ok-*, e a escolha e' deliberada:
+   sigiloso ligado nao e' aviso nem alerta, e' CONFIRMACAO de que uma protecao
+   esta valendo. Pintado de --warn ele competiria com a .sel-nota e com o
+   medidor de contexto, que sinalizam problema; e um estado permanente em cor de
+   alerta e' o que o DESIGN.md chama de "tudo alerta com a mesma intensidade,
+   nada alerta". Ele so existe quando o modo esta LIGADO -- desligado nao ha
+   estado a anunciar. */
+.selo-sigilo {
+  border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok-ink);
+  border-radius: var(--r-pill); padding: 3px 8px; font-size: var(--fs-micro);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;
+  font-weight: 600;
+}
+/* Na coluna estreita sobra o cadeado e o resto e' cortado pelo ellipsis acima --
+   o selo nunca empurra o medidor nem o custo para fora da linha. */
+.estreito .selo-sigilo { max-width: 34%; }
+
 /* Selo do modelo ativo (fica à direita na barra de ferramentas) */
 .modelo-badge {
   border: 1px dashed var(--line); background: transparent; color: var(--muted);

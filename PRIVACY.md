@@ -95,6 +95,45 @@ OpenRouter, do fornecedor que ele acionar para atender o pedido).
 A relação contratual com o provedor de IA é **sua** (a chave de API é sua); a extensão é
 apenas o cliente técnico dessa comunicação.
 
+## 3-A. Modo sigiloso (anonimização local)
+
+Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
+
+- **As peças deixam de ser enviadas como arquivo.** Elas são lidas no seu
+  computador (camada de texto do PDF e, nas páginas digitalizadas, OCR local) e
+  o que vai ao provedor de IA é apenas TEXTO com os dados pessoais substituídos
+  por rótulos — `[PESSOA_1]`, `[CPF_2]`, `[PROCESSO_1]`. **O PDF não sai da
+  máquina**, e nenhum arquivo é enviado à Files API do provedor.
+- **O reconhecimento é 100% local.** O modelo de reconhecimento de entidades
+  (BERT em português, ~109 MB) vem dentro do pacote da extensão e roda no seu
+  navegador. Nenhum serviço externo é consultado para anonimizar.
+- **O que é mascarado**: nomes de pessoas e organizações, CPF, CNPJ, RG, OAB,
+  número do processo (CNJ), e-mail, telefone, CEP e NIT — nas peças, no título
+  de cada peça, na ficha do processo, no inventário, na linha do tempo, nas suas
+  instruções personalizadas, na tese que você informa ao minutar, nas peças-modelo
+  que você cadastrou e no texto que você digita.
+- **O RG é detectado pelo rótulo**, e isso é uma limitação real: ele não tem
+  dígito verificador padronizado, e um número solto de 7 a 9 dígitos é
+  indistinguível de qualquer outro. "RG 12.345.678-9", "cédula de identidade nº…"
+  e "registro geral…" são detectados; um número sem nenhuma dessas âncoras, não —
+  salvo quando pertence a uma parte, caso em que os dados da ficha do processo o
+  alcançam.
+- **O que é PRESERVADO, de propósito**: datas e prazos, legislação e
+  jurisprudência. Mascará-los destruiria a utilidade jurídica do documento sem
+  proteger ninguém.
+- **A tabela que desfaz a anonimização** (qual rótulo corresponde a qual nome)
+  é gravada **apenas no seu computador**, no banco local da extensão, por
+  processo. Ela nunca é enviada a lugar nenhum e nunca vai para a sincronização
+  da conta Google. Apagar a memória de caso nas opções a apaga junto.
+- **Barreira final**: antes de qualquer envio, a extensão confere o corpo da
+  requisição e **recusa o envio** se algum dos valores originais aparecer nele.
+  O bloqueio é do turno inteiro — nada é enviado pela metade.
+
+**Limites, ditos com honestidade.** Nenhum anonimizador automático é perfeito: o
+que escapar da detecção vai INTEIRO para o provedor. A barreira final cobre os
+valores que a extensão reconheceu; ela não inventa o que não foi detectado. A
+revisão do que sai continua sendo sua.
+
 ## 4. Responsabilidade sobre dados de processos (LGPD)
 
 Autos judiciais podem conter dados pessoais e dados sensíveis de partes, testemunhas e

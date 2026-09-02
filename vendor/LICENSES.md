@@ -17,7 +17,18 @@ peças). **Não** são carregados nas páginas do PJe.
 | `pdf.min.mjs` / `pdf.worker.min.mjs` | [pdfjs-dist](https://mozilla.github.io/pdf.js/) | 6.2.108 | extração | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.{min,worker.min}.mjs` | Apache-2.0 — © Mozilla Foundation |
 | `ppu-ocr.web.bundle.js` | [ppu-paddle-ocr](https://github.com/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr) + [onnxruntime-web](https://onnxruntime.ai) | 6.4.3 + 1.29.0 | OCR | bundle IIFE gerado com esbuild a partir de `ppu-paddle-ocr/web` | MIT + MIT |
 | `ort/ort-wasm-simd-threaded.jsep.{wasm,mjs}` | onnxruntime-web | 1.29.0 | OCR | `npm:onnxruntime-web@1.29.0/dist/` | MIT — © Microsoft |
+| `ort/ort.bundle.min.mjs` | onnxruntime-web | 1.29.0 | NER | `npm:onnxruntime-web@1.29.0/dist/` | MIT — © Microsoft |
 | `ocr-modelos/PP-OCRv6_tiny_{det,rec}.ort` + dicionário | PP-OCRv6 (PaddleOCR) | tiny | OCR | `https://huggingface.co/snowfluke/ppu-paddle-ocr-models` | Apache-2.0 — © PaddlePaddle |
+
+O ORT aparece em TRÊS peças, e elas vêm obrigatoriamente da MESMA compilação
+(1.29.0): o `.wasm`, o `.mjs` de cola e o `ort.bundle.min.mjs`. As duas
+primeiras já eram exigência do OCR; a terceira entrou com o NER, porque o
+bundle IIFE do OCR publica `window.PpuOcr` e **`window` não existe num Web
+Worker** — o worker precisa do ORT como módulo. O que ele NÃO duplica é o que
+pesa: o `ort.bundle.min.mjs` referencia exatamente
+`ort-wasm-simd-threaded.jsep.{mjs,wasm}`, os mesmos 27 MB que já estavam no
+pacote. Conferir ao atualizar:
+`grep -o "ort-wasm[a-z0-9.-]*" vendor/ort/ort.bundle.min.mjs`.
 
 `markmap-view.js` é um bundle IIFE que publica `window.markmap` e **consome `d3` global** —
 por isso a ordem dos `<script>` em `mapa.html` importa (d3 primeiro).
