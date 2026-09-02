@@ -1431,6 +1431,7 @@ button > svg { flex: none; }
 }
 .sk-acts button:hover:not(:disabled) { border-color: var(--ok-ink); color: var(--ok-ink); }
 .sk-acts button:disabled { opacity: 0.6; cursor: default; }
+.sk-acts .sk-remover:hover:not(:disabled) { border-color: var(--warn); color: var(--warn-ink); }
 /* O texto que vai sair: monoespaçado, quebrando linha, com rolagem PRÓPRIA —
    mesma anatomia do `.aud-texto`, porque é a mesma prova. */
 .sk-txt {
@@ -1508,11 +1509,47 @@ button > svg { flex: none; }
   font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
 }
 .sigilo-bloqueio .sb-aud:hover { border-color: var(--line-focus); color: var(--pje-2); }
-/* As saídas que PRESERVAM o nome. "Mascarar e reenviar" é a ação principal e
-   veste o gradiente do modo sigiloso (é o modo trabalhando a seu favor);
-   "Nova conversa" é secundária, salvo quando é a ÚNICA que preserva o nome
-   (`.destaque`, canal opaco). "Liberar" fica no vermelho de alerta, que é o
-   que ele é: abrir mão de uma proteção. */
+/* A DECISÃO: dois cartões de mesmo peso ("é dado pessoal → manter protegido"
+   e "não é → liberar"), lado a lado quando cabe, um sob o outro no painel
+   estreito. O botão de manter veste o gradiente do modo (é o modo trabalhando
+   a favor de quem o ligou); o de liberar fica em `--warn-*`, não em alerta: é
+   uma decisão legítima (palavra comum, órgão), não uma transgressão. */
+.sigilo-bloqueio .sb-valor > em.sb-orig {
+  font-style: normal; font-size: var(--fs-nano); color: var(--text-2);
+}
+.sigilo-bloqueio .sb-q {
+  margin: var(--sp-3) 0 var(--sp-2); font-size: var(--fs-meta); font-weight: 700; color: var(--ink);
+}
+.sigilo-bloqueio .sb-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--sp-2); margin-top: 0; }
+.sigilo-bloqueio .sb-card {
+  display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start;
+  padding: var(--sp-2b) var(--sp-3); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.sigilo-bloqueio .sb-card > b { font-size: var(--fs-meta); color: var(--ink); }
+.sigilo-bloqueio .sb-card > span { font-size: var(--fs-micro); color: var(--text-2); line-height: 1.45; }
+.sigilo-bloqueio .sb-card > button { margin-top: auto; }
+.sigilo-bloqueio .sb-proteger { border-color: var(--ok-line); }
+.sigilo-bloqueio .sb-soltar { border-color: var(--warn-line); }
+.sigilo-bloqueio .sb-global {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-nano); color: var(--text-2); cursor: pointer;
+}
+.sigilo-bloqueio .sb-global input { width: 13px; height: 13px; accent-color: var(--warn); }
+.sigilo-bloqueio .sb-sec { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2b); }
+.sigilo-bloqueio .sb-remover,
+.sigilo-bloqueio .sb-editar {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
+  font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
+}
+.sigilo-bloqueio .sb-remover:hover:not(:disabled),
+.sigilo-bloqueio .sb-editar:hover { border-color: var(--line-focus); color: var(--pje-2); }
+.sigilo-bloqueio .sb-liberar {
+  border: 1px solid var(--warn); background: var(--surface); color: var(--warn-ink);
+}
+.sigilo-bloqueio .sb-liberar:hover:not(:disabled) { background: var(--warn); color: var(--surface); }
+.sigilo-bloqueio.liberado .sb-nota { margin-top: var(--sp-2b); }
 .sigilo-bloqueio .sb-mascarar {
   border: none; border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
   background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
@@ -1692,6 +1729,9 @@ button > svg { flex: none; }
 /* indicador "digitando" enquanto o modelo não responde */
 .msg.assistant.typing { padding: 13px 16px; }
 .dots { display: inline-flex; gap: 4px; align-items: center; }
+/* O texto da espera ao lado dos pontos: "Analisando… — 12 s". */
+.msg.assistant .wait-t { margin-left: 8px; font-size: var(--fs-micro); color: var(--muted); }
+.msg.assistant .wait-t:empty { display: none; }
 .dots i {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--pje-soft); opacity: 0.3;
@@ -2735,6 +2775,15 @@ button > svg { flex: none; }
   border-radius: var(--r-pill); background: var(--ok-bg); color: var(--ok-ink);
   border: 1px solid var(--ok-line);
 }
+/* "não é dado pessoal" na tabela: pequeno, em aviso suave — decisão legítima,
+   e o lugar de corrigir um falso positivo antes de ele segurar um envio. */
+.aud-liberar {
+  margin-left: auto; border: 1px solid var(--warn-line); background: var(--surface);
+  color: var(--warn-ink); border-radius: var(--r-md); padding: 1px 7px;
+  font: inherit; font-size: var(--fs-nano); font-weight: 600; cursor: pointer;
+}
+.aud-liberar:hover:not(:disabled) { border-color: var(--warn); }
+.aud-liberar:disabled { opacity: 0.6; cursor: default; }
 .aud-sec {
   font-size: var(--fs-micro); font-weight: 600; color: var(--muted);
   padding: 10px 10px 4px; border-top: 1px solid var(--line); margin-top: 6px;

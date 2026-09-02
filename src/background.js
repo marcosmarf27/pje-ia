@@ -365,6 +365,28 @@ const MODEL_CAPS = {
   // aqui a regra que o Sonnet 5 já seguia: registramos o preço de TABELA, não
   // o promocional, para o rodapé nunca subestimar o custo (e para dois modelos
   // de preço igual não aparecerem com custos diferentes na mesma conversa).
+  // GEMINI 3.8 FLASH (02/09/2026). Id CONFERIDO na página de modelos da API
+  // (`gemini-3.8-flash` — o anúncio do 3.7 já ensinou a não confiar no nome
+  // do blog): 1.048.576 de entrada, 65.536 de saída, PDF/imagem/áudio/vídeo,
+  // thinking `low|medium|high` (o `minimal` NÃO existe e dá erro — o
+  // `EFFORT` da extensão só mapeia esses três, então nada muda). PREÇO de
+  // tabela igual ao 3.7 (1,50 / 7,50 / 0,15; promocional de metade até
+  // 31/12/2026 — registramos o de tabela, regra do Sonnet 5). Vem ANTES do
+  // 3.7 de propósito: `sugestaoRedacao` desempata por ordem, e o mais novo da
+  // linha é o que o provedor indica. `perfil` INFERIDO do tier — o 3.7 é que
+  // foi medido; ainda sem smoke test com chave real.
+  "gemini-3.8-flash": {
+    provider: "gemini",
+    perfil: "redacao", // Inferido: geração seguinte do 3.7, mesmo preço.
+    contextTokens: 1000000,
+    maxPages: 1000,
+    googleSearch: true,
+    citacoesNativas: false,
+    thinking: null,
+    effort: true, // vira generation_config.thinking_level
+    tokensPagina: 258,
+    preco: { in: 1.5, out: 7.5, cacheRead: 0.15 },
+  },
   "gemini-3.7-flash": {
     provider: "gemini",
     perfil: "redacao", // MEDIDO em uso real: o melhor para expedientes.
@@ -628,7 +650,7 @@ function custoUsdDe(usage, preco) {
 // citação por página a um modelo que não as produz).
 const FALLBACK_POR_PROVEDOR = {
   anthropic: "claude-haiku-4-5",
-  gemini: "gemini-3.7-flash",
+  gemini: "gemini-3.8-flash",
   openai: "gpt-5.6-luna",
 };
 function capsDe(model) {

@@ -148,7 +148,7 @@ const NOME_PROVEDOR = {
 // para ele; o provedor NÃO é gravado no storage — continua derivado do `model`.
 const PADRAO = {
   anthropic: "claude-haiku-4-5",
-  gemini: "gemini-3.7-flash",
+  gemini: "gemini-3.8-flash",
   openai: "gpt-5.6-luna",
   openrouter: "or:openai/gpt-5.6-luna",
 };
@@ -196,6 +196,7 @@ const PERFIS = {
   "claude-sonnet-5": "ambos",
   "claude-opus-4-8": "ambos",
   "claude-fable-5": "redacao",
+  "gemini-3.8-flash": "redacao",
   "gemini-3.7-flash": "redacao",
   "gemini-3.6-flash": "redacao",
   "gemini-3.5-flash-lite": "analise",

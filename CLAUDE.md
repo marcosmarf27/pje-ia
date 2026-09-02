@@ -2874,8 +2874,57 @@ para sempre. Regras:
   "Mascarar" antes de "Liberar"). O caminho da bolha na minuta e no mapa não
   tem teste de ponta a ponta.
 
-**A ESPERA PELO MODELO TEM RELÓGIO** (`comecarEspera`/`rotularEspera`/
-`pararEspera` em content.js, v0.56.1). Entre o Enter e o primeiro token pode
+**O BLOQUEIO É UMA DECISÃO: "este valor é um dado pessoal?"** (v0.57.0,
+depois de o dono do projeto não saber o que fazer diante de "ALIMENTOS"
+rotulado como pessoa e uma bolha que só oferecia "Liberar" ou "Nova
+conversa"). Regra do usuário, gravada em memória: **usabilidade e feedback
+são a prioridade; nunca um beco sem saída.** O que mudou:
+- **Opaco contaminado é DESCARTADO da cópia de saída** (`podeOmitirOpaco` em
+  `remascaradorDeSaida`): `x-openrouter-item` (a doc diz que omitir
+  `reasoning_details` é sempre seguro) e `x-openai-item` (o item `reasoning` é
+  opcional no histórico) saem quando carregam valor do mapa; no Gemini só o
+  `thought`. Perde-se o contexto de raciocínio daquele turno, e nada mais — era
+  ESTE o caso que obrigava a "nova conversa". `conversation` não muda.
+- **A bolha faz a pergunta e dá dois cartões de mesmo peso** (`.sb-card`):
+  "É dado pessoal → manter protegido" (`Manter protegido e reenviar`; a máscara
+  é refeita e o opaco descartado) e "Não é → liberar" (`Liberar e reenviar`,
+  com "também nos outros processos"). Mostra o VALOR, em que peça o rótulo
+  nasceu (`origemDoRotulo`) e onde ia sair. Ações sobre a PEÇA na linha
+  secundária: "Tirar «peça» desta conversa" (desmarca; os blocos saem do
+  request por construção — o "vamos excluir a peça" do usuário) e "Editar o
+  texto da peça" (só peça NOVA: o histórico é o que foi visto). "Nova
+  conversa" só quando é a única saída (`repetido`, ou opaco que a API não deixa
+  omitir).
+- **Liberar em todos os processos** (`liberadosGlobais`,
+  `chrome.storage.local.sigiloLiberadosGlobais`, no `negadoAtual`): a palavra
+  comum que o NER confundiu não aborda o usuário no processo seguinte. E a
+  tabela da auditoria ganhou "não é dado pessoal" por linha
+  (`onLiberarAuditoria`): o lugar de corrigir um falso positivo ANTES de ele
+  segurar um envio.
+- **`deny-list.json` PERSON ganhou o vocabulário processual** ("alimentos",
+  "curatela", "tutela", "guarda", "petição", "sentença", "requerente"…, ~120
+  entradas): casa só o valor INTEIRO normalizado, então nenhum nome de gente é
+  atingido. É a correção na ORIGEM; liberar é o remendo.
+- **"Não enviar" por peça na caixa de conferência** (`.sk-remover`;
+  `confirmarEnvioSigiloso` devolve `removidas`, e os três chamadores filtram
+  `idsNovosParaBlocos`/`dl.ok` e desmarcam). Peça removida continua em
+  `sigiloAguardando`: marcada de novo, a caixa a mostra outra vez.
+- Testado: `opaco` (o turno SAI, sem o item e sem o nome; a conversa gravada
+  mantém o item), `t-sigilo-56 bloqueio` (pergunta, dois cartões, ordem,
+  opção global, sem "Nova conversa"). Sem teste de ponta a ponta: "Tirar a
+  peça", "Editar" na bolha, liberar pela auditoria e "Não enviar" na caixa.
+
+**A ESPERA PELO MODELO TEM RELÓGIO — DENTRO DA BOLHA, no status e no campo**
+(`comecarEspera`/`rotularEspera`/`pararEspera` em content.js, v0.56.1, e
+`panel.setEspera` + placeholder do `lockInput`, v0.57.0). Terceiro relato do
+mesmo defeito ("Isso é horrível, cara! Você não sabe se deu erro e travou"):
+o status é um segundo lugar; o olho está na bolha. O texto "Analisando… —
+12 s" vai no `.wait-t` ao lado dos pontos, e o campo diz "Aguardando a
+resposta do modelo…" enquanto travado. **Teste PRINCIPAL antes de qualquer
+release**: `t-turno-sigiloso.mjs normal lento` (4 s até o primeiro token, com
+thinking e delta vazios no meio: pontos + texto que anda na bolha, no status e
+no placeholder) e `normal erro` (nenhuma bolha vazia sobra; o status diz o
+erro; o campo destrava). Entre o Enter e o primeiro token pode
 haver dezenas de segundos, e a tela mostrava uma bolha vazia com três pontos e o
 status em branco — relato real: "não sei se o chat está processando". O status
 conta os segundos ("Analisando… — 12 s"): um número que anda é o que distingue
@@ -4829,8 +4878,14 @@ expandido.
 - Modelos da API: manter os IDs do `popup.html`/`options.html` alinhados aos aliases
   atuais da Anthropic (`claude-haiku-4-5` — rápido e barato, mas com janela de 200 mil
   tokens/100 págs.; o Sonnet 5 de 1M é a opção para autos volumosos) e do Google
-  (`gemini-3.7-flash` — o mais novo da linha Flash, 08/2026, e o recomendado do
-  provedor; `gemini-3.6-flash` e `gemini-3.5-flash-lite` seguem na lista). **Modelo
+  (`gemini-3.8-flash` — o mais novo da linha Flash, 09/2026, id conferido na
+  página de modelos da API, mesmo preço de tabela do 3.7 e ainda sem smoke test;
+  `gemini-3.7-flash`, o único MEDIDO para redigir; `gemini-3.6-flash` e
+  `gemini-3.5-flash-lite` seguem na lista). Modelo novo entra em SEIS pontos:
+  `MODEL_CAPS` (antes do irmão que ele substitui — `sugestaoRedacao` desempata
+  por ordem), `FALLBACK_POR_PROVEDOR`, `PADRAO`/`PERFIS` do popup.js,
+  `NOMES_MODELO` do painel, os `<option>` das DUAS telas (grupo direto e grupo
+  OpenRouter, se o catálogo o tiver) e as tabelas do `help.html`/README. **Modelo
   que já esteve na lista NÃO é removido**: `select.value` com um id que sumiu deixa o
   campo VAZIO, e quem tinha aquele modelo salvo perderia a seleção. E a tabela
   `MODEL_CAPS` sincronizada com os docs (limites, versões de tools, thinking/effort).

@@ -673,6 +673,18 @@ sai em claro"** (`.aud-map.liberado` + `.aud-lib`): apagá-lo da tabela afirmari
 uma proteção que não existe, e ele continua resolvendo o rótulo de uma minuta
 antiga.
 
+**A bolha é uma PERGUNTA com dois cartões** (v0.57.0): "Este valor é um dado
+pessoal?" — `.sb-card.sb-proteger` ("É dado pessoal → manter protegido", botão
+no gradiente do modo) e `.sb-card.sb-soltar` ("Não é → liberar", em `--warn-*`:
+decisão legítima, não transgressão, com o checkbox "também nos outros
+processos"). Antes deles, o VALOR com a origem ("reconhecido como pessoa
+([PESSOA_9]) em «Contestação»") e onde ia sair. Abaixo, a linha `.sb-sec` com
+as ações sobre a peça ("Tirar «peça» desta conversa", "Editar o texto da
+peça") e a auditoria. Grid `auto-fit` de 230px: lado a lado no expandido, um
+sob o outro no flutuante. A versão anterior (abaixo, mantida como histórico)
+punha "Nova conversa" em destaque e chamava "Liberar" de abrir mão de uma
+proteção — e o dono do projeto, diante de "ALIMENTOS", não soube o que fazer.
+
 **As saídas que PRESERVAM o nome vêm primeiro** (v0.56.1). A versão anterior
 dizia "não há segundo botão: não clicar já é manter protegido" — e estava
 errada, porque não clicar deixava o usuário sem conseguir enviar. A bolha
@@ -726,10 +738,13 @@ gradiente do modo (`--sig-btn-*`); "Cancelar envio" nomeia a consequência. O
 a volta está nas Configurações — uma dispensa sem caminho de volta não é
 preferência, é armadilha.
 
-### A espera pelo modelo conta os segundos (`.status`)
+### A espera pelo modelo conta os segundos (`.status`, `.wait-t`, placeholder)
 
-Entre o Enter e o primeiro token o `.status` mostra "Analisando… — 12 s", e o
-número anda. É a única mudança visível enquanto o modelo raciocina, e é o que
+Entre o Enter e o primeiro token a BOLHA do assistente mostra os pontos e, ao
+lado, "Analisando… — 12 s" (`.wait-t`, `--fs-micro` em `--muted`); o `.status`
+repete; o campo diz "Aguardando a resposta do modelo…" enquanto travado. Três
+lugares porque o olho está na bolha, não no rodapé — foi o terceiro relato do
+mesmo defeito que fixou a regra. O número anda. É a única mudança visível enquanto o modelo raciocina, e é o que
 separa "esperando" de "travou" — uma bolha com três pontos parados não
 responde a essa pergunta (relato real). O relógio só aparece a partir de 3 s
 (antes disso seria ruído), troca de rótulo sem zerar quando a busca ou o

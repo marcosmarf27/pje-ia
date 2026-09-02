@@ -689,6 +689,12 @@
   // modo — o oposto do que ele existe para fazer. Vive no casodb ao lado do
   // mapa (é do PROCESSO) e alimenta o `negado` dos detectores.
   const liberadosSigilo = new Set();
+  // Valores liberados EM TODOS OS PROCESSOS ("curatela", "alimentos" — a
+  // palavra comum ou o termo jurídico que o reconhecedor confundiu com nome).
+  // Vive em `chrome.storage.local.sigiloLiberadosGlobais` (normalizados): é
+  // propriedade do USUÁRIO, não do processo, e a deny list embarcada nunca
+  // cobre tudo. Entra no `negado` como os liberados do processo.
+  const liberadosGlobais = new Set();
   // Peças cujo mascaramento NÃO fechou: id -> {text, pages, sobras}. O texto
   // mascarado até onde deu fica aqui para o usuário REVISAR num editor e
   // decidir (mascarar à mão, liberar o valor, ou usar o texto como está).
@@ -1453,10 +1459,14 @@
       // ou OpenAI) — o provedor sai do prefixo do id, sem esperar o caps
       // chegar. customPrompt pega carona na mesma leitura (evita um get a mais).
       chrome.storage.local.get(
-        ["apiKey", "geminiApiKey", "openaiApiKey", "openrouterApiKey", "model", "customPrompt", "sigiloAprovar"],
+        ["apiKey", "geminiApiKey", "openaiApiKey", "openrouterApiKey", "model", "customPrompt", "sigiloAprovar", "sigiloLiberadosGlobais"],
         (v) => {
           customPrompt = (v.customPrompt || "").trim();
           sigiloAprovar = v.sigiloAprovar !== false;
+          liberadosGlobais.clear();
+          for (const x of Array.isArray(v.sigiloLiberadosGlobais) ? v.sigiloLiberadosGlobais : []) {
+            if (typeof x === "string" && x) liberadosGlobais.add(x);
+          }
           const m = String(v.model || "");
           const configurado = m.startsWith("or:")
             ? !!v.openrouterApiKey
@@ -1507,6 +1517,12 @@
     }
     if (area === "local" && ch.sigiloAprovar) {
       sigiloAprovar = ch.sigiloAprovar.newValue !== false;
+    }
+    if (area === "local" && ch.sigiloLiberadosGlobais) {
+      liberadosGlobais.clear();
+      for (const x of Array.isArray(ch.sigiloLiberadosGlobais.newValue) ? ch.sigiloLiberadosGlobais.newValue : []) {
+        if (typeof x === "string" && x) liberadosGlobais.add(x);
+      }
     }
   });
   panel.onConfigure(() => {
@@ -3148,8 +3164,12 @@
   // peça voltaria mascarado no título.
   function negadoAtual() {
     const deny = negadoSigilo || (() => false);
-    if (!liberadosSigilo.size) return deny;
-    return (tipo, valor) => deny(tipo, valor) || liberadosSigilo.has(PSEUD.normalizar(valor).trim());
+    if (!liberadosSigilo.size && !liberadosGlobais.size) return deny;
+    return (tipo, valor) => {
+      if (deny(tipo, valor)) return true;
+      const n = PSEUD.normalizar(valor).trim();
+      return liberadosSigilo.has(n) || liberadosGlobais.has(n);
+    };
   }
 
   // Ocorrências literais, neste texto, de tudo o que o mapa JÁ mascarou em
@@ -3294,15 +3314,24 @@
   //     em claro na ficha). Os turnos ANTERIORES do histórico, já enviados com
   //     o rótulo, ficam como estão: a API os viu assim.
   // Devolve o valor liberado, ou null se o rótulo não existia.
-  async function liberarRotulo(rotulo) {
+  async function liberarRotulo(rotulo, opcoes) {
     if (!mapaSigilo) return null;
     const valor = mapaSigilo.liberar(rotulo);
     if (valor == null) return null;
     // TODAS as formas vistas, não só a canônica: o `negado` compara o literal
     // normalizado, e "Banco Bradesco S.A." liberado só por "BANCO BRADESCO"
     // voltaria pelo NER na peça seguinte.
-    for (const f of [valor].concat(mapaSigilo.formasDe(rotulo))) {
-      liberadosSigilo.add(PSEUD.normalizar(f).trim());
+    const formas = [valor].concat(mapaSigilo.formasDe(rotulo)).map((f) => PSEUD.normalizar(f).trim());
+    for (const f of formas) liberadosSigilo.add(f);
+    // "Em todos os processos": a palavra comum que o reconhecedor confundiu com
+    // nome ("curatela") não deve abordar o usuário de novo no processo seguinte.
+    if (opcoes && opcoes.global) {
+      for (const f of formas) liberadosGlobais.add(f);
+      try {
+        chrome.storage.local.set({ sigiloLiberadosGlobais: [...liberadosGlobais] });
+      } catch {
+        /* contexto invalidado: vale só nesta sessão */
+      }
     }
     for (const [id, d] of sigiloCache) {
       if (d && typeof d.text === "string" && d.text.includes(rotulo)) {
@@ -3341,6 +3370,18 @@
   // NOVO pelo mesmo rótulo, "Mascarar e reenviar" viraria um laço — o valor
   // está onde a remáscara não chega, e a saída é a conversa nova.
   let ultimoBloqueioWorker = null;
+  // Em que peça o rótulo aparece — é o que dá ao usuário base para decidir se
+  // "ALIMENTOS" é uma pessoa: "reconhecido em «Petição de alimentos»" responde
+  // sozinho. Primeira peça do cache cujo texto carrega o rótulo.
+  function origemDoRotulo(rotulo) {
+    if (!rotulo) return null;
+    for (const [id, d] of sigiloCache) {
+      if (d && typeof d.text === "string" && d.text.includes(rotulo)) {
+        return { id, titulo: metaDe(id).titulo };
+      }
+    }
+    return null;
+  }
   function tratarBloqueioSigilo(e, textoDigitado, reenviar, bolhaUsuario) {
     if (!e || !e.vazamento) return false;
     const rotulo = e.rotulo || null;
@@ -3353,6 +3394,7 @@
     // criaria duas perguntas iguais e a conversa gravada carregaria ambas.
     if (bolhaUsuario) panel.removeMessage(bolhaUsuario);
     if (textoDigitado) panel.restaurarTexto(textoDigitado);
+    const origem = origemDoRotulo(rotulo);
     panel.mostrarBloqueioSigilo({
       tipo: e.tipo || null,
       rotulo,
@@ -3361,18 +3403,35 @@
       reenvia: !!reenviar,
       // ONDE o valor estava (só a conferência local sabe) e se dá para
       // reescrever. Sem `onde`, o bloqueio veio do worker: a remáscara do
-      // histórico já roda em todo envio, então "Mascarar e reenviar" é a
-      // tentativa certa — e, se bloquear de novo, a bolha volta com o canal.
+      // histórico já roda em todo envio, então "Manter protegido e reenviar"
+      // é a tentativa certa — e, se bloquear de novo, a bolha muda de saída.
       onde: e.onde || null,
+      origem: origem && origem.titulo ? origem.titulo : null,
       editavel: e.editavel !== false,
       repetido,
-      // As saídas que PRESERVAM o nome: reenviar com a máscara refeita (chat)
-      // ou começar uma conversa nova (as peças mascaradas e o mapa continuam).
       onMascarar: reenviar && e.editavel !== false && !repetido ? () => reenviar() : null,
       onNovaConversa: () => panel.novaConversa(),
+      // A peça atingida pode SAIR desta conversa: desmarcada, os blocos dela
+      // ficam fora do request por construção (`prepararEnvio` filtra por
+      // `ativos`). É o "vamos excluir a peça" pedido pelo usuário.
+      pecaTitulo: e.pecaTitulo || null,
+      onRemoverPeca:
+        e.pecaId
+          ? () => {
+              panel.desmarcarPecas([e.pecaId]);
+              if (reenviar) reenviar();
+            }
+          : null,
+      // E a peça NOVA (ainda fora do histórico) pode ter o texto corrigido à
+      // mão: o editor grava no `sigiloCache`, que é o que `montarBlocos` lê.
+      // Peça de turno anterior não: o bloco do histórico é o que foi visto.
+      onEditarPeca:
+        e.pecaId && e.pecaNova && sigiloCache.has(e.pecaId)
+          ? () => revisarPecaAprovacao(e.pecaId).then((salvou) => salvou && reenviar && reenviar())
+          : null,
       onLiberar: rotulo
-        ? async () => {
-            const v = await liberarRotulo(rotulo);
+        ? async (opts) => {
+            const v = await liberarRotulo(rotulo, opts);
             if (v == null) {
               panel.setStatus("Este rótulo já não está no mapa.");
               return;
@@ -3702,7 +3761,12 @@
     if (!d || typeof d.text !== "string" || !mapaSigilo) return d;
     const v = versaoMapaSigilo();
     if (d.versaoMascara === v) return d;
-    const t = mascararCurto(d.text);
+    // SÓ o gazetteer do mapa (rótulos que JÁ existem), nunca os detectores:
+    // isto roda em toda repintura da auditoria, sem envio, e descobrir um
+    // valor novo aqui gravaria rótulo no mapa por um clique no selo. A
+    // remáscara de ENVIO (`remascaradorDeSaida`) é que pode descobrir.
+    const achados = achadosDoMapa(d.text);
+    const t = achados.length ? PSEUD.mascarar(d.text, achados, mapaSigilo) : d.text;
     const novo = Object.assign({}, d, { text: t, versaoMascara: v });
     sigiloCache.set(id, novo);
     return novo;
@@ -3722,7 +3786,7 @@
     // `recarregar` relê o cache: editar ou liberar de dentro da caixa muda o
     // texto de uma peça (liberar muda o de várias), e a caixa repinta.
     const dados = () => ({ itens: mapaSigilo.tabela(), pecas: pend.map(fichaAprovacao) });
-    const ok = await panel.confirmarEnvioSigiloso({
+    const r = await panel.confirmarEnvioSigiloso({
       dados: dados(),
       recarregar: dados,
       onEditar: (id) => revisarPecaAprovacao(id),
@@ -3735,7 +3799,7 @@
         }
       },
     });
-    if (!ok) {
+    if (!r || !r.ok) {
       const e = new Error(
         "Envio cancelado na conferência. As peças anonimizadas continuam prontas — " +
           "ao enviar de novo, a conferência aparece outra vez."
@@ -3743,11 +3807,17 @@
       e.cancelado = true;
       throw e;
     }
-    for (const id of pend) sigiloAguardando.delete(id);
+    // "Não enviar" numa peça: ela sai da seleção (desmarcada, os blocos dela
+    // ficam fora do request por construção) e continua esperando aprovação —
+    // se o usuário a marcar de novo, a caixa a mostra outra vez.
+    const removidas = new Set((r.removidas || []).map(String));
+    if (removidas.size) panel.desmarcarPecas([...removidas]);
+    for (const id of pend) if (!removidas.has(String(id))) sigiloAguardando.delete(id);
     // O selo e a caixa de auditoria passam a contar as peças aprovadas: até
     // aqui o retrato era o do fim de `anonimizarLote`, tirado ANTES da
     // aprovação, e a auditoria mostraria peça de menos.
     panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+    return removidas;
   }
   // Editor de revisão aberto DE DENTRO da caixa de aprovação, para uma peça
   // que a pós-condição já aprovou: confere de novo e regrava o cache. Sem
@@ -3756,7 +3826,8 @@
   // com o texto que vale agora.
   function revisarPecaAprovacao(id) {
     const d = sigiloCache.get(id);
-    if (!d) return Promise.resolve();
+    if (!d) return Promise.resolve(false);
+    let salvou = false;
     return new Promise((resolve) => {
       panel.abrirEditorSigilo({
         id,
@@ -3785,9 +3856,10 @@
             console.warn("[PJe IA] guarda não re-armada após a revisão:", (e && e.message) || e);
           }
           panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+          salvou = true;
           return { ok: true };
         },
-        onFechar: resolve,
+        onFechar: () => resolve(salvou),
       });
     });
   }
@@ -3986,6 +4058,9 @@
     return L.join("\n");
   }
 
+  // "Não é dado pessoal" na tabela da auditoria: o lugar natural de corrigir um
+  // falso positivo ANTES de ele bloquear alguma coisa.
+  panel.onLiberarAuditoria((rotulo, opts) => liberarRotulo(rotulo, opts));
   panel.onBaixarAuditoria(() => {
     try {
       // O NOME DO ARQUIVO também é um canal: o CNJ identifica o processo e, por
@@ -5639,9 +5714,11 @@
           if (ativos && !ativos.has(b.__pecaId)) continue; // peça desmarcada: fora do request
           const limpo = Object.assign({}, b);
           delete limpo.__pecaId;
-          content.push(remascarar ? remascarar(b, limpo) : limpo);
+          const r = remascarar ? remascarar(b, limpo) : limpo;
+          if (r !== null) content.push(r);
         } else {
-          content.push(remascarar ? remascarar(b, b) : b);
+          const r = remascarar ? remascarar(b, b) : b;
+          if (r !== null) content.push(r); // null = opaco contaminado, descartado
         }
       }
       return { role: t.role, content };
@@ -5676,6 +5753,19 @@
   function versaoMapaSigilo() {
     return mapaSigilo ? mapaSigilo.tabela().length + "/" + liberadosSigilo.size : "";
   }
+  // BLOCO OPACO que pode ser OMITIDO do reenvio sem quebrar o request: o
+  // raciocínio do OpenRouter (`reasoning_details` — a doc diz que omitir é
+  // sempre seguro) e o item `reasoning` criptografado da OpenAI (opcional no
+  // histórico; a mensagem que ele produziu segue sozinha). No Gemini só o
+  // `thought` assinado é opcional; `model_output` assinado e os steps de busca
+  // (tudo ou nada) NÃO podem sair — para esses vale a conferência local, que
+  // aponta o raciocínio como não reescrevível.
+  function podeOmitirOpaco(b) {
+    if (!b || typeof b.type !== "string") return false;
+    if (b.type === "x-openrouter-item" || b.type === "x-openai-item") return true;
+    if (b.type === "x-gemini-item") return !!(b.raw && b.raw.type === "thought");
+    return false;
+  }
   function remascaradorDeSaida() {
     const versao = versaoMapaSigilo();
     const memo = !medindoSemGravar;
@@ -5686,7 +5776,20 @@
         if (m && m.versao === versao) return m.bloco;
       }
       let saida = bloco;
-      if (bloco.type === "text" && typeof bloco.text === "string") {
+      if (typeof bloco.type === "string" && bloco.type.startsWith("x-")) {
+        // Opaco: não dá para reescrever. Se carrega um valor do mapa (o modelo
+        // repetiu um nome no raciocínio antes de o mapa aprendê-lo — ou uma
+        // palavra comum que o NER rotulou), o bloco é DESCARTADO quando a API
+        // permite: perde-se o contexto de raciocínio daquele turno, e nada
+        // mais. Era este o beco sem saída ("comece uma nova conversa").
+        let txt = null;
+        try {
+          txt = JSON.stringify(bloco.raw || bloco);
+        } catch {
+          txt = null;
+        }
+        if (txt != null && podeOmitirOpaco(bloco) && !PSEUD.conferir(txt, mapaSigilo).ok) saida = null;
+      } else if (bloco.type === "text" && typeof bloco.text === "string") {
         const t = mascararCurto(bloco.text);
         if (t !== bloco.text) saida = Object.assign({}, bloco, { text: t });
       } else if (
@@ -5731,6 +5834,9 @@
         let texto = null;
         let onde = null;
         let editavel = true;
+        let pecaId = null;
+        let pecaTitulo = null;
+        let pecaNova = false;
         if (b.type === "text" && typeof b.text === "string") {
           texto = b.text;
           onde =
@@ -5745,6 +5851,11 @@
             "no texto da peça " +
             (b.title ? "«" + String(b.title).slice(0, 60) + "»" : "anexada") +
             (i === ultimo ? "" : ", enviada num turno anterior");
+          // O id vem do título ("123456 - Nome"), o mesmo canal das citações.
+          const m = /^(\d{6,})\b/.exec(String(b.title || ""));
+          pecaId = m ? m[1] : null;
+          pecaTitulo = b.title || null;
+          pecaNova = i === ultimo;
         } else if (typeof b.type === "string" && b.type.startsWith("x-")) {
           try {
             texto = JSON.stringify(b.raw || b);
@@ -5768,6 +5879,9 @@
         e.rotulo = conf.rotulo || null;
         e.onde = onde;
         e.editavel = editavel;
+        e.pecaId = pecaId;
+        e.pecaTitulo = pecaTitulo;
+        e.pecaNova = pecaNova;
         e.local = true;
         e.retryable = false;
         throw e;
@@ -5874,15 +5988,20 @@
   let esperaT0 = 0;
   let esperaRotulo = "";
   let esperaIcone = undefined;
+  let esperaEl = null; // a bolha do assistente que carrega o texto da espera
   function pintarEspera() {
     const seg = Math.round((Date.now() - esperaT0) / 1000);
-    panel.setStatus(esperaRotulo + (seg >= 3 ? " — " + seg + " s" : ""), true, esperaIcone);
+    const texto = esperaRotulo + (seg >= 3 ? " — " + seg + " s" : "");
+    panel.setStatus(texto, true, esperaIcone);
+    // E DENTRO DA BOLHA, que é onde o olho está (o status é um segundo lugar).
+    if (esperaEl) panel.setEspera(esperaEl, texto);
   }
-  function comecarEspera(rotulo, icone) {
+  function comecarEspera(rotulo, icone, el) {
     pararEspera();
     esperaT0 = Date.now();
     esperaRotulo = rotulo;
     esperaIcone = icone;
+    esperaEl = el || null;
     pintarEspera();
     esperaTimer = setInterval(pintarEspera, 1000);
   }
@@ -5895,6 +6014,8 @@
   function pararEspera() {
     if (esperaTimer) clearInterval(esperaTimer);
     esperaTimer = null;
+    if (esperaEl) panel.setEspera(esperaEl, "");
+    esperaEl = null;
   }
 
   function stream(messages, handlers, opts, tipo) {
@@ -6757,7 +6878,7 @@
       // algo a analisar. "Nada baixou" só derruba o turno quando não há mais nada
       // — nem histórico, nem anexo —; do contrário seguimos com o que existe e as
       // falhas viram relatório (o usuário não perde a pergunta que já digitou).
-      const idsNovosParaBlocos = [...anexadas, ...anexosNovos];
+      let idsNovosParaBlocos = [...anexadas, ...anexosNovos];
       // `!anexos.size` fecha a SEGUNDA metade do bloqueio do turno só-de-anexo:
       // no 2º turno não há nada NOVO (o arquivo já subiu) e `pecasNaConversa`
       // está vazio, então mesmo passando a guarda lá de cima o turno morria
@@ -6811,7 +6932,18 @@
         // CONFERÊNCIA HUMANA antes de qualquer rede: depois de peças E anexos
         // mascarados, antes do upload dos anexos, do pré-voo e do stream.
         // Cancelar lança `cancelado` (tratado no catch: o texto volta ao campo).
-        await confirmarEnvioSigiloso(idsNovosParaBlocos);
+        const removidas = (await confirmarEnvioSigiloso(idsNovosParaBlocos)) || new Set();
+        if (removidas.size) {
+          anexadas = anexadas.filter((id) => !removidas.has(String(id)));
+          idsNovosParaBlocos = idsNovosParaBlocos.filter((id) => !removidas.has(String(id)));
+          if (!idsNovosParaBlocos.length && !pecasNaConversa.size && !anexos.size) {
+            const e = new Error(
+              "Nenhuma peça ficou no envio. Marque outras peças (ou volte a marcar esta) e envie de novo."
+            );
+            e.cancelado = true;
+            throw e;
+          }
+        }
         await subirAnexos(anexosNovos);
         stripOldCacheControl();
         // O TEXTO DIGITADO É RE-MASCARADO DEPOIS das peças, e a ordem importa.
@@ -6988,8 +7120,8 @@
         conversaProvider = (modelCaps && modelCaps.provider) || "anthropic";
       }
 
-      comecarEspera("Analisando…" + infoCtx);
       assistantEl = panel.addMessage("assistant", "");
+      comecarEspera("Analisando…" + infoCtx, undefined, assistantEl);
       // Citações deste turno: marcadores [n] entram no texto via placeholders
       // (área de uso privado do Unicode — sobrevivem intactos ao escape do
       // renderizador) e a lista numerada vai no rodapé da mensagem.
@@ -7093,7 +7225,7 @@
           truncated = false;
           statusFerramenta = false;
           panel.updateAssistant(assistantEl, acc, cites);
-          panel.setStatus("O serviço da extensão reiniciou — reenviando a análise…", true);
+          comecarEspera("O serviço da extensão reiniciou — reenviando a análise…", undefined, assistantEl);
         },
       }, opts);
       registrarCusto(fim);
@@ -8004,7 +8136,15 @@
       if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
       // Conferência humana do modo sigiloso, antes de qualquer rede (a minuta
       // não tem anexos do input: o delta é o que acabou de ser mascarado).
-      await confirmarEnvioSigiloso(dl.ok);
+      {
+        const rem = (await confirmarEnvioSigiloso(dl.ok)) || new Set();
+        if (rem.size) dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
+        if (!dl.ok.length) {
+          const e = new Error("Nenhuma peça ficou no envio. Marque outras peças e gere de novo.");
+          e.cancelado = true;
+          throw e;
+        }
+      }
       // Teto de páginas do modelo que vai REDIGIR: o do chat barraria em 100
       // páginas (Haiku) uma minuta que vai rodar no Sonnet 5, que aceita 600.
       guardaPaginas(dl.ok, capsMinuta);
@@ -8122,7 +8262,7 @@
       await estimarContexto(messages, optsMinuta);
       assistantEl = panel.addMessage("assistant", "");
 
-      comecarEspera("Gerando a minuta…");
+      comecarEspera("Gerando a minuta…", undefined, assistantEl);
       const fimMinuta = await stream(messages, {
         onDelta(delta) {
           if (!delta) return;
@@ -8423,7 +8563,15 @@
       const dl = await baixarSelecionadas(selectedIds);
       if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
       // Conferência humana do modo sigiloso, antes de qualquer rede.
-      await confirmarEnvioSigiloso(dl.ok);
+      {
+        const rem = (await confirmarEnvioSigiloso(dl.ok)) || new Set();
+        if (rem.size) dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
+        if (!dl.ok.length) {
+          const e = new Error("Nenhuma peça ficou no envio. Marque outras peças e gere de novo.");
+          e.cancelado = true;
+          throw e;
+        }
+      }
       guardaPaginas(dl.ok);
       await subirPecas(dl.ok);
       const blocos = montarBlocos(dl.ok);
@@ -8485,7 +8633,7 @@
       await estimarContexto(messages, optsMapa);
       assistantEl = panel.addMessage("assistant", "");
 
-      comecarEspera("Gerando o mapa mental…");
+      comecarEspera("Gerando o mapa mental…", undefined, assistantEl);
       const fimMapa = await stream(messages, {
         onDelta(delta) {
           if (!delta) return;

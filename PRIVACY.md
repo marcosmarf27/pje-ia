@@ -127,9 +127,12 @@ Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
   da conta Google. Apagar a memória de caso nas opções a apaga junto.
 - **Barreira final**: antes de qualquer envio, a extensão confere o corpo da
   requisição e **recusa o envio** se algum dos valores originais aparecer nele.
-  O bloqueio é do turno inteiro — nada é enviado pela metade. A bolha diz onde
-  o valor estava e oferece manter o nome protegido (mascarar e reenviar, ou nova
-  conversa mantendo as peças); liberar é só para o que não é dado pessoal.
+  O bloqueio é do turno inteiro — nada é enviado pela metade. A bolha mostra o
+  valor e onde ele estava e pergunta se é um dado pessoal: manter protegido e
+  reenviar (a máscara é refeita; o raciocínio guardado do modelo que o carregava
+  é descartado) ou liberar — neste processo ou em todos —, além de tirar a peça
+  da conversa. Valores liberados "em todos os processos" ficam em
+  `chrome.storage.local` (normalizados), nunca em sincronização.
 
 - **Você APROVA antes de sair.** Quando o envio traz peça recém-anonimizada,
   uma caixa mostra o texto exatamente como vai sair, peça por peça, e espera a

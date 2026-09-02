@@ -103,7 +103,39 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.56.1</span> <strong>Bloqueio com saída</strong> que preserva o nome, e a espera que se vê</h2>
+        <h2><span class="v novo">v0.57.0</span> O bloqueio vira uma <strong>pergunta</strong>, a espera se vê, e chega o <strong>Gemini 3.8 Flash</strong></h2>
+        <p>
+          <strong>“Este valor é um dado pessoal?”</strong> Quando a proteção do modo sigiloso
+          segura um envio, a bolha agora mostra o valor, em que peça ele foi reconhecido e onde
+          ia sair — e faz essa pergunta, com dois caminhos de mesmo peso: <strong>Manter
+          protegido e reenviar</strong> (a máscara é refeita em toda a conversa; o raciocínio
+          guardado do modelo que carregava o valor é descartado, e nada mais) ou
+          <strong>Liberar e reenviar</strong>, para palavra comum, termo jurídico ou órgão que o
+          reconhecedor confundiu com um nome — com a opção “também nos outros processos”. Dá
+          ainda para <strong>tirar a peça desta conversa</strong> ou editar o texto dela. “Nova
+          conversa” deixou de ser a saída. Na tabela da auditoria cada linha ganhou “não é dado
+          pessoal”, e a caixa de conferência ganhou “Não enviar” por peça. E o reconhecedor
+          deixou de tratar como pessoa o vocabulário do processo: “alimentos”, “curatela”,
+          “tutela”, “petição”, “sentença” e mais uma centena de termos.
+        </p>
+        <p>
+          <strong>A espera se vê onde o olho está.</strong> A bolha da resposta mostra
+          “Analisando… — 12 s” ao lado dos pontos, o campo diz “Aguardando a resposta do
+          modelo…” e o status repete. Uma bolha em branco durante o raciocínio era
+          indistinguível de travamento, e nenhuma sobrevive a um erro.
+        </p>
+        <p>
+          O <strong>Gemini 3.8 Flash</strong>, lançado hoje pelo Google, entra na lista de modelos
+          — nas duas telas de configuração, no grupo direto e no do OpenRouter — e passa a ser o
+          indicado do cartão Gemini. Mesma janela (1M tokens, até 1000 páginas) e mesmo preço de
+          tabela do 3.7 (US$ 1,50 / 7,50 por milhão; promocional de metade até o fim de 2026), com
+          os três níveis de raciocínio que a extensão já usa. O 3.7 continua na lista: é o único
+          Gemini medido em uso real para redigir, e o 3.8 ainda não passou por isso aqui.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.56.1</span> <strong>Bloqueio com saída</strong> que preserva o nome, e a espera que se vê</h2>
         <p>
           <strong>Você não precisa mais liberar um nome para conseguir enviar.</strong> Quando a
           proteção bloqueava um envio, a bolha só oferecia “Liberar neste processo” — e quem
@@ -1968,6 +2000,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.57.0</span></td><td>02/09/2026</td><td><strong>O bloqueio da proteção vira uma pergunta</strong> (“este valor é um dado pessoal?”) com dois caminhos: manter protegido e reenviar (o raciocínio guardado que carregava o valor é descartado) ou liberar, neste processo ou em todos; tirar a peça da conversa; “não é dado pessoal” na auditoria; “Não enviar” por peça na conferência; vocabulário processual fora do reconhecedor de nomes. A espera pelo modelo aparece dentro da bolha e no campo. <strong>Gemini 3.8 Flash</strong> entra na lista (direto e via OpenRouter) e vira o indicado do cartão Gemini</td></tr>
             <tr><td><span class="v">0.56.1</span></td><td>02/09/2026</td><td><strong>Bloqueio da proteção com saída que preserva o nome.</strong> A conversa inteira é remascarada com o mapa atual a cada envio (um nome descoberto tarde não volta em claro num bloco antigo); a conferência roda antes de qualquer rede e diz onde o valor estava; a bolha oferece “Mascarar e reenviar” e “Nova conversa (mantém as peças)” antes de “Liberar”, também na minuta e no mapa. A espera pelo modelo conta os segundos no status e a bolha mantém o indicador até haver texto</td></tr>
             <tr><td><span class="v">0.56.0</span> <span class="dot-marco"></span></td><td>02/09/2026</td><td><strong>Modo sigiloso corrigido, visível e negociável.</strong> A lista de termos nunca mascarados não carregava (faltava no manifesto); o que o reconhecedor achava numa peça não era aplicado na ficha, nos títulos e na pergunta, e a última barreira bloqueava o envio por um órgão público. Agora tudo o que já foi mascarado vale em todos os canais, órgãos públicos saem em claro por prefixo, e um bloqueio vira decisão na conversa: “Liberar neste processo” devolve a pergunta ao campo e reenvia. Peça que não pôde ser anonimizada diz isso; o card não conta além do total. Os nomes voltam na tela (a resposta chega com rótulos e é reidentificada pela tabela local, marcada) e no editor de minutas (“Restaurar nomes”); formas diferentes do mesmo nome recebem um rótulo só. O painel inteiro muda de cor com o modo ligado (cabeçalho verde, tarja com a contagem, botão Enviar). Abrir, fechar, trocar de modo e recolher a lista ganharam animações perceptíveis. OpenRouter: modelo que não lê PDF (DeepSeek, GLM) recebe o texto extraído no computador do usuário, com OCR local — o processo de 120 folhas que batia em “~22 MB” passa; DeepSeek atualizado para o V4 Flash 0731 (1,3M); teto de tamanho por fabricante nos modelos que leem PDF; liberar um nome libera todas as formas dele. E o envio passou a pedir aprovação: uma caixa mostra o texto anonimizado exatamente como vai sair, peça por peça, com editar/mascarar/liberar, antes de qualquer coisa ir ao provedor (chat, minuta e mapa; desligável nas Configurações)</td></tr>
             <tr><td><span class="v">0.55.0</span></td><td>01/09/2026</td><td><strong>Anonimização local antes do envio (modo sigiloso).</strong> Com o botão Sigiloso ligado, as peças vão como texto com nomes, CPF, CNPJ, OAB, e-mail, telefone e o número do processo substituídos por rótulos estáveis, reconhecidos no próprio computador por regras com dígito verificador, pela ficha do processo e por um modelo de entidades em português; o PDF não sai da máquina. Uma guarda no serviço da extensão confere cada requisição antes de sair. Caixa de auditoria mostra o texto exatamente como foi enviado e a tabela de reidentificação, que fica só na tela; relatório de conferência para baixar sem a tabela</td></tr>

@@ -18,6 +18,7 @@ var PjePanel = (function () {
     "claude-sonnet-5": "Claude Sonnet 5",
     "claude-opus-4-8": "Claude Opus 4.8",
     "claude-fable-5": "Claude Fable 5",
+    "gemini-3.8-flash": "Gemini 3.8 Flash",
     "gemini-3.7-flash": "Gemini 3.7 Flash",
     "gemini-3.6-flash": "Gemini 3.6 Flash",
     "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite",
@@ -2245,6 +2246,7 @@ var PjePanel = (function () {
     let audDados = null;
     let audbox = null;
     let audBaixarCb = null;
+    let audLiberarCb = null;
 
     function fecharAud() {
       if (!audbox) return;
@@ -2418,6 +2420,24 @@ var PjePanel = (function () {
             l.className = "aud-lib";
             l.textContent = "liberado — sai em claro";
             row.appendChild(l);
+          } else if (audLiberarCb) {
+            // O lugar natural de corrigir um falso positivo ANTES de ele
+            // segurar um envio: "ALIMENTOS" não é pessoa, e quem lê a tabela
+            // vê isso na hora. Escopo do processo; o global fica na bolha.
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "aud-liberar";
+            b.textContent = "não é dado pessoal";
+            b.title = "Libera este valor neste processo: passa a sair em claro";
+            b.addEventListener("click", async () => {
+              b.disabled = true;
+              try {
+                await audLiberarCb(it.rotulo, { global: false });
+              } catch (e) {
+                b.disabled = false;
+              }
+            });
+            row.appendChild(b);
           }
           lista.appendChild(row);
         }
@@ -2984,9 +3004,12 @@ var PjePanel = (function () {
     function estruturaAssistant(el) {
       if (el.__body) return el;
       el.classList.remove("typing");
+      // O corpo NASCE com o indicador de digitação: enquanto só há raciocínio
+      // (o bloco "Raciocínio" aberto acima), os pontos dizem que a resposta
+      // ainda está por vir. O primeiro `updateAssistant` com texto os substitui.
       el.innerHTML =
         '<details class="think" hidden><summary>Raciocínio</summary><div class="think-t"></div></details>' +
-        '<div class="body"></div>' +
+        '<div class="body"><span class="dots"><i></i><i></i><i></i></span><span class="wait-t"></span></div>' +
         '<button class="copy" title="Copiar texto da resposta">' + SVG.copy + "</button>";
       el.__think = el.querySelector(".think");
       el.__thinkT = el.querySelector(".think-t");
@@ -3497,14 +3520,19 @@ var PjePanel = (function () {
     // ids cujo texto está aberto — preservado no repintar (editar uma peça não
     // pode fechar as outras que o usuário estava lendo)
     const sigokAbertos = new Set();
+    // ids que o usuário tirou DESTE envio ("Não enviar"): voltam ao content
+    // no {ok:true, removidas}, que os desmarca.
+    const sigokRemovidas = new Set();
     function responderSigok(v) {
       const r = sigokResolve;
+      const removidas = [...sigokRemovidas];
       sigokResolve = null;
       sigokInfo = null;
       sigokBox.hidden = true;
       sigokList.textContent = "";
       sigokAbertos.clear();
-      if (r) r(v);
+      sigokRemovidas.clear();
+      if (r) r(v ? { ok: true, removidas } : false);
     }
     $(".sigok-close").addEventListener("click", () => responderSigok(false));
     $(".sigok-cancel").addEventListener("click", () => responderSigok(false));
@@ -3524,7 +3552,7 @@ var PjePanel = (function () {
     });
     const RE_ROTULO_SK = /\[([A-Z][A-Z0-9]*)_(\d+)\]/g;
     function pintarSigok(d) {
-      const pecas = (d && d.pecas) || [];
+      const pecas = ((d && d.pecas) || []).filter((pe) => !sigokRemovidas.has(String(pe.id)));
       const itens = (d && d.itens) || [];
       // Resumo: quantas peças e quantas SUBSTITUIÇÕES neste envio — o número
       // que muda de um turno para o outro, e não o total do processo.
@@ -3552,7 +3580,9 @@ var PjePanel = (function () {
         sigokChips.appendChild(c);
       }
       sigokChips.hidden = !porTipo.size;
-      sigokOk.textContent = "Enviar " + (pecas.length === 1 ? "1 peça" : pecas.length + " peças");
+      sigokOk.textContent = pecas.length
+        ? "Enviar " + (pecas.length === 1 ? "1 peça" : pecas.length + " peças")
+        : "Enviar sem peça nova";
 
       sigokList.textContent = "";
       for (const pe of pecas) {
@@ -3607,6 +3637,19 @@ var PjePanel = (function () {
           });
           acts.appendChild(ed);
         }
+        // "Não enviar": a peça sai DESTE envio (e da seleção). É o "vamos
+        // excluir a peça" — a decisão mais barata quando o texto não convence.
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "sk-remover";
+        rm.textContent = "Não enviar";
+        rm.title = "Tira esta peça do envio e da seleção; marque-a de novo quando quiser";
+        rm.addEventListener("click", () => {
+          sigokRemovidas.add(String(pe.id));
+          const inf = sigokInfo;
+          pintarSigok(inf && typeof inf.recarregar === "function" ? inf.recarregar() : { pecas, itens });
+        });
+        acts.appendChild(rm);
         cab.appendChild(nome);
         cab.appendChild(meta);
         cab.appendChild(acts);
@@ -7162,7 +7205,10 @@ var PjePanel = (function () {
           } else {
             // aguardando o modelo: indicador de digitação
             el.classList.add("typing");
-            el.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+            // Os pontos + o TEXTO da espera (`setEspera`): "Analisando… — 12 s"
+            // dentro da bolha, que é onde o olho está. Uma bolha muda durante
+            // um raciocínio longo é indistinguível de travamento (relato real).
+            el.innerHTML = '<span class="dots"><i></i><i></i><i></i></span><span class="wait-t"></span>';
           }
         } else {
           const txt = document.createElement("div");
@@ -7286,11 +7332,24 @@ var PjePanel = (function () {
         msgs.scrollTop = msgs.scrollHeight;
       },
       // Resumo do raciocínio (thinking) em bloco colapsável no topo da bolha.
+      // O texto da espera dentro da bolha ("Analisando… — 12 s"). Só enquanto
+      // ela ainda mostra os pontos; com texto de resposta, o `.wait-t` já saiu.
+      setEspera(el, texto) {
+        const w = el && el.querySelector(".wait-t");
+        if (w) w.textContent = texto || "";
+      },
       setThinking(el, text) {
+        // Raciocínio VAZIO (o OpenRouter manda um `thinking` sem texto só para
+        // acender o status) não pode estruturar a bolha: `estruturaAssistant`
+        // tira o indicador de digitação, e o que sobrava era uma bolha em
+        // branco pelo resto do raciocínio (relato real, DeepSeek). Sem texto e
+        // sem estrutura ainda, os pontos ficam.
+        if (!text && !el.__body) return;
         estruturaAssistant(el);
         el.__think.hidden = !text;
         if (text) {
-          if (!el.__body.innerHTML) el.__think.open = true;
+          // "sem texto ainda" = o corpo só tem o indicador de digitação
+          if (el.__body.querySelector(".dots")) el.__think.open = true;
           el.__thinkT.textContent = text;
         }
         msgs.scrollTop = msgs.scrollHeight;
@@ -7358,6 +7417,7 @@ var PjePanel = (function () {
           sigokResolve = resolve;
           sigokInfo = info || {};
           sigokCb.checked = false;
+          sigokRemovidas.clear();
           pintarSigok(sigokInfo.dados || {});
           sigokBox.hidden = false;
           sigokCard.focus();
@@ -7516,6 +7576,9 @@ var PjePanel = (function () {
       },
       onBaixarAuditoria(cb) {
         audBaixarCb = cb;
+      },
+      onLiberarAuditoria(cb) {
+        audLiberarCb = cb;
       },
       isSearchOn() {
         return searchOn;
@@ -7890,6 +7953,17 @@ var PjePanel = (function () {
       // onde nasceu a ação — e não na `.alertbar`: não exige recomeçar a
       // conversa, exige uma decisão sobre UM valor. Conteúdo do processo entra
       // sempre por textContent; o HTML abaixo é só estrutura constante.
+      // BLOQUEIO DA GUARDA = UMA DECISÃO: "este valor é um dado pessoal?".
+      // A versão anterior empurrava para "Nova conversa" e chamava "Liberar" de
+      // abrir mão de uma proteção — e o dono do projeto, diante de "ALIMENTOS"
+      // rotulado como pessoa, não soube o que fazer. A bolha agora DIZ o que
+      // aconteceu (o valor, onde ele nasceu, onde ia sair), faz a pergunta e
+      // oferece os dois caminhos com o mesmo peso — manter protegido (a
+      // máscara é refeita; o raciocínio guardado que não dá para reescrever é
+      // descartado) ou liberar (palavra comum, termo jurídico, órgão) — mais
+      // as ações sobre a PEÇA: tirar desta conversa, editar o texto. "Nova
+      // conversa" só quando é de fato a única saída (`repetido`, ou opaco que
+      // a API não deixa omitir). Conteúdo dos autos por textContent, sempre.
       mostrarBloqueioSigilo(info) {
         const o = info || {};
         clearEmptyHint();
@@ -7898,147 +7972,182 @@ var PjePanel = (function () {
         el.setAttribute("role", "alert");
         el.innerHTML =
           '<div class="sb-h">' + SVG.coAlerta +
-          '<span>A proteção bloqueou este envio</span></div>' +
+          '<span>A proteção segurou este envio</span></div>' +
+          '<div class="sb-valor" hidden><span>Valor encontrado</span><strong></strong><em class="sb-orig"></em></div>' +
           '<p class="sb-p"></p>' +
-          '<div class="sb-valor" hidden><span>Valor encontrado</span><strong></strong></div>' +
-          '<p class="sb-nota"></p>' +
-          '<div class="sb-acts"></div>';
+          '<p class="sb-q"></p>' +
+          '<div class="sb-acts"></div>' +
+          '<p class="sb-nota"></p>';
 
         const tipo = o.tipo && NOME_TIPO[o.tipo]
           ? NOME_TIPO[o.tipo][0]
           : String(o.tipo || "dado protegido").toLowerCase();
-        el.querySelector(".sb-p").textContent =
-          "A guarda encontrou no conteúdo que seria enviado um valor identificado como " +
-          tipo + (o.onde ? " — " + o.onde : "") + ". Nada foi enviado à IA.";
+        const editavel = o.editavel !== false;
+        const podeReenviar = typeof o.onMascarar === "function";
+        const semSaidaProtegida = !!o.repetido || (!editavel && !podeReenviar);
 
         const valorEl = el.querySelector(".sb-valor");
         if (o.valor) {
           valorEl.querySelector("strong").textContent = "“" + o.valor + "”";
+          valorEl.querySelector(".sb-orig").textContent =
+            "reconhecido como " + tipo + (o.rotulo ? " (" + o.rotulo + ")" : "") +
+            (o.origem ? " em «" + o.origem + "»" : "");
           valorEl.hidden = false;
         }
+        el.querySelector(".sb-p").textContent =
+          (o.valor ? "Esse valor" : "Um valor identificado como " + tipo) +
+          " ia sair em claro" + (o.onde ? " " + o.onde : "") +
+          ". Nada foi enviado à IA — no modo sigiloso, tudo o que o reconhecedor marcou " +
+          "sai substituído por um rótulo, e aqui a substituição não alcançou esse trecho.";
 
-        const nota = el.querySelector(".sb-nota");
+        const q = el.querySelector(".sb-q");
         const acts = el.querySelector(".sb-acts");
-        // AS SAÍDAS QUE PRESERVAM O NOME vêm PRIMEIRO. Até aqui a bolha só
-        // oferecia "Liberar", e quem não quer liberar ficava sem opção (relato
-        // real). Com o canal reescrevível, a máscara é refeita no reenvio; com
-        // o canal opaco (raciocínio guardado do modelo), só uma conversa nova
-        // mantém o nome protegido — e as peças mascaradas continuam prontas.
-        const editavel = o.editavel !== false;
-        const frases = [];
-        if (o.repetido) {
-          frases.push(
-            "A máscara já foi refeita e a proteção bloqueou de novo pelo mesmo valor: ele " +
-              "está numa parte da conversa que não dá para reescrever daqui. Para manter o " +
-              "nome protegido, comece uma nova conversa — as peças anonimizadas e a tabela " +
-              "de rótulos continuam valendo."
-          );
-        } else if (!editavel) {
-          frases.push(
-            "Para manter o nome protegido, comece uma nova conversa: as peças já " +
-              "anonimizadas e a tabela de rótulos continuam valendo, e essa parte da " +
-              "conversa que não pode ser reescrita fica para trás."
-          );
-        } else if (typeof o.onMascarar === "function") {
-          frases.push(
-            "Para manter o nome protegido, clique em Mascarar e reenviar: a máscara é " +
-              "refeita em toda a conversa com tudo o que o mapa já conhece."
-          );
+        const nota = el.querySelector(".sb-nota");
+        const concluir = (titulo, texto) => {
+          el.classList.add("liberado");
+          el.querySelector(".sb-h span").textContent = titulo;
+          q.textContent = "";
+          acts.textContent = "";
+          nota.textContent = texto;
+        };
+        const card = (classe, titulo, texto) => {
+          const c = document.createElement("div");
+          c.className = "sb-card " + classe;
+          const t = document.createElement("b");
+          t.textContent = titulo;
+          const d = document.createElement("span");
+          d.textContent = texto;
+          c.appendChild(t);
+          c.appendChild(d);
+          acts.appendChild(c);
+          return c;
+        };
+
+        if (!o.rotulo && !o.valor) {
+          // Sem rótulo não há decisão a tomar: só o caminho de conferir.
+          q.textContent =
+            "Não foi possível apontar qual rótulo causou o bloqueio. Confira a auditoria e tente de novo.";
+        } else if (semSaidaProtegida) {
+          q.textContent = "Este valor é um dado pessoal?";
+          // Manter protegido: só a conversa nova (a parte da conversa que o
+          // carrega não pode ser reescrita nem omitida).
+          const cp = card("sb-proteger", "É dado pessoal → manter protegido",
+            o.repetido
+              ? "A máscara já foi refeita e a proteção segurou de novo pelo mesmo valor: ele está numa parte da conversa que não dá para reescrever daqui. Comece uma nova conversa — as peças anonimizadas e a tabela de rótulos continuam valendo."
+              : "Ele está numa parte da conversa que não pode ser reescrita nem omitida. Comece uma nova conversa — as peças anonimizadas e a tabela de rótulos continuam valendo.");
+          if (typeof o.onNovaConversa === "function") {
+            const bn = document.createElement("button");
+            bn.type = "button";
+            bn.className = "sb-nova";
+            bn.textContent = "Nova conversa (mantém as peças)";
+            bn.addEventListener("click", () => o.onNovaConversa());
+            cp.appendChild(bn);
+          }
         } else {
-          frases.push(
-            "Para manter o nome protegido, gere novamente: a máscara é refeita em toda a " +
-              "conversa com tudo o que o mapa já conhece."
-          );
+          q.textContent = "Este valor é um dado pessoal?";
+          const cp = card("sb-proteger", "É dado pessoal → manter protegido",
+            "A máscara é refeita em toda a conversa com o que o mapa já conhece" +
+              (editavel ? "" : "; o raciocínio guardado do modelo que carregava o valor é descartado (só esse trecho)") +
+              (podeReenviar ? ", e a pergunta é reenviada." : ". Gere novamente quando quiser."));
+          if (podeReenviar) {
+            const bm = document.createElement("button");
+            bm.type = "button";
+            bm.className = "sb-mascarar";
+            bm.textContent = "Manter protegido e reenviar";
+            bm.addEventListener("click", () => {
+              bm.disabled = true;
+              bm.textContent = "Reenviando…";
+              try {
+                o.onMascarar();
+                concluir("Reenviado com a máscara refeita",
+                  "Se a proteção segurar de novo, a bolha seguinte diz onde o valor está.");
+              } catch (e) {
+                bm.disabled = false;
+                bm.textContent = "Manter protegido e reenviar";
+              }
+            });
+            cp.appendChild(bm);
+          }
         }
+
+        // Liberar: o caminho do falso positivo. Vale para os dois casos acima.
         if (o.valor && typeof o.onLiberar === "function") {
-          frases.push(
-            "Liberar só faz sentido se este valor identificar um órgão público ou outro " +
-              "dado não pessoal — vale somente para este processo."
-          );
-        }
-        if (editavel && typeof o.onMascarar === "function") {
-          const bm = document.createElement("button");
-          bm.type = "button";
-          bm.className = "sb-mascarar";
-          bm.textContent = "Mascarar e reenviar";
-          bm.title = "Refaz a máscara em toda a conversa com o mapa atual e envia de novo";
-          bm.addEventListener("click", () => {
-            bm.disabled = true;
-            bm.textContent = "Reenviando…";
-            try {
-              o.onMascarar();
-              el.classList.add("liberado");
-              el.querySelector(".sb-h span").textContent = "Reenviado com a máscara refeita";
-              nota.textContent =
-                "Se a proteção bloquear de novo, a bolha seguinte diz onde o valor está.";
-            } catch (e) {
-              bm.disabled = false;
-              bm.textContent = "Mascarar e reenviar";
-            }
-          });
-          acts.appendChild(bm);
-        }
-        if (typeof o.onNovaConversa === "function") {
-          const bn = document.createElement("button");
-          bn.type = "button";
-          bn.className = editavel && !o.repetido ? "sb-nova" : "sb-nova destaque";
-          bn.textContent = "Nova conversa (mantém as peças)";
-          bn.title = "Zera o chat; as peças anonimizadas, o mapa e o modo sigiloso continuam";
-          bn.addEventListener("click", () => o.onNovaConversa());
-          acts.appendChild(bn);
-        }
-        if (o.valor && typeof o.onLiberar === "function") {
-          nota.textContent = frases.join(" ");
+          const cl = card("sb-soltar", "Não é dado pessoal → liberar",
+            "Palavra comum, termo jurídico ou órgão público que o reconhecedor confundiu com um nome. Passa a sair em claro" +
+              (o.reenvia ? " e a pergunta é reenviada." : "."));
+          const lab = document.createElement("label");
+          lab.className = "sb-global";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(" também nos outros processos"));
+          cl.appendChild(lab);
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "sb-liberar";
-          btn.textContent = "Liberar neste processo";
+          btn.textContent = o.reenvia ? "Liberar e reenviar" : "Liberar neste processo";
           btn.addEventListener("click", async () => {
             btn.disabled = true;
             btn.textContent = "Liberando…";
             try {
-              const liberado = await o.onLiberar();
+              const liberado = await o.onLiberar({ global: cb.checked });
               if (liberado == null) {
                 btn.disabled = false;
                 btn.textContent = "Tentar liberar novamente";
                 return;
               }
-              el.classList.add("liberado");
-              el.querySelector(".sb-h span").textContent = "Valor liberado neste processo";
-              nota.textContent = o.reenvia
-                ? "A pergunta foi reenviada com este valor em claro."
-                : "Gere novamente quando quiser continuar.";
-              btn.textContent = "Liberado neste processo";
+              concluir(
+                cb.checked ? "Valor liberado em todos os processos" : "Valor liberado neste processo",
+                o.reenvia ? "A pergunta foi reenviada com este valor em claro." : "Gere novamente quando quiser continuar."
+              );
             } catch (e) {
               btn.disabled = false;
               btn.textContent = "Tentar liberar novamente";
               nota.textContent = "Não foi possível liberar o valor. A proteção continua ativa.";
             }
           });
-          acts.appendChild(btn);
-        } else {
-          frases.push(
-            "Não foi possível identificar com segurança qual rótulo causou o bloqueio. " +
-              "Confira a auditoria do modo sigiloso antes de tentar novamente."
-          );
-          nota.textContent = frases.join(" ");
+          cl.appendChild(btn);
         }
-        // A segunda saída, sempre: ver a tabela do que foi mascarado. É lá que
-        // se confere se o valor é mesmo o do órgão, e é o mesmo gesto do selo.
+
+        // Ações sobre a PEÇA atingida e a auditoria — secundárias, numa linha.
+        const sec = document.createElement("div");
+        sec.className = "sb-sec";
+        if (typeof o.onRemoverPeca === "function") {
+          const br = document.createElement("button");
+          br.type = "button";
+          br.className = "sb-remover";
+          br.textContent = "Tirar " + (o.pecaTitulo ? "«" + String(o.pecaTitulo).slice(0, 48) + "»" : "a peça") + " desta conversa";
+          br.title = "Desmarca a peça: os blocos dela ficam fora do envio, e a pergunta é reenviada";
+          br.addEventListener("click", () => {
+            br.disabled = true;
+            o.onRemoverPeca();
+            concluir("Peça tirada desta conversa", "A pergunta foi reenviada sem ela. Marque-a de novo quando quiser.");
+          });
+          sec.appendChild(br);
+        }
+        if (typeof o.onEditarPeca === "function") {
+          const be = document.createElement("button");
+          be.type = "button";
+          be.className = "sb-editar";
+          be.textContent = "Editar o texto da peça";
+          be.title = "Abre o texto anonimizado para corrigir à mão; ao usar o texto, a pergunta é reenviada";
+          be.addEventListener("click", () => o.onEditarPeca());
+          sec.appendChild(be);
+        }
         if (sigiloOn) {
           const ver = document.createElement("button");
           ver.type = "button";
           ver.className = "sb-aud";
           ver.textContent = "Ver o que foi mascarado";
           ver.addEventListener("click", () => abrirAud());
-          acts.appendChild(ver);
+          sec.appendChild(ver);
         }
+        if (sec.childNodes.length) el.appendChild(sec);
 
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
         return el;
       },
-
       // Medidor de contexto da conversa: barra + resumo (tokens e páginas
       // acumulados no request vs. limites do modelo). null esconde.
       setContexto(info) {
@@ -8240,6 +8349,16 @@ var PjePanel = (function () {
       },
       lockInput(b) {
         inEl.disabled = b;
+        // O campo DIZ que está esperando: o placeholder é o segundo lugar
+        // para onde o olho vai depois da bolha. O original volta no destravar
+        // (o modo minuta/mapa troca o placeholder, por isso se guarda o atual).
+        if (b) {
+          if (!inEl.dataset.phOriginal) inEl.dataset.phOriginal = inEl.placeholder;
+          inEl.placeholder = "Aguardando a resposta do modelo…";
+        } else if (inEl.dataset.phOriginal) {
+          inEl.placeholder = inEl.dataset.phOriginal;
+          delete inEl.dataset.phOriginal;
+        }
         // O `disabled` do Enviar tem DUAS fontes (turno em andamento e falta de
         // orientação na minuta) e é `aplicarEstadoSend` quem as concilia —
         // escrever direto aqui faria o fim de um turno reabilitar o botão sem

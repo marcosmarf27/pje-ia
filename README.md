@@ -138,7 +138,8 @@ caso — sem depender da extensão para lê-lo depois.
 | **Claude Sonnet 5** | 1M / 600 págs. | 3 / 15 | Autos volumosos; todos os recursos |
 | **Claude Opus 4.8** | 1M / 600 págs. | 5 / 25 | Qualidade superior para análises delicadas |
 | **Claude Fable 5** | 1M / 600 págs. | 10 / 50 | O mais capaz — e o mais caro e lento |
-| **Gemini 3.7 Flash** | 1M / 1000 págs. | 1,50 / 7,50 | O Gemini mais novo e o indicado do provedor |
+| **Gemini 3.8 Flash** | 1M / 1000 págs. | 1,50 / 7,50 | O Gemini mais novo (09/2026) e o indicado do provedor |
+| **Gemini 3.7 Flash** | 1M / 1000 págs. | 1,50 / 7,50 | Rápido e direto; o único Gemini medido em uso real para redigir |
 | **Gemini 3.6 Flash** | 1M / 1000 págs. | 1,50 / 7,50 | A geração anterior do Flash, ainda disponível |
 | **Gemini 3.5 Flash-Lite** | 1M / 1000 págs. | 0,30 / 2,50 | O mais barato e veloz — triagens e resumos |
 | **GPT-5.6 Terra** | 1,05M tokens | 2 / 12 | GPT equilibrado entre custo e capacidade; citações no texto |
@@ -436,8 +437,9 @@ em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o text
   destruiria a utilidade jurídica do documento sem proteger ninguém.
 - **Barreira final.** Antes de cada envio a extensão **confere o que sairia** e recusa o
   envio se algum valor original tiver escapado — o turno inteiro é bloqueado, nada vai pela
-  metade. A bolha diz onde o valor estava e oferece manter o nome protegido (mascarar e
-  reenviar, ou nova conversa mantendo as peças); liberar é só para o que não é dado pessoal.
+  metade. A bolha mostra o valor e onde ele estava e pergunta se é um dado pessoal: manter
+  protegido e reenviar, ou liberar (neste processo ou em todos) — além de tirar a peça da
+  conversa ou editar o texto dela.
 - **Você aprova antes de sair.** Quando o envio traz peça recém-anonimizada, uma caixa
   mostra o texto exatamente como vai sair, peça por peça, e espera a sua aprovação — dá
   para editar, mascarar à mão ou liberar um valor antes de enviar; cancelar não manda nada.
