@@ -592,8 +592,11 @@ button > svg { flex: none; }
    vê é um borrão de reflow em vez de uma coluna deslizando para fora. Com o
    piso de largura, o conteúdo fica firme e é CLIPADO — que é o que o olho lê
    como "a coluna saiu de cena". */
+/* O clipe vale SÓ quando é preciso — ver `.docs.anim` mais abaixo. Em repouso,
+   com a lista aberta, a `.docs` volta a NÃO clipar: o balão do aviso da timeline
+   (`.tip-txt`) é absoluto e abre para cima de dentro dela, e um clipe permanente
+   aqui o cortaria em silêncio no dia em que aquele texto crescesse. */
 .docs {
-  overflow: hidden;
   transition:
     max-height var(--dur-3) var(--ease-move),
     padding-top var(--dur-3) var(--ease-move),
@@ -607,6 +610,11 @@ button > svg { flex: none; }
     porque o colapso era `display: none` — propriedade que ninguém disputa.
     Depender da ordem no arquivo é o que faz uma regra correta parar de valer
     quando alguém acrescenta outra 2000 linhas abaixo. */
+/* COLAPSADA (repouso) e EM TRANSIÇÃO: aí o clipe é obrigatório. Sem ele, os
+   300px de conteúdo apareceriam por cima do chat enquanto a caixa encolhe — foi
+   assim que uma captura com o relógio congelado mostrou a coluna e a aba na tela
+   ao mesmo tempo. A classe `.anim` é posta e retirada por `setDocsOcultas`. */
+.wrap.docs-collapsed .docs, .docs.anim { overflow: hidden; }
 .wrap.docs-collapsed .docs,
 .wrap.lateral.docs-collapsed .docs,
 .wrap.livre.docs-collapsed .docs,

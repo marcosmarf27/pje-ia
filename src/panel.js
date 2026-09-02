@@ -1862,7 +1862,20 @@ var PjePanel = (function () {
     const docsVisBtn = $(".docsvis");
     const docsFoldBtn = $(".docs-fold");
     const docsRail = $(".docs-rail");
+    // Espelha `--dur-3` (240ms) do panel.css com uma folga: é quanto dura o
+    // colapso da lista. Conferido por teste, como o MS_SAIDA.
+    const MS_COLAPSO = 260;
+    let colapsoTimer = null;
     function setDocsOcultas(on, persistir) {
+      // O clipe só existe durante a transição (e no repouso colapsado, por CSS):
+      // permanente, ele cortaria o balão do aviso da timeline, que é absoluto e
+      // abre para cima de dentro da lista.
+      const dEl = $(".docs");
+      if (dEl) {
+        dEl.classList.add("anim");
+        clearTimeout(colapsoTimer);
+        colapsoTimer = setTimeout(() => dEl.classList.remove("anim"), MS_COLAPSO);
+      }
       wrap.classList.toggle("docs-collapsed", on);
       docsVisBtn.classList.toggle("on", on);
       docsVisBtn.setAttribute("aria-pressed", String(!!on));
