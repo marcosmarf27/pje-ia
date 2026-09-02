@@ -449,6 +449,28 @@ OCR), e abrir processos com Ctrl+clique em várias abas é o padrão de trabalho
 PJe. Transições correm na linha do tempo do documento e não têm esse modo de
 falha.
 
+**Onde há movimento hoje, e por quê**: a janela (abrir/fechar), o painel erguido
+no arrasto, o colapso da lista de peças, a tarja do modo sigiloso, as **bolhas do
+chat** e a **barra de alerta**. As bolhas eram o elemento mais visto do produto e
+o único sem movimento nenhum; elas SOBEM nos dois papéis, porque a do usuário vem
+do campo e a do assistente vem do fim da conversa — as duas nascem de onde a
+atenção já está. A `.alertbar` faz o contrário e CAI: ela é interrupção, e a
+convenção de uma faixa que interrompe é vir de cima.
+
+**A peça que a EXTENSÃO marca sozinha acende** (`.docrow.acesa`): o "Escolher com
+IA" e o botão da peça citada como faltante mexem na seleção sem um clique na
+linha, e sem sinal a lista simplesmente amanhece diferente. O realce some sozinho
+— marca permanente viraria mais um estado a manter — e não tem override de
+`prefers-reduced-motion`, porque um esmaecimento de cor não é movimento e aqui
+ele É a informação.
+
+**Antes de animar algo, conferir se já anima.** A `.minutabar`, a `.mapabar` e a
+`.promptbar` já entravam por `animation: chip-in`, e `animation` vence
+`transition` na mesma propriedade: uma transição declarada para elas seria código
+morto com um comentário afirmando o contrário — e o `allow-discrete` junto lhes
+daria uma SAÍDA de 120ms que elas não tinham, deixando a faixa presa na tela
+depois de fechada. Medido: elas computam `scale(0.85)`, o `from` do `chip-in`.
+
 **Entradas e saídas de elementos que somem do layout** usam `@starting-style` +
 `transition-behavior: allow-discrete`, nunca um par animação-de-entrada +
 `display:none` seco. É o que dá os DOIS sentidos com um par de regras — e o que

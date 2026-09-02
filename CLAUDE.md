@@ -2612,7 +2612,20 @@ os tokens de movimento e o porquê de não haver biblioteca estão no DESIGN.md
 - **`overflow: hidden` + `min-width` nos filhos não é zelo**: sem o piso de
   largura o texto da lista se RE-QUEBRA a cada largura intermediária e o que se
   vê são 240ms de borrão de reflow em vez de uma coluna saindo de cena.
-- **MEDIR ANIMAÇÃO EM HEADLESS TEM DUAS ARMADILHAS**, e as duas já falsificaram
+- **A entrada da bolha vive no `.msg`, nunca no `.body`.** A bolha do assistente
+  é criada UMA vez e re-renderizada a cada delta do stream (`updateAssistant`
+  reescreve o `innerHTML` do `.body`): uma entrada nos filhos dispararia a cada
+  token. `@starting-style` no `.msg` roda uma vez por INSERÇÃO — seguro por
+  construção, e há teste (6 deltas, zero redisparos). A retomada da memória de
+  caso, que é um REPLAY de `addMessage`, insere tudo na mesma tarefa: as bolhas
+  entram JUNTAS, num só esmaecimento, e não em escada (testado).
+- **ANTES DE ANIMAR, CONFERIR SE JÁ ANIMA.** `.minutabar`, `.mapabar` e
+  `.promptbar` já tinham `animation: chip-in`, e `animation` vence `transition`
+  na mesma propriedade: a transição que acrescentei a elas era código morto com
+  um comentário afirmando o contrário, e o `allow-discrete` junto lhes dava uma
+  SAÍDA de 120ms inexistente — a faixa ficaria presa na tela depois de fechada.
+  Só a medição pegou (elas computavam `scale(0.85)`, o `from` do `chip-in`).
+- **MEDIR ANIMAÇÃO EM HEADLESS TEM TRÊS ARMADILHAS**, e as duas já falsificaram
   medições aqui: (a) o `panel.css` chega por `fetch` ASSÍNCRONO — medir antes
   dele mede uma árvore sem estilo, em que um `<button>` é `inline-block` e o
   painel cai no fluxo normal; (b) sob `--virtual-time-budget` o relógio das
@@ -2620,8 +2633,11 @@ os tokens de movimento e o porquê de não haver biblioteca estão no DESIGN.md
   coluna e a aba na tela ao mesmo tempo). A saída é inspecionar as
   `CSSTransition` pela **WAAPI** — `getAnimations()` diz se existem, com que
   duração e com que curva, e `finish()` leva ao estado final sem depender de
-  tempo nenhum. Headless também reporta `prefers-reduced-motion: reduce` por
-  padrão: sem saber disso, mede-se sempre o ramo reduzido.
+  tempo nenhum — mas **`document.getAnimations()` não alcança a árvore SOMBRA**
+  neste arnês, e usá-lo produziu um falso negativo convincente (o teste dizia
+  que a lista não colapsava, com o CSS correto); `elemento.getAnimations()`
+  alcança. Headless também reporta `prefers-reduced-motion: reduce` por padrão:
+  sem saber disso, mede-se sempre o ramo reduzido.
 
 ## Modo sigiloso — anonimização LOCAL (`trava.js`, `pseudonimos.js`, `anonimizar.js`, `tokenizador.js`, `ner-nucleo.js`, `ner-worker.js`)
 

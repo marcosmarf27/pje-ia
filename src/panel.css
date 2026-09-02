@@ -1294,6 +1294,25 @@ button > svg { flex: none; }
   padding: 10px 13px; border-radius: 12px;
   font-size: var(--fs-body); line-height: 1.55;
   word-break: break-word; max-width: 90%;
+  /* A ENTRADA DA BOLHA. Era o elemento mais visto do produto e o único sem
+     movimento nenhum — pergunta e resposta surgiam de estalo.
+
+     Sobe (`translateY(6px)`) nos DOIS papéis, e não é simetria mal pensada: a
+     do usuário vem do campo de mensagem, que está embaixo; a do assistente vem
+     do fim da conversa, que também está embaixo, porque a lista rola para o pé.
+     As duas nascem de onde a atenção já está.
+
+     A transição vive no `.msg`, NUNCA no `.body` nem nos filhos: a bolha do
+     assistente é criada UMA vez e re-renderizada a cada delta do stream
+     (`updateAssistant` reescreve o `innerHTML` do `.body`), e uma entrada ali
+     dispararia de novo a cada token. `@starting-style` no `.msg` roda uma vez
+     por INSERÇÃO, então isto é seguro por construção — e há teste. */
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out);
+}
+@starting-style {
+  .msg { opacity: 0; transform: translateY(6px); }
 }
 
 /* ---------- Faixa de retomada (memória de caso) ----------
@@ -1717,6 +1736,18 @@ button > svg { flex: none; }
 .status:empty { display: none; }
 
 /* ---------- Alerta persistente: contexto da IA cheio ---------- */
+/* A barra de alerta CAI, ao contrário das faixas do rodapé, que sobem. Ela é
+   uma interrupção — `role="alert"`, e o §2 a reserva para o que IMPEDE de
+   continuar —, e a convenção de uma faixa que interrompe é vir de cima. Só
+   ENTRADA: um alerta que demora a sumir depois de resolvido parece grudado. */
+.alertbar {
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out);
+}
+@starting-style {
+  .alertbar { opacity: 0; transform: translateY(-6px); }
+}
 .alertbar {
   display: flex; align-items: center; gap: 10px;
   font-size: var(--fs-meta); font-weight: 600; color: var(--alerta-ink);
@@ -2262,18 +2293,26 @@ button > svg { flex: none; }
    CONFIRMAÇÃO de que uma proteção está valendo, e em `--warn` ela competiria com
    a `.sel-nota` e com o medidor de contexto, que sinalizam problema. Um estado
    PERMANENTE em cor de alerta é o "tudo alerta com a mesma intensidade" do §2. */
-/* As faixas de MODO (sigiloso, minuta, mapa) aparecem por `hidden`, que é
-   discreto: com `allow-discrete` elas deslizam para dentro em 120ms. Uma faixa
-   que muda a altura do painel de estalo empurra o que está embaixo dela — e no
-   rodapé isso é o bug do 📎 que "só abria na terceira vez". */
-.sigbar, .minutabar, .mapabar {
+/* As faixas de MODO aparecem por `hidden`, que é discreto: com `allow-discrete`
+   elas deslizam para dentro em 120ms. Uma faixa que muda a altura do painel de
+   estalo empurra o que está embaixo dela — e no rodapé isso é o bug do 📎 que
+   "só abria na terceira vez".
+
+   SÓ a `.sigbar`: a `.minutabar`, a `.mapabar` e a `.promptbar` JÁ entram por
+   `animation: chip-in` desde antes, e `animation` vence `transition` na mesma
+   propriedade — declarar uma transição para elas seria código morto com um
+   comentário afirmando o contrário. Pior: o `allow-discrete` lhes daria uma
+   SAÍDA de 120ms que elas não tinham, e a faixa ficaria presa na tela depois de
+   fechada. (Medido: elas computam `scale(0.85)`, o `from` do `chip-in`.)
+   Ela cai de cima porque mora colada ao cabeçalho — é de lá que ela vem. */
+.sigbar {
   transition:
     opacity var(--dur-1) var(--ease-out),
     transform var(--dur-1) var(--ease-out),
     display var(--dur-1) allow-discrete;
 }
 @starting-style {
-  .sigbar, .minutabar, .mapabar { opacity: 0; transform: translateY(-4px); }
+  .sigbar { opacity: 0; transform: translateY(-4px); }
 }
 .sigbar {
   flex: none;
@@ -2340,13 +2379,27 @@ button > svg { flex: none; }
   .panel, .wrap.open .panel,
   .launcher, .wrap.open .launcher,
   .docs, .wrap.expanded .docs, .wrap.livre-wide .docs,
-  .docs-rail, .sigbar, .minutabar, .mapabar {
+  .docs-rail, .sigbar, .msg, .alertbar {
     transition-duration: 1ms;
   }
   .panel, .wrap.open .panel { transform: none; }
   .wrap.livre .panel.movendo { transform: none; }
 }
 
+/* PEÇA MARCADA PELA EXTENSÃO, não pelo usuário: o "Escolher com IA" e o botão
+   que adiciona a peça citada como faltante mexem na seleção sem um clique na
+   linha. Sem um sinal, a lista simplesmente amanhece diferente e não há como
+   saber o que mudou. O realce dura o suficiente para o olho encontrar e some
+   sozinho — marca permanente viraria mais um estado a manter.
+   Sem override de `prefers-reduced-motion`: um esmaecimento de COR não é
+   movimento, e aqui ele É a informação — quem pediu menos movimento não pediu
+   para deixar de saber o que mudou na lista. */
+.docrow.acesa { animation: acender 0.9s var(--ease-out); }
+@keyframes acender {
+  0% { background: var(--accent-bg); }
+  60% { background: var(--accent-bg); }
+  100% { background: transparent; }
+}
 /* CAIXA DE AUDITORIA do modo sigiloso. Herda a anatomia da `.movbox` (cabeçalho
    `.mv-hd`, lista `.mv-list`, vazio `.mv-vazio`) de propósito: é o MESMO gesto —
    um selo da metarow que abre um painel `fixed` — e dois desenhos para o mesmo

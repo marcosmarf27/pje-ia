@@ -6681,6 +6681,17 @@ var PjePanel = (function () {
           }
         }
         if (mexeu) syncSelection();
+        // Realce nas linhas que a EXTENSÃO acabou de marcar (o "Escolher com
+        // IA" e a peça citada como faltante). Só nas que estão no DOM: a row
+        // lazy não existe para acender, e quando ela nascer o `setDocs` já terá
+        // apagado a classe de todo jeito.
+        for (const id of novos) {
+          const row = doclist.querySelector('.docrow[data-id="' + CSS.escape(id) + '"]');
+          if (!row) continue;
+          row.classList.remove("acesa");
+          void row.offsetWidth; // reinicia a animação se a linha já acendeu antes
+          row.classList.add("acesa");
+        }
         return novos;
       },
       clearMessages() {
