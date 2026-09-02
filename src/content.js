@@ -1487,7 +1487,7 @@
       } catch (e) {
         if (meuSeq !== seqSigilo) return; // outro clique já mandou
         modoSigiloso = false;
-        panel.setSigiloso(false, mapaSigilo ? mapaSigilo.quantos() : 0);
+        panel.setSigiloso(false, mapaSigilo ? mapaSigilo.quantos() : 0, dadosAuditoria());
         panel.setStatus(
           "O modo sigiloso NÃO foi ligado: a verificação de saída não pôde ser armada (" +
             ((e && e.message) || e) + "). Recarregue a página do processo e tente de novo."
@@ -1503,7 +1503,7 @@
       // OCR de duzentas folhas por causa de um clique seria caro a toa.
     }
     if (meuSeq !== seqSigilo) return; // um clique mais novo já decidiu por nós
-    panel.setSigiloso(ligado, mapaSigilo ? mapaSigilo.quantos() : 0);
+    panel.setSigiloso(ligado, mapaSigilo ? mapaSigilo.quantos() : 0, dadosAuditoria());
     salvarMapaSigilo();
     // O historico construido num modo nao roda no outro (a mesma peca apareceria
     // duas vezes, com nomes numa e rotulos na outra). Mesma disciplina do
@@ -3152,12 +3152,24 @@
   }
 
   // Anonimiza UMA peça e guarda o resultado no `sigiloCache`.
-  async function anonimizarPeca(id) {
+  async function anonimizarPeca(id, posicao, total) {
     if (sigiloFeitas.has(id)) return;
     const c = docsCache.get(id) || anexos.get(id);
     if (!c) return;
     const rotulo = (metaDe(id).titulo || String(id)).slice(0, 40);
-    panel.setPrepNota("Anonimizando — " + rotulo);
+    // A PEÇA VOLTA A GIRAR NO CARD. Depois do download ela já está `done` e a
+    // barra em 100% — e a anonimização é a parte LENTA (o OCR de centenas de
+    // folhas). Sem isto o card ficava cheio, parado e mudo enquanto o trabalho
+    // continuava: exatamente o "parecendo travado" que a v0.50.0 do OCR entregou
+    // ao usuário. O contador não regride (a guarda `jaTerminou` do painel cuida
+    // disso); o que muda é que se VÊ qual peça está sendo processada.
+    panel.setPrepState(id, "anon");
+    // E a nota CONTA, porque uma nota que só nomeia a peça não diz se falta
+    // muito. É a mesma lição do card do OCR: o progresso é por unidade de
+    // trabalho, não por spinner.
+    panel.setPrepNota(
+      "Anonimizando" + (total ? " " + posicao + " de " + total : "") + " — " + rotulo
+    );
     // NFC UMA vez, na entrada: a string canônica é a que se tokeniza, a que se
     // mascara e a que vai ao modelo. Sem isso haveria dois sistemas de
     // coordenadas — o offset que o NER devolve apontaria para outra string, e o
@@ -3182,6 +3194,7 @@
         text: "_[esta peça não teve texto extraível; no modo sigiloso o arquivo original não é enviado]_",
       });
       sigiloFeitas.add(id);
+      panel.setPrepState(id, "done");
       return;
     }
     const texto = bruto.length > MAX_CHARS_SIGILO ? bruto.slice(0, MAX_CHARS_SIGILO) : bruto;
@@ -3223,6 +3236,7 @@
       pages: c.pages,
     });
     sigiloFeitas.add(id);
+    panel.setPrepState(id, "done");
   }
 
   // Anonimiza o lote. Uma peça que não dá para anonimizar NÃO derruba o turno:
@@ -3231,11 +3245,13 @@
   async function anonimizarLote(ids) {
     const falhas = [];
     const ok = [];
-    for (const id of ids) {
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
       try {
-        await anonimizarPeca(id);
+        await anonimizarPeca(id, i + 1, ids.length);
         ok.push(id);
       } catch (e) {
+        panel.setPrepState(id, "erro");
         falhas.push({ id, titulo: metaDe(id).titulo, erro: (e && e.message) || String(e) });
       }
     }
@@ -3249,6 +3265,12 @@
       /* best-effort: se o offscreen já morreu, não há o que fechar */
     }
     salvarMapaSigilo();
+    // O SELO E A CAIXA ACOMPANHAM. Sem isto a contagem ficaria a do estado
+    // anterior e a auditoria mostraria peça de menos — e uma auditoria
+    // desatualizada é pior que nenhuma, porque parece completa.
+    if (modoSigiloso && mapaSigilo) {
+      panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+    }
     // RE-ARMA a guarda com a lista COMPLETA, e este ponto e' o que importa.
     // O turno arma cedo (logo apos `garantirCaps`), mas naquele instante o mapa
     // so tem o que foi mascarado ANTES -- o texto que o usuario digitou, e nada
@@ -3258,6 +3280,122 @@
     await armarSigilo();
     return { ok, falhas };
   }
+
+  // O que a CAIXA DE AUDITORIA mostra. É a resposta à única pergunta que
+  // importa depois de o recurso existir: "como eu SEI que esta peça saiu
+  // anonimizada?".
+  //
+  // Vai INTEIRO para a tela — inclusive o texto que de fato saiu. Ele já está
+  // em memória (é o mesmo que foi ao request), então não custa nada, e mostrar
+  // um resumo em vez do texto seria pedir que o usuário confiasse na extensão
+  // outra vez, que é justamente o que a auditoria existe para dispensar.
+  function dadosAuditoria() {
+    const itens = mapaSigilo ? mapaSigilo.tabela() : [];
+    const pecas = [];
+    for (const [id, d] of sigiloCache) {
+      pecas.push({
+        id,
+        // DOIS títulos, e a distinção é o que torna o relatório compartilhável.
+        //
+        // `titulo` é o ORIGINAL e vale para a TELA: quem audita precisa saber
+        // QUAL peça está olhando, e "[PESSOA_1] — petição inicial" não diz.
+        // `tituloEnviado` é o MASCARADO, e é o que vai no relatório — o título
+        // dos autos carrega nome ("Petição inicial de FULANO DE TAL"), e um
+        // arquivo feito para ser mostrado a terceiro vazaria justamente ali,
+        // no cabeçalho de cada seção. É também o título que de fato foi ao
+        // modelo, então o relatório continua descrevendo o que saiu.
+        titulo: metaDe(id).titulo,
+        tituloEnviado: tituloParaEnvio(id),
+        chars: (d.text || "").length,
+        texto: d.text || "",
+      });
+    }
+    return { itens, pecas };
+  }
+
+  // O RELATÓRIO DE CONFERÊNCIA — o artefato que se pode mostrar a terceiro.
+  //
+  // Ele leva o que foi mascarado (por TIPO e por quantidade) e o TEXTO EXATO
+  // que saiu, peça por peça. E NÃO leva a tabela de reidentificação, que é a
+  // chave: um relatório que a carregasse provaria o contrário do que ele existe
+  // para provar. A tabela fica na tela, para o uso de quem conduz o processo.
+  function relatorioAuditoria() {
+    const d = dadosAuditoria();
+    const porTipo = new Map();
+    for (const it of d.itens) porTipo.set(it.tipo, (porTipo.get(it.tipo) || 0) + 1);
+    const versao =
+      (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || "?";
+    const agora = new Date();
+    const L = [];
+    L.push("# Relatório de conferência da anonimização");
+    L.push("");
+    // O número do processo é mascarado como qualquer outro dado: ele identifica
+    // as partes, e este arquivo é feito para poder ser mostrado a terceiro.
+    L.push("Processo: " + mascararCurto(PJE.getNumeroProcesso() || "(não identificado)"));
+    L.push("Gerado em: " + agora.toLocaleString("pt-BR"));
+    L.push("Extensão: TecJustiça PJe v" + versao);
+    L.push(
+      "Reconhecimento: detectores determinísticos (dígito verificador, gazetteer da " +
+        "ficha do processo) + modelo de entidades nomeadas em português, ambos " +
+        "executados NESTE computador. Nenhum serviço externo foi consultado para " +
+        "anonimizar."
+    );
+    L.push("");
+    L.push("## O que foi substituído");
+    L.push("");
+    if (!porTipo.size) L.push("_Nada foi mascarado nesta sessão._");
+    for (const [tipo, n] of [...porTipo].sort((a, b) => b[1] - a[1])) {
+      L.push("- **" + tipo + "**: " + n + " valor(es) distinto(s)");
+    }
+    L.push("");
+    L.push(
+      "> A tabela que liga cada rótulo ao valor original **não faz parte deste " +
+        "relatório**. Ela desfaz a anonimização e permanece apenas no computador de " +
+        "quem conduz o processo — está visível na caixa de auditoria do painel."
+    );
+    L.push("");
+    L.push("## O texto exatamente como foi enviado");
+    L.push("");
+    L.push(
+      "É este o conteúdo que o provedor de IA recebeu. O arquivo original (PDF) não " +
+        "foi enviado."
+    );
+    for (const pe of d.pecas) {
+      L.push("");
+      L.push("### " + (pe.tituloEnviado || pe.titulo));
+      L.push("");
+      L.push("_" + pe.chars + " caracteres._");
+      L.push("");
+      L.push(pe.texto);
+    }
+    L.push("");
+    L.push("---");
+    L.push("");
+    L.push(
+      "**Limite desta conferência.** Ela mostra o que a extensão RECONHECEU e " +
+        "substituiu. Nenhum anonimizador automático é perfeito: o que escapar da " +
+        "detecção aparece acima em claro, e é por isso que este relatório traz o texto " +
+        "inteiro em vez de um resumo — a conferência final é humana."
+    );
+    return L.join("\n");
+  }
+
+  panel.onBaixarAuditoria(() => {
+    try {
+      // O NOME DO ARQUIVO também é um canal: o CNJ identifica o processo e, por
+      // ele, as partes. Num relatório feito para ser compartilhado, ele fica
+      // fora — a data basta para o usuário distinguir dois relatórios do mesmo
+      // dia de trabalho, e quem precisar renomear renomeia.
+      const nome =
+        "conferencia-anonimizacao-" +
+        new Date().toISOString().slice(0, 10) +
+        ".md";
+      baixarBlob(nome, new Blob([relatorioAuditoria()], { type: "text/markdown" }));
+      panel.setStatus("Relatório de conferência baixado. Ele NÃO contém a tabela de reidentificação.");
+    } catch (e) {
+      panel.setStatus("Não foi possível gerar o relatório: " + ((e && e.message) || e));
+    }
+  });
 
   // O texto CONSTANTE do próprio programa. Sem estas isenções bastaria o
   // detector rotular "Brasil" ou "Justiça" numa peça para a guarda de saída
@@ -3319,7 +3457,7 @@
         // no disco do usuario e' o oposto do que este modo existe para fazer.
         // Ao reabrir, a primeira analise refaz o mascaramento -- o que tambem e'
         // o correto se a peca mudou.
-        panel.setSigiloso(true, mapaSigilo.quantos());
+        panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
         armarSigilo();
       }
     } catch (e) {
@@ -7840,7 +7978,7 @@
       sigiloCache.clear();
       sigiloFeitas.clear();
       conversaSigilosa = null;
-      panel.setSigiloso(false, 0);
+      panel.setSigiloso(false, 0, { itens: [], pecas: [] });
       // A segunda frase não é enfeite: `memoriaMorta` desliga a gravação até o
       // fim desta sessão, de propósito (senão a conversa em andamento seria
       // regravada segundos depois e o botão pareceria não ter funcionado). Sem

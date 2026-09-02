@@ -1302,7 +1302,11 @@ button > svg { flex: none; }
 /* Segunda fase da peça: baixada, subindo para a API. Mesmo anel giratório da
    fase de download, em tom mais claro — é a MESMA peça avançando, não um
    estado de outra natureza; uma cor nova aqui leria como alerta. */
-.prep-ic.upload {
+.prep-ic.upload,
+/* `anon` acompanha o `upload` pela mesma razão que ele acompanha o download: é
+   a MESMA peça avançando de fase, não um estado de outra natureza. Cor nova
+   aqui leria como alerta — e anonimizar é o caminho normal deste modo. */
+.prep-ic.anon {
   border: 2px solid var(--hover); border-top-color: var(--pje-soft);
   animation: spin 0.7s linear infinite;
 }
@@ -2077,6 +2081,72 @@ button > svg { flex: none; }
    é um container de tamanho ZERO. A largura é generosa porque o complemento do
    movimento é a informação que fecha a conta do prazo ("Decorrido prazo de … em
    16/07/2026 23:59") e cortá-lo tiraria justamente o que se veio ler. */
+/* CAIXA DE AUDITORIA do modo sigiloso. Herda a anatomia da `.movbox` (cabeçalho
+   `.mv-hd`, lista `.mv-list`, vazio `.mv-vazio`) de propósito: é o MESMO gesto —
+   um selo da metarow que abre um painel `fixed` — e dois desenhos para o mesmo
+   gesto divergiriam no primeiro ajuste. O que muda é a largura: aqui cabe o
+   TEXTO ENVIADO, e 420px cortariam a linha no meio. */
+.audbox {
+  position: fixed; z-index: 2147483646;
+  width: min(520px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--line-card);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: rise 0.12s ease-out;
+}
+/* Resumo por tipo: a visão de uma olhada, antes do detalhe. */
+.aud-res { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px 2px; }
+.aud-chip {
+  font-size: var(--fs-nano); font-weight: 600; padding: 2px 7px;
+  border-radius: var(--r-pill); background: var(--ok-bg); color: var(--ok-ink);
+  border: 1px solid var(--ok-line);
+}
+.aud-sec {
+  font-size: var(--fs-micro); font-weight: 600; color: var(--muted);
+  padding: 10px 10px 4px; border-top: 1px solid var(--line); margin-top: 6px;
+}
+/* O aviso da chave usa --warn, e não --ok: aqui NÃO é confirmação, é a única
+   linha da caixa que pede cuidado de quem lê. */
+.aud-avi {
+  font-size: var(--fs-nano); color: var(--warn-ink); background: var(--warn-bg);
+  border-radius: var(--r-sm); padding: 6px 8px; margin: 0 10px 6px;
+}
+.aud-peca { padding: 6px 10px; border-top: 1px dashed var(--line); }
+.aud-pcab { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: var(--fs-micro); }
+.aud-pmeta { color: var(--muted); font-size: var(--fs-nano); }
+.aud-ver {
+  margin-left: auto; font-size: var(--fs-nano); color: var(--pje);
+  background: none; border: 0; cursor: pointer; text-decoration: underline;
+}
+/* O texto enviado é a PROVA: monoespaçado, quebrando linha, e com rolagem
+   própria — uma peça de 40 folhas não pode empurrar o resto da caixa para fora
+   da tela. */
+.aud-texto {
+  margin: 6px 0 2px; padding: 8px; max-height: 220px; overflow: auto;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  font-family: var(--ff-mono); font-size: var(--fs-nano); line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word;
+}
+.aud-map {
+  display: flex; gap: 8px; align-items: baseline; padding: 2px 10px;
+  font-size: var(--fs-micro);
+}
+.aud-map code {
+  font-family: var(--ff-mono); font-size: var(--fs-nano); color: var(--pje-2);
+  background: var(--accent-bg); border-radius: var(--r-sm); padding: 1px 5px; white-space: nowrap;
+}
+.aud-val { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aud-pe { padding: 8px 10px; border-top: 1px solid var(--line); background: var(--surface-2); }
+.aud-baixar {
+  width: 100%; font-size: var(--fs-micro); font-weight: 600; cursor: pointer;
+  padding: 7px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-focus); background: var(--accent-bg); color: var(--pje-2);
+}
+.aud-baixar:disabled { opacity: 0.5; cursor: default; }
+/* O selo virou BOTÃO (ele abre a auditoria): o cursor precisa dizer isso. */
+.selo-sigilo { cursor: pointer; }
+.selo-sigilo:hover { border-color: var(--ok-ink); }
+
 .movbox {
   position: fixed; z-index: 2147483646;
   /* A largura REAL é calculada em `posicionarMov` contra a caixa do painel (nunca

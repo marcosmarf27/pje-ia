@@ -129,6 +129,14 @@ Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
   requisição e **recusa o envio** se algum dos valores originais aparecer nele.
   O bloqueio é do turno inteiro — nada é enviado pela metade.
 
+- **Você pode CONFERIR o que saiu.** Clicando no selo `🔒 sigiloso` do painel
+  abre-se uma caixa de auditoria com: quanto foi mascarado e de que tipo; cada
+  peça enviada, com o **texto exato que o provedor recebeu**; e a tabela que liga
+  cada rótulo ao valor original. O botão **Baixar relatório de conferência**
+  gera um arquivo `.md` com o que foi substituído e o texto integral que saiu —
+  **sem** a tabela de reidentificação, para que o relatório possa ser mostrado a
+  terceiros sem revelar ninguém.
+
 **Limites, ditos com honestidade.** Nenhum anonimizador automático é perfeito: o
 que escapar da detecção vai INTEIRO para o provedor. A barreira final cobre os
 valores que a extensão reconheceu; ela não inventa o que não foi detectado. A

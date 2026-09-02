@@ -935,7 +935,7 @@ var PjePanel = (function () {
                   <button class="linhatempo" hidden aria-expanded="false">
                     ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
                   </button>
-                  <span class="selo-sigilo" hidden role="note"></span>
+                  <button class="selo-sigilo" hidden aria-expanded="false"></button>
                   <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
                   <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
                 </div>
@@ -1926,8 +1926,13 @@ var PjePanel = (function () {
     // (ao retomar um processo que já estava em modo sigiloso), e sem a separação
     // ele teria de simular um clique — que dispararia o callback e ligaria o
     // modo de novo, do lado de lá.
-    function pintarSigilo(ligado, quantos) {
+    function pintarSigilo(ligado, quantos, dados) {
       sigiloOn = !!ligado;
+      if (dados !== undefined) audDados = dados;
+      // A caixa nunca pode mostrar o retrato de um estado anterior — a mesma
+      // regra do `setLinhaDoTempo`, que fecha a `.movbox` ao trocar o retrato.
+      if (!sigiloOn) fecharAud();
+      else if (audbox) { fecharAud(); abrirAud(); }
       tglSigilo.setAttribute("aria-pressed", String(sigiloOn));
       tglSigilo.classList.toggle("on", sigiloOn);
       // SÓ o rótulo — o <svg> é irmão dele. Escrever no textContent do botão
@@ -1937,11 +1942,12 @@ var PjePanel = (function () {
       if (sigiloOn) {
         const n = Number(quantos) || 0;
         seloSigilo.textContent = n
-          ? "🔒 sigiloso · " + n + " dado(s) mascarado(s)"
+          ? "🔒 sigiloso · " + n + " mascarado(s)"
           : "🔒 sigiloso";
         seloSigilo.title =
           "As peças vão como texto anonimizado; o arquivo original não sai desta máquina." +
-          (n ? " " + n + " valor(es) distinto(s) já substituído(s) por rótulo." : "");
+          (n ? " " + n + " valor(es) distinto(s) já substituído(s) por rótulo." : "") +
+          " Clique para AUDITAR: o que foi mascarado e o texto exato que foi enviado.";
       }
     }
 
@@ -1952,6 +1958,206 @@ var PjePanel = (function () {
         : "Modo sigiloso desligado: as peças voltam a ser enviadas como arquivo.";
       if (sigiloCb) sigiloCb(sigiloOn);
     });
+
+    // ---------------------------------------------------------------- AUDITORIA
+    //
+    // O selo do modo sigiloso ABRE esta caixa, e é ela que responde à pergunta
+    // que o recurso inteiro precisa poder responder: "como eu SEI que esta peça
+    // saiu anonimizada?". Sem ela o usuário tinha um botão, uma contagem e a
+    // palavra da extensão — e a palavra da extensão não é auditoria.
+    //
+    // Três camadas, na ordem em que a dúvida aparece:
+    //   1. QUANTO foi mascarado, por tipo — a visão de uma olhada;
+    //   2. O QUE foi mascarado, peça por peça, com o TEXTO QUE DE FATO SAIU;
+    //   3. A CHAVE (rótulo -> valor original), que é o que permite reidentificar.
+    //
+    // A camada 3 fica SÓ NA TELA. Ela desfaz a anonimização — um relatório que a
+    // carregasse seria o oposto do que ele existe para provar. O arquivo que se
+    // baixa leva as camadas 1 e 2, e diz isso em voz alta.
+    let audDados = null;
+    let audbox = null;
+    let audBaixarCb = null;
+
+    function fecharAud() {
+      if (!audbox) return;
+      audbox.remove();
+      audbox = null;
+      seloSigilo.setAttribute("aria-expanded", "false");
+    }
+
+    function linhaAud(classe, texto) {
+      const el = document.createElement("div");
+      el.className = classe;
+      el.textContent = texto;   // textContent SEMPRE: isto é conteúdo dos autos
+      return el;
+    }
+
+    function abrirAud() {
+      fecharAud();
+      const box = document.createElement("div");
+      box.className = "audbox";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", "Auditoria da anonimização");
+
+      const hd = document.createElement("div");
+      hd.className = "mv-hd";
+      const t = document.createElement("span");
+      t.className = "mv-t";
+      const d = audDados || { itens: [], pecas: [] };
+      t.textContent = "Anonimização — " + d.itens.length + " valor(es) mascarado(s)";
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "mv-x";
+      x.title = "Fechar (Esc)";
+      x.innerHTML = SVG.x;
+      x.addEventListener("click", fecharAud);
+      hd.appendChild(t);
+      hd.appendChild(x);
+      box.appendChild(hd);
+
+      const lista = document.createElement("div");
+      lista.className = "mv-list";
+
+      // CONJUNTO VAZIO SE EXPLICA (a regra da `.sel-nota`): sem nada mascarado
+      // ainda, o clique não pode abrir uma caixa em branco — a pergunta "então
+      // está funcionando?" nasce exatamente aqui.
+      if (!d.itens.length && !d.pecas.length) {
+        lista.appendChild(linhaAud("mv-vazio",
+          "Nada foi anonimizado ainda. O mascaramento acontece no primeiro envio: " +
+          "marque as peças e pergunte alguma coisa. Depois disso, esta caixa mostra " +
+          "o que foi substituído e o texto exato que saiu."));
+      }
+
+      // --- 1) resumo por tipo
+      if (d.itens.length) {
+        const porTipo = new Map();
+        for (const it of d.itens) porTipo.set(it.tipo, (porTipo.get(it.tipo) || 0) + 1);
+        const res = document.createElement("div");
+        res.className = "aud-res";
+        for (const [tipo, n] of [...porTipo].sort((a, b) => b[1] - a[1])) {
+          const c = document.createElement("span");
+          c.className = "aud-chip";
+          c.textContent = tipo + " " + n;
+          res.appendChild(c);
+        }
+        lista.appendChild(res);
+      }
+
+      // --- 2) as peças, com o TEXTO QUE SAIU
+      if (d.pecas.length) {
+        lista.appendChild(linhaAud("aud-sec", "Peças anonimizadas e enviadas"));
+        for (const pe of d.pecas) {
+          const row = document.createElement("div");
+          row.className = "aud-peca";
+          const cab = document.createElement("div");
+          cab.className = "aud-pcab";
+          const nome = document.createElement("b");
+          nome.textContent = pe.titulo || String(pe.id);
+          const meta = document.createElement("span");
+          meta.className = "aud-pmeta";
+          meta.textContent = pe.chars + " caracteres";
+          const ver = document.createElement("button");
+          ver.type = "button";
+          ver.className = "aud-ver";
+          ver.textContent = "ver o texto enviado";
+          const corpo = document.createElement("pre");
+          corpo.className = "aud-texto";
+          corpo.hidden = true;
+          corpo.textContent = pe.texto || "";
+          ver.addEventListener("click", () => {
+            corpo.hidden = !corpo.hidden;
+            ver.textContent = corpo.hidden ? "ver o texto enviado" : "ocultar";
+            posicionarAud();
+          });
+          cab.appendChild(nome);
+          cab.appendChild(meta);
+          cab.appendChild(ver);
+          row.appendChild(cab);
+          row.appendChild(corpo);
+          lista.appendChild(row);
+        }
+      }
+
+      // --- 3) a CHAVE, só na tela
+      if (d.itens.length) {
+        lista.appendChild(linhaAud("aud-sec", "Tabela de reidentificação (não sai daqui)"));
+        lista.appendChild(linhaAud("aud-avi",
+          "Esta tabela desfaz a anonimização. Ela fica só neste computador e NÃO " +
+          "acompanha o relatório — um relatório que a carregasse provaria o contrário " +
+          "do que ele existe para provar."));
+        for (const it of d.itens) {
+          const row = document.createElement("div");
+          row.className = "aud-map";
+          const r = document.createElement("code");
+          r.textContent = it.rotulo;
+          const v = document.createElement("span");
+          v.className = "aud-val";
+          v.textContent = it.valor;
+          row.appendChild(r);
+          row.appendChild(v);
+          lista.appendChild(row);
+        }
+      }
+
+      box.appendChild(lista);
+
+      // --- o relatório
+      const pe = document.createElement("div");
+      pe.className = "aud-pe";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "aud-baixar";
+      btn.textContent = "⬇ Baixar relatório de conferência";
+      btn.title =
+        "Um arquivo .md com o que foi mascarado (por tipo) e o TEXTO EXATO que foi " +
+        "enviado ao provedor, peça por peça. Não leva a tabela de reidentificação.";
+      btn.disabled = !d.pecas.length;
+      btn.addEventListener("click", () => {
+        if (audBaixarCb) audBaixarCb();
+      });
+      pe.appendChild(btn);
+      box.appendChild(pe);
+
+      wrap.appendChild((audbox = box));
+      seloSigilo.setAttribute("aria-expanded", "true");
+      posicionarAud();
+    }
+
+    // Mesma geometria da `.movbox`: `position: fixed` porque o `.wrap` é um
+    // container de tamanho ZERO, alinhada à direita do selo e ACIMA dele.
+    function posicionarAud() {
+      if (!audbox) return;
+      const pr = panelEl.getBoundingClientRect();
+      const r = seloSigilo.getBoundingClientRect();
+      const larg = Math.min(520, Math.max(300, pr.width - 24), window.innerWidth - 24);
+      audbox.style.width = larg + "px";
+      const lista = audbox.querySelector(".mv-list");
+      if (lista) lista.style.maxHeight = Math.min(420, window.innerHeight - 160) + "px";
+      const alt = audbox.offsetHeight;
+      audbox.style.left =
+        Math.max(6, Math.min(r.right - larg, window.innerWidth - larg - 6)) + "px";
+      if (r.top - alt - 8 >= 6) audbox.style.top = r.top - alt - 8 + "px";
+      else audbox.style.top = Math.max(6, Math.min(r.bottom + 8, window.innerHeight - alt - 6)) + "px";
+    }
+
+    seloSigilo.addEventListener("click", () => (audbox ? fecharAud() : abrirAud()));
+
+    // O clique fora fecha pelo DOCUMENT, não pelo `wrap`: nos modos lateral,
+    // livre e flutuante a página do tribunal fica visível e CLICÁVEL ao lado, e
+    // ancorado no wrap um clique nos autos não fecharia nada. `composedPath` e
+    // não `e.target`: no document o alvo de dentro do Shadow DOM chega
+    // RETARGETADO para o host, e `closest(".audbox")` daria null — o clique
+    // dentro da própria caixa a fecharia.
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (!audbox) return;
+        const caminho = (e.composedPath && e.composedPath()) || [];
+        if (caminho.indexOf(audbox) >= 0 || caminho.indexOf(seloSigilo) >= 0) return;
+        fecharAud();
+      },
+      true
+    );
 
     // Geração de MINUTA por modo explícito: o clique no botão liga o modo — a
     // instrução padrão (editável) entra no campo, a faixa .minutabar explica o
@@ -6545,8 +6751,13 @@ var PjePanel = (function () {
       },
       // Pinta sem disparar o callback — é o que o content usa ao retomar um
       // processo que já estava em modo sigiloso.
-      setSigiloso(ligado, quantos) {
-        pintarSigilo(ligado, quantos);
+      setSigiloso(ligado, quantos, dados) {
+        pintarSigilo(ligado, quantos, dados);
+      },
+      // O relatório de conferência: quem monta é o content (ele tem o texto e a
+      // ficha); o painel só oferece o gesto.
+      onBaixarAuditoria(cb) {
+        audBaixarCb = cb;
       },
       isSearchOn() {
         return searchOn;

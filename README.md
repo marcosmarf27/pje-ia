@@ -440,6 +440,12 @@ em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o text
 - **A tabela que desfaz a anonimização** fica só no seu computador, por processo, e nunca
   sai dele.
 
+- **Dá para conferir e para provar.** O selo `🔒 sigiloso` abre uma caixa de auditoria
+  com o que foi mascarado, o **texto exato que o provedor recebeu** peça por peça, e a
+  tabela que liga cada rótulo ao nome real. O botão **Baixar relatório de conferência**
+  gera um arquivo com tudo isso **menos a tabela** — para poder ser juntado aos autos ou
+  mostrado a terceiro sem revelar ninguém.
+
 **Limite dito com honestidade:** nenhum anonimizador automático é perfeito, e o que escapar
 da detecção vai inteiro para o provedor. A conferência final cobre o que a extensão
 reconheceu; ela não inventa o que não detectou. **A revisão do que sai continua sendo sua.**

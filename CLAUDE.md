@@ -2679,6 +2679,52 @@ silêncio. Uma pós-condição sobre o corpo serializado não envelhece.
   bloquear um turno que não revela ninguém. Isentar é seguro porque a região é
   definida pela ocorrência LITERAL de uma constante daqui.
 
+**A CAIXA DE AUDITORIA é o que torna o recurso verificável, e ela faltava.**
+O mecanismo inteiro estava pronto e o usuário tinha um botão, uma contagem e a
+palavra da extensão — e a palavra da extensão não é auditoria. O sinal de que a
+peça faltava estava no próprio código: `PSEUD.tabela()` existe com o comentário
+"a tabela que a caixa de auditoria mostra" e **não tinha um único consumidor**.
+
+O selo `🔒 sigiloso` da `.metarow` virou BOTÃO e abre a `.audbox`, espelhando a
+`.movbox` da linha do tempo (mesmo gesto, mesma anatomia — dois desenhos para o
+mesmo gesto divergiriam no primeiro ajuste). Três camadas, na ordem em que a
+dúvida aparece:
+
+1. **QUANTO** foi mascarado, por tipo (`PESSOA 4`, `CPF 2`…) — a visão de uma
+   olhada.
+2. **O QUE** foi mascarado, peça por peça, com o **TEXTO QUE DE FATO SAIU**. Ele
+   já está em memória (é o mesmo que foi ao request), então mostrar um resumo
+   seria pedir que o usuário confiasse na extensão outra vez — que é justamente
+   o que a auditoria existe para dispensar.
+3. **A CHAVE** (rótulo → valor original), que é o que permite reidentificar.
+
+**A camada 3 fica SÓ NA TELA, e essa separação é a decisão central.** O
+relatório que se baixa (`⬇ Baixar relatório de conferência`) leva as camadas 1 e
+2 e **não** leva a tabela: ela desfaz a anonimização, e um arquivo feito para ser
+mostrado a terceiro que a carregasse provaria o CONTRÁRIO do que existe para
+provar. O relatório diz isso em voz alta, e diz também o seu próprio limite ("a
+conferência final é humana").
+
+- **No relatório, o título da peça vai MASCARADO** (`tituloEnviado`), e o
+  original fica só na tela. Título de auto carrega nome — "Petição inicial de
+  FULANO DE TAL" —, e o arquivo vazaria no cabeçalho de cada seção. Na tela vale
+  o original: quem audita precisa saber QUAL peça está olhando, e
+  "[PESSOA_1] — petição inicial" não diz.
+- **O CNJ e o NOME DO ARQUIVO também.** O número identifica o processo e, por
+  ele, as partes; o nome do arquivo é um canal como qualquer outro. O relatório
+  sai como `conferencia-anonimizacao-AAAA-MM-DD.md`.
+- **Conjunto vazio se explica** (a regra da `.sel-nota`): sem nada mascarado
+  ainda, a caixa diz que o mascaramento acontece no primeiro envio — a pergunta
+  "então está funcionando?" nasce exatamente ali.
+
+**E o PROGRESSO passou a contar.** Depois do download a peça já está `done` e a
+barra em 100% — e a anonimização é a parte LENTA (o OCR de centenas de folhas).
+O card ficava cheio, parado e mudo enquanto o trabalho continuava: o mesmo
+"parecendo travado" que a v0.50.0 do OCR entregou ao usuário. Hoje a peça volta
+a girar (estado `anon`, que herda o estilo do `upload` — é a MESMA peça
+avançando de fase) e a nota CONTA (`Anonimizando 3 de 12 — <peça>`), porque uma
+nota que só nomeia a peça não diz se falta muito.
+
 **O QUE A REVISÃO PROFUNDA MUDOU** (advisor + Codex, 11 achados; os que mais
 importam, porque nenhum tinha sintoma):
 
