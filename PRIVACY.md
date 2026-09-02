@@ -129,6 +129,12 @@ Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
   requisição e **recusa o envio** se algum dos valores originais aparecer nele.
   O bloqueio é do turno inteiro — nada é enviado pela metade.
 
+- **Você APROVA antes de sair.** Quando o envio traz peça recém-anonimizada,
+  uma caixa mostra o texto exatamente como vai sair, peça por peça, e espera a
+  sua aprovação — dá para editar, mascarar à mão ou liberar um valor antes.
+  Cancelar não envia nada. A conferência pode ser dispensada nas Configurações
+  (e religada lá).
+
 - **Você pode CONFERIR o que saiu.** Clicando no selo `🔒 sigiloso` do painel
   abre-se uma caixa de auditoria com: quanto foi mascarado e de que tipo; cada
   peça enviada, com o **texto exato que o provedor recebeu**; e a tabela que liga
@@ -140,7 +146,8 @@ Com o botão **🔒 Sigiloso** ligado no painel, o tratamento muda:
 **Limites, ditos com honestidade.** Nenhum anonimizador automático é perfeito: o
 que escapar da detecção vai INTEIRO para o provedor. A barreira final cobre os
 valores que a extensão reconheceu; ela não inventa o que não foi detectado. A
-revisão do que sai continua sendo sua.
+revisão do que sai continua sendo sua — e a caixa de conferência antes do envio
+é o momento de fazê-la.
 
 ## 4. Responsabilidade sobre dados de processos (LGPD)
 

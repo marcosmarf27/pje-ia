@@ -1817,7 +1817,16 @@ chrome.runtime.onConnect.addListener((port) => {
         })
       )
       .catch((e) =>
-        postar(port, { type: "error", error: String((e && e.message) || e) })
+        postar(port, {
+          type: "error",
+          error: String((e && e.message) || e),
+          // Bloqueio da guarda de saída: o content precisa saber que É um
+          // bloqueio (para não tratar como falha de rede) e QUAL rótulo, para
+          // oferecer ao usuário liberar o valor. O valor em si nunca viaja.
+          vazamento: !!(e && e.vazamento),
+          rotulo: (e && e.rotulo) || null,
+          tipo: (e && e.tipo) || null,
+        })
       )
       .finally(parar);
   });

@@ -14,6 +14,8 @@ const customEl = document.getElementById("customPrompt");
 // elemento exclusivo de uma das duas telas, é acessado sempre sob `if (el)` —
 // tocá-lo direto quebraria a outra página.
 const memoriaEl = document.getElementById("memoriaCaso");
+// Só na página de opções (como o `memoriaCaso`): no popup vem null.
+const sigiloAprovarEl = document.getElementById("sigiloAprovar");
 const limparMemBtn = document.getElementById("limparMemoria");
 // Exclusivos da página de opções: no popup eles não existem, e ler `.textContent`
 // de `null` quebraria a tela inteira. A regra vale para todo elemento que só
@@ -456,6 +458,7 @@ chrome.storage.local.get(
     "customPrompt",
     "memoriaCaso",
     "modeloMinuta",
+    "sigiloAprovar",
   ],
   (v) => {
     if (v.apiKey) apiKeyEl.value = v.apiKey;
@@ -486,6 +489,7 @@ chrome.storage.local.get(
     // Default LIGADO, e por isso o teste é `!== false`: quem nunca abriu esta
     // tela não tem a chave no storage, e `v.memoriaCaso` vem `undefined`.
     if (memoriaEl) memoriaEl.checked = v.memoriaCaso !== false;
+    if (sigiloAprovarEl) sigiloAprovarEl.checked = v.sigiloAprovar !== false;
     pintarMascaras();
     setChip();
     // Os passos "Como usar" só existem enquanto NENHUMA chave foi salva: é
@@ -669,6 +673,7 @@ saveBtn.addEventListener("click", () => {
   if (effortEl) cfg.effort = getEffort();
   if (customEl) cfg.customPrompt = customEl.value.trim();
   if (memoriaEl) cfg.memoriaCaso = memoriaEl.checked;
+  if (sigiloAprovarEl) cfg.sigiloAprovar = sigiloAprovarEl.checked;
   chrome.storage.local.set(cfg, () => {
     // DESLIGAR tem de apagar o que já existe, na hora. Um interruptor que só
     // impede gravações futuras deixaria no disco exatamente o material que o

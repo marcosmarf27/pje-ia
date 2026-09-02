@@ -233,24 +233,64 @@
   // passada aqui. Formato: {"*": [...], "PERSON": [...], "ORGANIZATION": [...],
   // "LOCATION": [...]} — o mesmo do TecJustiça Sigilo, para as duas listas
   // poderem ser mantidas juntas.
+  //
+  // DUAS FORMAS DE CASAR, e a segunda nasceu de um bloqueio real. As listas
+  // simples ("*", PERSON, ORGANIZATION, LOCATION) casam o valor INTEIRO
+  // normalizado. A chave `prefixos` casa por PREFIXO com fronteira de palavra:
+  // "Ministério Público do Estado do Ceará", "Tribunal de Justiça do Estado do
+  // Ceará", "Vara Única de Ocara" — as formas em que os órgãos públicos de fato
+  // aparecem nos autos — nunca casavam a lista inteira, viravam
+  // [ORGANIZACAO_n] e, como o órgão julgador também vai na ficha do system em
+  // todo request, a guarda de saída bloqueava o turno. Órgão público não é dado
+  // pessoal, e mascará-lo só destrói a leitura jurídica.
+  //
+  // Prefixo de UMA palavra é aceito aqui de propósito ("vara", "comarca",
+  // "delegacia"), porque a lista é curada e é só de instituições: o risco de
+  // "vara" liberar o nome de uma pessoa não existe. O que NÃO entra é qualquer
+  // cabeça que uma EMPRESA também use — "escola", "fundação", "agência",
+  // "câmara" (a CDL é "Câmara de Dirigentes Lojistas"), "sistema", "central",
+  // "núcleo": empresa que é PARTE vem da ficha como ORGANIZACAO por decisão do
+  // gazetteer, e o `negado` vale também para o gazetteer — um prefixo largo
+  // mandaria "Fundação Bradesco" ou "Escola X Ltda" em claro. Cabeça ambígua só
+  // entra qualificada ("câmara cível", "seção judiciária", "agência nacional").
+  // A regra tem teste caso a caso.
   function prepararDeny(bruto) {
     const norm = (s) => normalizarComIndice(s).alvo.trim();
     const geral = new Set((bruto && bruto["*"] ? bruto["*"] : []).map(norm));
     const porTipo = new Map();
+    const prefixos = new Map();
     for (const k of Object.keys(bruto || {})) {
       if (k === "*") continue;
+      if (k === "prefixos") {
+        for (const t of Object.keys(bruto[k] || {})) {
+          prefixos.set(
+            t.toUpperCase(),
+            (bruto[k][t] || []).map(norm).filter(Boolean)
+          );
+        }
+        continue;
+      }
       porTipo.set(k.toUpperCase(), new Set((bruto[k] || []).map(norm)));
     }
     // Os nomes do modelo são PESSOA/ORGANIZACAO/LOCAL; os da lista são
     // PERSON/ORGANIZATION/LOCATION. Um alias evita manter duas listas.
     const ALIAS = { PESSOA: "PERSON", ORGANIZACAO: "ORGANIZATION", LOCAL: "LOCATION" };
+    const casaPrefixo = (v, lista) => {
+      for (const p of lista || []) {
+        if (v === p) return true;
+        if (v.startsWith(p) && !ehLetraOuDigito(v[p.length])) return true;
+      }
+      return false;
+    };
     return function negado(tipo, valor) {
       const v = norm(valor);
       if (!v) return true;
       if (geral.has(v)) return true;
       const t = ALIAS[String(tipo).toUpperCase()] || String(tipo).toUpperCase();
       const s = porTipo.get(t);
-      return !!(s && s.has(v));
+      if (s && s.has(v)) return true;
+      if (casaPrefixo(v, prefixos.get("*"))) return true;
+      return casaPrefixo(v, prefixos.get(t));
     };
   }
 
@@ -299,7 +339,12 @@
       while (de !== -1) {
         const ate = de + agulha.length;
         if (!ehLetraOuDigito(alvo[de - 1]) && !ehLetraOuDigito(alvo[ate])) {
-          out.push({ tipo: it.tipo, ini: idx[de], fim: idx[ate], score: 1, origem: "ficha" });
+          const o = { tipo: it.tipo, ini: idx[de], fim: idx[ate], score: 1, origem: "ficha" };
+          // Item vindo do MAPA carrega o rótulo: é por ele que `sobrasDoMapa`
+          // diz qual entrada sobrou sem precisar rotular — e, portanto, sem
+          // escrever no mapa num caminho que só existe para mostrar.
+          if (it.rotulo) o.rotulo = it.rotulo;
+          out.push(o);
         }
         de = alvo.indexOf(agulha, de + 1);
       }

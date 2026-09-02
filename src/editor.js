@@ -793,6 +793,58 @@
     box.hidden = false;
   }
 
+  // ------------------------------------------ reidentificação (modo sigiloso)
+  // A minuta gerada em modo sigiloso chega com [PESSOA_1] no lugar dos nomes.
+  // A tabela que desfaz isso vive no casodb do WORKER, por processo; a página
+  // a pede pela chave do caso gravada com a minuta e troca os rótulos nos NÓS
+  // DE TEXTO do documento (nunca por replace no HTML: um nome com "<" quebraria
+  // a marcação). Grava o resultado como qualquer edição. É o único caminho
+  // pelo qual o nome volta ao documento — e ele fica neste computador.
+  const RE_ROTULO_ANON = /\[[A-Z][A-Z0-9]*_\d+\]/;
+  function prepararReidentificacao(d) {
+    const btn = document.getElementById("reid");
+    if (!btn) return;
+    const corpo = String((d && (d.html || d.md)) || "");
+    if (!d || !d.casoChave || !RE_ROTULO_ANON.test(corpo) || typeof PSEUD === "undefined") {
+      btn.hidden = true;
+      return;
+    }
+    btn.hidden = false;
+    btn.onclick = () => {
+      btn.disabled = true;
+      chrome.runtime.sendMessage({ type: "casoLer", chave: d.casoChave }, (r) => {
+        btn.disabled = false;
+        const g = r && r.ok && r.caso && r.caso.sigilo && r.caso.sigilo.mapa;
+        if (!g) {
+          elSalvo.className = "salvo";
+          elSalvo.textContent = "tabela de reidentificação não encontrada neste computador";
+          return;
+        }
+        const mapa = PSEUD.hidratar(g);
+        const doc = new DOMParser().parseFromString("<div id=\"r\">" + editor.value + "</div>", "text/html");
+        const raiz = doc.getElementById("r");
+        const walker = doc.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+        let trocados = 0;
+        let semMapa = 0;
+        let no;
+        while ((no = walker.nextNode())) {
+          if (!RE_ROTULO_ANON.test(no.nodeValue)) continue;
+          const res = PSEUD.reidentificar(no.nodeValue, mapa);
+          trocados += res.trocados || 0;
+          semMapa += res.desconhecidos || 0;
+          no.nodeValue = res.texto;
+        }
+        editor.value = raiz.innerHTML;
+        salvar();
+        elSalvo.className = "salvo ok";
+        elSalvo.textContent =
+          trocados + " nome(s) restaurado(s)" +
+          (semMapa ? " · " + semMapa + " rótulo(s) sem correspondência" : "");
+        if (!RE_ROTULO_ANON.test(editor.value)) btn.hidden = true;
+      });
+    };
+  }
+
   // ------------------------------------------------------------------ Jodit
 
   function montarEditor(html) {
@@ -985,6 +1037,7 @@
       elSalvo.className = "salvo ok";
       elSalvo.textContent = "salvo " + horaCurta(d.atualizadoEm || d.criadoEm || Date.now());
       mostrarOrigem(d);
+      prepararReidentificacao(d);
       // HTML editado tem prioridade; na primeira abertura, converte o Markdown
       // cru com o parser dedicado e grava o HTML de volta.
       if (d.html) {

@@ -524,10 +524,21 @@
   // foram cortadas — a mesma razão que já mantinha a constante compartilhada.
   function tetoTextoDe(ids) {
     let n = 0;
+    let soma = 0;
     for (const id of ids) {
       const d = entradaParaMedir(id);
-      if (d && d.kind === "text" && d.text) n++;
+      if (d && d.kind === "text" && d.text) {
+        n++;
+        soma += d.text.length;
+      }
     }
+    // SÓ CORTA QUANDO NÃO CABE. Dividir o orçamento pelo número de textos
+    // cortava a peça longa mesmo com a soma folgada: 34 peças de texto numa
+    // janela de 1,3M davam ~73 mil caracteres para CADA uma, e uma inicial de
+    // 40 folhas era truncada com o conjunto ocupando 8% da janela. Se a soma
+    // cabe no orçamento inteiro, nenhum teto individual se aplica; se não
+    // cabe, vale a repartição de antes (piso de 60 mil).
+    if (soma <= tetoTextoChars(1)) return Number.MAX_SAFE_INTEGER;
     return tetoTextoChars(n);
   }
   // O corte em si é aceitável; cortar EM SILÊNCIO não é. O modelo veria metade
@@ -663,8 +674,41 @@
   // `.zip` sair com as peças anonimizadas, em silêncio. Mesma distinção do par
   // `precisaBaixar`/`temBytes`: a pergunta parece uma e são duas.
   const sigiloCache = new Map();
+  // TEXTO EXTRAÍDO das peças (pdf.js + OCR local), por sessão. Dois
+  // consumidores: o modo sigiloso (mascara e envia) e os modelos que NÃO leem
+  // PDF ou imagem (enviam o texto). Uma extração por peça: trocar de modo ou
+  // de modelo não refaz o OCR. Vive no TOPO porque `entradaParaMedir` o lê de
+  // dentro do callback de seleção (a zona morta temporal deste arquivo).
+  const textoCache = new Map();
+  const MARCA_OCR_FALHOU = "_[o reconhecimento de texto falhou nesta página]_";
   // Peças que já passaram pelo mascaramento nesta sessão (evita refazer OCR).
   const sigiloFeitas = new Set();
+  // Valores que o USUÁRIO decidiu que não são sigilosos (normalizados). É a
+  // resposta ao bloqueio da guarda: "um valor do tipo ORGANIZACAO apareceu" e
+  // a organização era o Tribunal. Sem esta lista a única saída era desligar o
+  // modo — o oposto do que ele existe para fazer. Vive no casodb ao lado do
+  // mapa (é do PROCESSO) e alimenta o `negado` dos detectores.
+  const liberadosSigilo = new Set();
+  // Peças cujo mascaramento NÃO fechou: id -> {text, pages, sobras}. O texto
+  // mascarado até onde deu fica aqui para o usuário REVISAR num editor e
+  // decidir (mascarar à mão, liberar o valor, ou usar o texto como está).
+  // Sem isto, a única saída para uma peça reprovada era desmarcá-la.
+  const sigiloPendentes = new Map();
+  // Peças cujo texto mascarado AINDA NÃO FOI APROVADO para sair. A anonimização
+  // automática é a primeira passada e ela erra; a conferência final é humana —
+  // e tem de acontecer ANTES do request, não depois (a auditoria mostra o que
+  // SAIU; a caixa de aprovação decide o que SAI). Entra aqui toda peça que
+  // ganha entrada no `sigiloCache`; sai quando o usuário aprova (ou quando
+  // dispensou a conferência nas opções). Dois consumidores: a caixa
+  // (`confirmarEnvioSigiloso`) e o PORTÃO DURO de `stream`/`estimarContexto`
+  // (`exigirAprovacaoSigilo`), que recusa qualquer request com peça ainda
+  // aqui — erra para o lado de não enviar. No TOPO porque `refinarContexto`
+  // o lê de dentro do callback de seleção.
+  const sigiloAguardando = new Set();
+  // Preferência "conferir antes de enviar" (`chrome.storage.local
+  // .sigiloAprovar`, default LIGADO). Desligada, o conjunto acima é esvaziado
+  // sem caixa — o portão duro continua valendo para quem esquecer de chamá-la.
+  let sigiloAprovar = true;
 
   // ANEXOS DO INPUT — arquivos que o usuário anexa na própria caixa de mensagem
   // (PDF, TXT, MD), para conversar sobre eles junto das peças do processo, ou
@@ -695,7 +739,13 @@
   // medidor de contexto sumia da tela até o primeiro turno — justamente na fase
   // em que o usuário está marcando peças e precisa dele.
   function entradaParaMedir(id) {
-    return sigiloCache.get(id) || docsCache.get(id) || anexos.get(id);
+    if (sigiloCache.has(id)) return sigiloCache.get(id);
+    const d = docsCache.get(id) || anexos.get(id);
+    // Modelo que não lê o arquivo: o texto já extraído mede melhor do que
+    // páginas × tokens; ainda não extraído, mede o original (é medição — não
+    // sai da máquina).
+    if (d && precisaTextoLocal(d)) return entradaTextoLocal(id, d) || d;
+    return d;
   }
 
   function entradaDoc(id) {
@@ -711,7 +761,13 @@
       // a exportação, que não mandam nada para fora.)
       return sigiloCache.get(id);
     }
-    return docsCache.get(id) || anexos.get(id);
+    const d = docsCache.get(id) || anexos.get(id);
+    // MODELO QUE NÃO LÊ O ARQUIVO (cap `aceitaPdf`/`aceitaImagem` === false):
+    // o que vai é o texto extraído aqui, e sem ele a peça NÃO vai — a mesma
+    // falha fechada do sigilo, porque o arquivo nunca é a saída certa para um
+    // modelo que não o lê (o provedor o descartaria ou converteria sem OCR).
+    if (d && precisaTextoLocal(d)) return entradaTextoLocal(id, d);
+    return d;
   }
 
   // Seleção de peças MAIS os anexos do input — o conjunto que de fato vai ao
@@ -1397,9 +1453,10 @@
       // ou OpenAI) — o provedor sai do prefixo do id, sem esperar o caps
       // chegar. customPrompt pega carona na mesma leitura (evita um get a mais).
       chrome.storage.local.get(
-        ["apiKey", "geminiApiKey", "openaiApiKey", "openrouterApiKey", "model", "customPrompt"],
+        ["apiKey", "geminiApiKey", "openaiApiKey", "openrouterApiKey", "model", "customPrompt", "sigiloAprovar"],
         (v) => {
           customPrompt = (v.customPrompt || "").trim();
+          sigiloAprovar = v.sigiloAprovar !== false;
           const m = String(v.model || "");
           const configurado = m.startsWith("or:")
             ? !!v.openrouterApiKey
@@ -1448,6 +1505,9 @@
       // o system mudou → a última medição de contexto não vale mais
       ultimaChaveEst = "";
     }
+    if (area === "local" && ch.sigiloAprovar) {
+      sigiloAprovar = ch.sigiloAprovar.newValue !== false;
+    }
   });
   panel.onConfigure(() => {
     if (!extensaoViva()) return;
@@ -1467,6 +1527,11 @@
   // `carregarDeny()`, o segundo desliga tudo, e o primeiro retomava e pintava
   // "ligado" — a interface afirmando proteção com o modo interno desligado. Só
   // o gesto MAIS RECENTE tem direito de aplicar o resultado dele.
+  // A tabela desfaz a anonimização NA TELA: a resposta volta com [PESSOA_1] e
+  // o painel mostra o nome, marcado. Lê o mapa vivo a cada chamada — ele nasce
+  // no toggle e é hidratado da memória depois do boot.
+  panel.setReidentificador((rotulo) => (mapaSigilo ? mapaSigilo.paraValor(rotulo) : null));
+
   let seqSigilo = 0;
   panel.onSigiloso(async (ligado) => {
     const meuSeq = ++seqSigilo;
@@ -3077,14 +3142,248 @@
   // de forma síncrona, guarda a string e desliga antes de qualquer espera.
   let medindoSemGravar = false;
 
+  // O `negado` de verdade: a deny list do pacote MAIS o que o usuário liberou
+  // neste processo. Ponto ÚNICO — os três chamadores (peça, canais curtos e
+  // fusão com o NER) precisam da mesma resposta, senão um valor liberado numa
+  // peça voltaria mascarado no título.
+  function negadoAtual() {
+    const deny = negadoSigilo || (() => false);
+    if (!liberadosSigilo.size) return deny;
+    return (tipo, valor) => deny(tipo, valor) || liberadosSigilo.has(PSEUD.normalizar(valor).trim());
+  }
+
+  // Ocorrências literais, neste texto, de tudo o que o mapa JÁ mascarou em
+  // outro lugar (regra do gazetteer: sem acento, sem caixa, com fronteira de
+  // palavra). O NER não é determinístico entre peças — acha o nome na
+  // contestação e deixa passar na réplica —, e sem isto a conferência da peça
+  // seguinte (`PSEUD.conferir`, que olha o mapa inteiro) reprovava a peça por
+  // um valor que o detector dela não viu: era daí que vinham as "N peças não
+  // puderam ser baixadas" sob sigilo.
+  function achadosDoMapa(texto) {
+    if (!mapaSigilo) return [];
+    const itens = mapaSigilo.proibidos();
+    if (!itens.length) return [];
+    return ANON.acharGazetteer(texto, itens).map((a) => Object.assign(a, { origem: "mapa" }));
+  }
+
+  // O que SOBROU em claro num texto já mascarado, com rótulo e valor — a lista
+  // que o relatório de falha e o editor de revisão mostram. Um item por valor
+  // distinto.
+  function sobrasDoMapa(texto) {
+    const out = [];
+    const vistos = new Set();
+    for (const a of achadosDoMapa(texto)) {
+      // O rótulo vem NO achado (o gazetteer do mapa o carrega). Rotular aqui
+      // ESCREVERIA no mapa — forma nova, ou entrada nova — num caminho que só
+      // existe para mostrar o que sobrou.
+      const rotulo = a.rotulo;
+      if (!rotulo || vistos.has(rotulo)) continue;
+      vistos.add(rotulo);
+      out.push({
+        rotulo,
+        tipo: a.tipo,
+        valor: mapaSigilo.paraValor(rotulo) || texto.slice(a.ini, a.fim),
+      });
+    }
+    return out;
+  }
+
+  // Mascara ATÉ CONVERGIR. A primeira passada mascara o que os detectores
+  // acharam; mas o mapa CRESCE durante ela (uma pessoa vista pela primeira vez
+  // nesta peça ganha rótulo ali), e a mesma pessoa pode aparecer de novo no
+  // mesmo texto em forma que o NER não marcou — "BANCO BRADESCO S.A." depois
+  // de "Banco Bradesco". Era o que ainda derrubava peças com "um valor do tipo
+  // PESSOA, [PESSOA_31], sobrou": o valor nascera na própria peça. As passadas
+  // seguintes reaplicam o gazetteer com o mapa já atualizado, até não sobrar
+  // nada ou até o teto (o mapa é finito, então converge).
+  function mascararAteConvergir(texto, achados) {
+    let mascarado = PSEUD.mascarar(texto, achados, mapaSigilo);
+    for (let passo = 0; passo < 4; passo++) {
+      const sobras = achadosDoMapa(mascarado);
+      if (!sobras.length) break;
+      mascarado = PSEUD.mascarar(mascarado, sobras, mapaSigilo);
+    }
+    return mascarado;
+  }
+
+  // O usuário REVISOU o texto de uma peça reprovada (ou liberou o valor que a
+  // reprovava) e quer usá-la: confere de novo e, se fechou, ela entra no
+  // cache mascarado e volta à seleção para o próximo envio.
+  async function aceitarTextoRevisado(id, texto) {
+    const conf = PSEUD.conferir(texto, mapaSigilo);
+    if (!conf.ok) {
+      const sobras = sobrasDoMapa(texto);
+      return {
+        ok: false,
+        sobras,
+        msg:
+          "ainda aparece em claro: " +
+          sobras.map((s) => "«" + s.valor + "» (" + s.rotulo + ")").join(", "),
+      };
+    }
+    const pend = sigiloPendentes.get(id) || {};
+    sigiloCache.set(id, { kind: "text", fmt: "texto", text: texto, pages: pend.pages });
+    sigiloFeitas.add(id);
+    // Revisada à mão, mas ainda não APROVADA para sair: a peça volta à seleção
+    // e a caixa de conferência do próximo envio a mostra junto das outras.
+    sigiloAguardando.add(id);
+    sigiloPendentes.delete(id);
+    try {
+      await armarSigilo();
+    } catch (e) {
+      console.warn("[PJe IA] guarda não re-armada após a revisão:", (e && e.message) || e);
+    }
+    panel.marcarPecas([id]);
+    panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+    panel.setStatus("Peça revisada e devolvida à seleção — ela entra no próximo envio.");
+    return { ok: true };
+  }
+
+  // Abre o editor de revisão de uma peça pendente.
+  function revisarPecaSigilo(id) {
+    const pend = sigiloPendentes.get(id);
+    if (!pend) {
+      panel.setStatus("Esta peça já não está pendente de revisão.");
+      return;
+    }
+    panel.abrirEditorSigilo({
+      id,
+      titulo: metaDe(id).titulo || String(id),
+      texto: pend.text,
+      sobras: sobrasDoMapa(pend.text),
+      onLiberar: async (rotulo) => {
+        const v = await liberarRotulo(rotulo);
+        return v;
+      },
+      onSalvar: (texto) => aceitarTextoRevisado(id, texto),
+    });
+  }
+
+  // As AÇÕES do relatório de falha de anonimização: liberar o valor que
+  // reprovou a peça (e devolvê-la à seleção para o próximo envio refazer o
+  // mascaramento sem ele) ou revisar o texto à mão.
+  function acoesDaFalhaSigilo(id, sobras) {
+    const acoes = [];
+    for (const s of (sobras || []).slice(0, 3)) {
+      acoes.push({
+        rotulo: "Liberar «" + s.valor + "» e refazer",
+        fn: async () => {
+          const v = await liberarRotulo(s.rotulo);
+          if (v == null) return;
+          sigiloPendentes.delete(id);
+          panel.marcarPecas([id]);
+          panel.setStatus(
+            "«" + v + "» liberado. A peça voltou à seleção e será anonimizada de novo no próximo envio."
+          );
+        },
+      });
+    }
+    acoes.push({ rotulo: "Revisar o texto", fn: () => revisarPecaSigilo(id) });
+    return acoes;
+  }
+
+  // O usuário decidiu que um rótulo NÃO designa dado sigiloso ("[ORGANIZACAO_3]"
+  // é o Tribunal). Três coisas, nesta ordem, e nenhuma refaz OCR ou NER:
+  //  1. o valor entra em `liberadosSigilo` (os detectores passam a pulá-lo);
+  //  2. é MARCADO como liberado no mapa (a guarda deixa de procurá-lo, o
+  //     gazetteer do mapa deixa de mascará-lo — mas `paraValor` continua
+  //     resolvendo, porque uma minuta já gerada pode carregar o rótulo);
+  //  3. o rótulo volta a ser o valor nos textos JÁ mascarados do `sigiloCache`
+  //     — troca literal, barata, e o que garante que o próximo request saia
+  //     coerente (o modelo não pode ver `[ORGANIZACAO_3]` numa peça e o nome
+  //     em claro na ficha). Os turnos ANTERIORES do histórico, já enviados com
+  //     o rótulo, ficam como estão: a API os viu assim.
+  // Devolve o valor liberado, ou null se o rótulo não existia.
+  async function liberarRotulo(rotulo) {
+    if (!mapaSigilo) return null;
+    const valor = mapaSigilo.liberar(rotulo);
+    if (valor == null) return null;
+    // TODAS as formas vistas, não só a canônica: o `negado` compara o literal
+    // normalizado, e "Banco Bradesco S.A." liberado só por "BANCO BRADESCO"
+    // voltaria pelo NER na peça seguinte.
+    for (const f of [valor].concat(mapaSigilo.formasDe(rotulo))) {
+      liberadosSigilo.add(PSEUD.normalizar(f).trim());
+    }
+    for (const [id, d] of sigiloCache) {
+      if (d && typeof d.text === "string" && d.text.includes(rotulo)) {
+        sigiloCache.set(id, Object.assign({}, d, { text: d.text.split(rotulo).join(valor) }));
+      }
+    }
+    // As peças PENDENTES de revisão também: o editor abre `pend.text`, e uma
+    // peça revisada depois da liberação sairia com o rótulo enquanto a ficha
+    // já leva o nome.
+    for (const [id, pd] of sigiloPendentes) {
+      if (pd && typeof pd.text === "string" && pd.text.includes(rotulo)) {
+        sigiloPendentes.set(id, Object.assign({}, pd, { text: pd.text.split(rotulo).join(valor) }));
+      }
+    }
+    salvarMapaSigilo();
+    // A guarda é re-armada SEM o valor — é isso que destrava o reenvio. Se o
+    // worker não responder, o modo continua ligado e o próximo envio bloqueia
+    // de novo com o mesmo aviso: erra para o lado de não enviar.
+    try {
+      await armarSigilo();
+    } catch (e) {
+      console.warn("[PJe IA] guarda não re-armada após liberar:", (e && e.message) || e);
+    }
+    if (modoSigiloso) panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+    return valor;
+  }
+
+  // Bloqueio da guarda de saída, tratado como o que é: uma DECISÃO do usuário,
+  // não uma falha de rede. Restaura o que ele digitou (o turno foi desfeito) e
+  // oferece, na conversa, liberar o valor — com o valor escrito, porque é a
+  // tela dele e sem ver o valor não há como decidir. `reenviar` (opcional) é
+  // chamado depois de liberar, para o chat repetir o envio sozinho.
+  // Devolve true quando o erro era um bloqueio e foi tratado.
+  function tratarBloqueioSigilo(e, textoDigitado, reenviar, bolhaUsuario) {
+    if (!e || !e.vazamento) return false;
+    const rotulo = e.rotulo || null;
+    const valor = rotulo && mapaSigilo ? mapaSigilo.paraValor(rotulo) : null;
+    // O turno bloqueado já ganhou uma bolha antes de a rede começar. Como ele
+    // será restaurado no campo — e pode ser reenviado depois da liberação —,
+    // a bolha precisa sair TAMBÉM do transcript visual. Sem isto o reenvio
+    // criaria duas perguntas iguais e a conversa gravada carregaria ambas.
+    if (bolhaUsuario) panel.removeMessage(bolhaUsuario);
+    if (textoDigitado) panel.restaurarTexto(textoDigitado);
+    panel.mostrarBloqueioSigilo({
+      tipo: e.tipo || null,
+      rotulo,
+      valor,
+      mensagem: (e && e.message) || String(e),
+      reenvia: !!reenviar,
+      onLiberar: rotulo
+        ? async () => {
+            const v = await liberarRotulo(rotulo);
+            if (v == null) {
+              panel.setStatus("Este rótulo já não está no mapa.");
+              return;
+            }
+            panel.setStatus("«" + v + "» liberado: ele passa a sair em claro neste processo.");
+            if (reenviar) reenviar();
+            return v;
+          }
+        : null,
+    });
+    return true;
+  }
+
   function mascararCurto(texto) {
     if (!modoSigiloso || !mapaSigilo || !texto) return texto;
     const bruto = String(texto);
     try {
+      // TAMBÉM o que já está no mapa. Esta função só roda os detectores
+      // determinísticos (não há NER aqui), mas a guarda de saída confere TODOS
+      // os valores do mapa — inclusive os que o NER achou dentro das peças. Um
+      // "Tribunal de Justiça do Estado do Ceará" rotulado numa peça e escrito
+      // em claro na ficha do system (órgão julgador vai em todo request) era
+      // um bloqueio certo, sem nada que o usuário pudesse fazer. Mascarar aqui
+      // o que o mapa já conhece é o que faz os canais curtos e as peças
+      // saírem com o MESMO rótulo — que é a razão de o mapa existir.
       const achados = ANON.detectar(bruto, {
         ficha: fichaParaSigilo(),
-        negado: negadoSigilo || (() => false),
-      });
+        negado: negadoAtual(),
+      }).concat(achadosDoMapa(bruto));
       if (!achados.length) return bruto;
       return PSEUD.mascarar(bruto, achados, medindoSemGravar ? PSEUD.criarMapa(null) : mapaSigilo);
     } catch (e) {
@@ -3096,7 +3395,7 @@
     }
   }
 
-  // O texto de uma peça, para o modo sigiloso.
+  // O texto de uma peça — para o modo sigiloso e para o modelo que não lê PDF.
   //
   // Reusa `lerPdfNoFrame` (o pdf.js do iframe) e o motor de OCR, mas NÃO reusa o
   // laço de `onExtrairTexto`: aquele monta o `.md` com front-matter, índice e
@@ -3104,13 +3403,31 @@
   // string, e só. A duplicação é a mesma escolha do `rtfParaTexto` copiado em
   // `docx-importar.js`: dois contextos, trabalho parecido, e fundi-los custaria
   // mais que separá-los.
-  async function textoDaPecaParaSigilo(id, c, rotulo) {
+  async function textoDaPeca(id, c, rotulo, fase) {
+    if (textoCache.has(id)) return textoCache.get(id);
+    // NFC UMA vez, na entrada: a string canônica é a que se tokeniza, a que se
+    // mascara e a que vai ao modelo. Sem isso haveria dois sistemas de
+    // coordenadas — o offset que o NER devolve apontaria para outra string, e
+    // o sintoma seria máscara no lugar errado, não uma exceção. Feito AQUI, e
+    // não por `Tokenizador.paraCanonico`, porque `tokenizador.js` roda no Web
+    // Worker do NER, do outro lado da ponte. CONTRATO: NFC, nunca NFKC.
+    const t = String((await extrairTextoDaPeca(id, c, rotulo, fase)) || "").normalize("NFC");
+    // Folha cujo OCR FALHOU não fixa o resultado na sessão: a falha pode ser
+    // transitória (offscreen morto, teto de tempo na 1ª folha), e cachear o
+    // texto com a marca tornaria permanente o que o próximo envio resolveria.
+    if (!t.includes(MARCA_OCR_FALHOU)) textoCache.set(id, t);
+    return t;
+  }
+
+  async function extrairTextoDaPeca(id, c, rotulo, fase) {
     if (c.kind === "text") return (c.text || "").trim();
     if (c.kind === "img") {
       const o = await comTeto(
         rpc({
           type: "ocrReconhecer",
-          payload: { img: "data:image/" + (c.fmt || "jpeg") + ";base64," + c.b64 },
+          // `c.mime` é o que `montarBlocos` usa; `c.fmt` é o formato de ORIGEM
+          // e pode não bater com os bytes depois da redução para JPEG.
+          payload: { img: "data:" + (c.mime || "image/jpeg") + ";base64," + c.b64 },
         }),
         OCR_TIMEOUT_1A_MS,
         "o reconhecimento do anexo em imagem"
@@ -3131,7 +3448,7 @@
         // derruba a peça, mas a folha sai MARCADA — uma folha que o OCR não leu
         // é uma folha cujo conteúdo o modelo não vai ver, e isso muda a resposta.
         try {
-          panel.setPrepNota("Anonimizando — OCR da fl. " + f.p + " · " + rotulo);
+          panel.setPrepNota((fase || "Lendo") + " — OCR da fl. " + f.p + " · " + rotulo);
           const o = await comTeto(
             rpc({ type: "ocrReconhecer", payload: { img: f.img } }),
             pagsOcrSigilo === 0 ? OCR_TIMEOUT_1A_MS : OCR_TIMEOUT_MS,
@@ -3141,7 +3458,7 @@
           corpo = (o.resultado && o.resultado.texto) || "";
           if (!corpo) corpo = "_[página sem texto reconhecível]_";
         } catch (e) {
-          corpo = "_[o reconhecimento de texto falhou nesta página]_";
+          corpo = MARCA_OCR_FALHOU;
           console.warn("[PJe IA sigilo] OCR falhou em", id, "fl." + f.p, "->", (e && e.message) || e);
         }
         delete f.img; // solta o data URL antes da próxima
@@ -3182,7 +3499,7 @@
     // dele: **NFC, nunca NFKC** — a compatibilidade reescreve ligaduras, frações
     // e formas de largura, e o que sai daqui é o texto do documento. Há teste
     // que confere que os dois lados usam a mesma forma.
-    const bruto = String(await textoDaPecaParaSigilo(id, c, rotulo) || "").normalize("NFC");
+    const bruto = await textoDaPeca(id, c, rotulo, "Anonimizando");
     if (!bruto) {
       // Peça sem texto extraível (PDF só de imagem cujo OCR não leu nada). Ela
       // NÃO pode ir como arquivo — é o que o modo existe para impedir —, então
@@ -3194,14 +3511,18 @@
         text: "_[esta peça não teve texto extraível; no modo sigiloso o arquivo original não é enviado]_",
       });
       sigiloFeitas.add(id);
+      sigiloAguardando.add(id);
       panel.setPrepState(id, "done");
       return;
     }
     const texto = bruto.length > MAX_CHARS_SIGILO ? bruto.slice(0, MAX_CHARS_SIGILO) : bruto;
     const cortada = texto.length < bruto.length;
 
-    const negado = await carregarDeny();
-    const doRegex = ANON.detectar(texto, { ficha: fichaParaSigilo(), negado });
+    await carregarDeny();
+    const negado = negadoAtual();
+    const doRegex = ANON.detectar(texto, { ficha: fichaParaSigilo(), negado }).concat(
+      achadosDoMapa(texto)
+    );
     let doNer = [];
     try {
       const r = await rpc({ type: "nerDetectar", payload: { texto } });
@@ -3217,15 +3538,25 @@
       );
     }
     const achados = ANON.fundir(doNer, doRegex, { texto, negado });
-    const mascarado = PSEUD.mascarar(texto, achados, mapaSigilo);
+    const mascarado = mascararAteConvergir(texto, achados);
     // PÓS-CONDIÇÃO por peça, barata: nenhum valor recém-mascarado pode ter
     // sobrado. A guarda do worker continua existindo porque esta não vê os
     // outros doze canais.
     const conf = PSEUD.conferir(mascarado, mapaSigilo);
     if (!conf.ok) {
-      throw new Error(
-        "a anonimização desta peça não ficou completa (um valor do tipo " + conf.tipo + " sobrou)"
+      // O texto mascarado até aqui fica PENDENTE: é o que o editor de revisão
+      // abre. Jogá-lo fora obrigaria a refazer OCR e NER só para o usuário
+      // olhar o que sobrou.
+      const sobras = sobrasDoMapa(mascarado);
+      sigiloPendentes.set(id, { text: mascarado, pages: c.pages, sobras });
+      const e = new Error(
+        "a anonimização não fechou: " +
+          (sobras.length
+            ? sobras.map((s) => "«" + s.valor + "» (" + s.rotulo + ")").join(", ") + " ainda em claro"
+            : "um valor do tipo " + conf.tipo + (conf.rotulo ? " (" + conf.rotulo + ")" : "") + " sobrou")
       );
+      e.sobras = sobras;
+      throw e;
     }
     sigiloCache.set(id, {
       kind: "text",
@@ -3236,6 +3567,7 @@
       pages: c.pages,
     });
     sigiloFeitas.add(id);
+    sigiloAguardando.add(id);
     panel.setPrepState(id, "done");
   }
 
@@ -3245,6 +3577,11 @@
   async function anonimizarLote(ids) {
     const falhas = [];
     const ok = [];
+    // O teto LONGO do OCR vale para a primeira folha de cada LOTE, não da
+    // sessão: o offscreen morre por ociosidade entre um envio e outro, e a
+    // primeira folha do lote seguinte paga de novo o carregamento do modelo e o
+    // duelo de backends. Com o contador acumulado, ela caía no teto curto.
+    pagsOcrSigilo = 0;
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       try {
@@ -3252,7 +3589,18 @@
         ok.push(id);
       } catch (e) {
         panel.setPrepState(id, "erro");
-        falhas.push({ id, titulo: metaDe(id).titulo, erro: (e && e.message) || String(e) });
+        // `anon: true` é o que faz o relatório do chat dizer "não pôde ser
+        // anonimizada" em vez de "não pôde ser baixada" — ela BAIXOU; o que
+        // falhou foi o mascaramento, e "abra a peça na linha do tempo" seria
+        // conselho falso.
+        falhas.push({
+          id,
+          titulo: metaDe(id).titulo,
+          erro: (e && e.message) || String(e),
+          anon: true,
+          // As saídas: liberar o valor que reprovou, ou revisar o texto à mão.
+          acoes: e && e.sobras ? acoesDaFalhaSigilo(id, e.sobras) : null,
+        });
       }
     }
     panel.setPrepNota("");
@@ -3281,6 +3629,224 @@
     return { ok, falhas };
   }
 
+  // ---------------------------------------------------------------------------
+  // APROVAÇÃO HUMANA ANTES DE SAIR (modo sigiloso).
+  //
+  // A anonimização automática é a primeira passada, e ela erra: o que escapar
+  // vai inteiro ao provedor. Até aqui a extensão mascarava e ENVIAVA no mesmo
+  // gesto — a auditoria mostrava o que tinha saído, e conferir depois não
+  // desfaz um vazamento. A conferência precisa ficar ENTRE o mascaramento e o
+  // request. Três regras:
+  //
+  //  - É chamada nos TRÊS fluxos (chat, minuta, mapa), e NÃO dentro de
+  //    `baixarSelecionadas`, ao contrário do gancho do mascaramento: no chat os
+  //    anexos do input são anonimizados DEPOIS daquele funil, e uma caixa lá
+  //    dentro ou não os mostraria ou apareceria duas vezes por turno.
+  //  - Como três call sites são uma lista, o que garante a regra é o PORTÃO
+  //    DURO em `stream` e em `estimarContexto` (`exigirAprovacaoSigilo`): um
+  //    request cujo `opts.ids` contenha peça ainda não aprovada é recusado.
+  //    Quem esquecer de chamar a caixa recebe um erro, nunca um envio.
+  //  - Só o DELTA do turno é conferido (a interseção de `sigiloAguardando` com
+  //    o que vai no request): o que já saiu em turno anterior não volta à caixa,
+  //    e peça mascarada e depois desmarcada continua esperando sem travar nada.
+  //
+  // Cancelar lança com `cancelado:true` — decisão do usuário, não erro: o chat
+  // devolve o texto ao campo e nada vira "Erro:". As peças ficam no conjunto:
+  // o próximo envio pergunta de novo.
+  function aguardandoAprovacao(ids) {
+    return (ids || []).filter((id) => sigiloAguardando.has(id));
+  }
+  function exigirAprovacaoSigilo(ids) {
+    if (!modoSigiloso || !sigiloAguardando.size) return;
+    const presas = aguardandoAprovacao(ids);
+    if (!presas.length) return;
+    throw new Error(
+      presas.length +
+        " peça(s) anonimizada(s) ainda não passaram pela sua conferência — nada foi enviado."
+    );
+  }
+  // A ficha de uma peça para a caixa: título ORIGINAL (é a tela do dono dos
+  // autos, que precisa saber qual peça está olhando) e o texto exatamente como
+  // sairia — o mesmo objeto que `montarBlocos` vai ler.
+  function fichaAprovacao(id) {
+    const d = sigiloCache.get(id) || {};
+    const texto = typeof d.text === "string" ? d.text : "";
+    return { id, titulo: metaDe(id).titulo, texto, chars: texto.length };
+  }
+  async function confirmarEnvioSigiloso(ids) {
+    if (!modoSigiloso || !mapaSigilo) return;
+    const pend = aguardandoAprovacao(ids);
+    if (!pend.length) return;
+    if (!sigiloAprovar) {
+      // Conferência dispensada nas opções: aprova sem caixa. O conjunto tem de
+      // esvaziar aqui MESMO ASSIM, senão o portão duro barraria o envio — e a
+      // auditoria repinta pelo mesmo motivo do caminho com caixa (abaixo).
+      for (const id of pend) sigiloAguardando.delete(id);
+      panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+      return;
+    }
+    // `recarregar` relê o cache: editar ou liberar de dentro da caixa muda o
+    // texto de uma peça (liberar muda o de várias), e a caixa repinta.
+    const dados = () => ({ itens: mapaSigilo.tabela(), pecas: pend.map(fichaAprovacao) });
+    const ok = await panel.confirmarEnvioSigiloso({
+      dados: dados(),
+      recarregar: dados,
+      onEditar: (id) => revisarPecaAprovacao(id),
+      onNaoPerguntar: () => {
+        sigiloAprovar = false;
+        try {
+          chrome.storage.local.set({ sigiloAprovar: false });
+        } catch {
+          /* contexto invalidado: vale só nesta sessão */
+        }
+      },
+    });
+    if (!ok) {
+      const e = new Error(
+        "Envio cancelado na conferência. As peças anonimizadas continuam prontas — " +
+          "ao enviar de novo, a conferência aparece outra vez."
+      );
+      e.cancelado = true;
+      throw e;
+    }
+    for (const id of pend) sigiloAguardando.delete(id);
+    // O selo e a caixa de auditoria passam a contar as peças aprovadas: até
+    // aqui o retrato era o do fim de `anonimizarLote`, tirado ANTES da
+    // aprovação, e a auditoria mostraria peça de menos.
+    panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+  }
+  // Editor de revisão aberto DE DENTRO da caixa de aprovação, para uma peça
+  // que a pós-condição já aprovou: confere de novo e regrava o cache. Sem
+  // `marcarPecas` nem "devolvida à seleção" — ela nunca saiu dela. Devolve uma
+  // promessa que resolve quando o editor fecha, para a caixa repintar a linha
+  // com o texto que vale agora.
+  function revisarPecaAprovacao(id) {
+    const d = sigiloCache.get(id);
+    if (!d) return Promise.resolve();
+    return new Promise((resolve) => {
+      panel.abrirEditorSigilo({
+        id,
+        titulo: metaDe(id).titulo || String(id),
+        texto: d.text || "",
+        sobras: sobrasDoMapa(d.text || ""),
+        onLiberar: (rotulo) => liberarRotulo(rotulo),
+        onSalvar: async (texto) => {
+          const conf = PSEUD.conferir(texto, mapaSigilo);
+          if (!conf.ok) {
+            const sobras = sobrasDoMapa(texto);
+            return {
+              ok: false,
+              sobras,
+              msg:
+                "ainda aparece em claro: " +
+                sobras.map((s) => "«" + s.valor + "» (" + s.rotulo + ")").join(", "),
+            };
+          }
+          // `sigiloCache.get` de novo, não o `d` capturado: um "Liberar" de
+          // dentro do editor já pode ter reescrito a entrada.
+          sigiloCache.set(id, Object.assign({}, sigiloCache.get(id) || d, { text: texto }));
+          try {
+            await armarSigilo();
+          } catch (e) {
+            console.warn("[PJe IA] guarda não re-armada após a revisão:", (e && e.message) || e);
+          }
+          panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
+          return { ok: true };
+        },
+        onFechar: resolve,
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // MODELO QUE NÃO LÊ PDF OU IMAGEM (caps `aceitaPdf`/`aceitaImagem` === false —
+  // hoje só modelos de texto pelo OpenRouter, como DeepSeek e GLM).
+  //
+  // Para esses modelos mandar o arquivo não compra nada: o OpenRouter o
+  // converte em texto antes de entregar (engine `cloudflare-ai`, sem OCR — a
+  // folha digitalizada chega VAZIA) e o corpo do request carrega 20 MB de base64
+  // que o modelo nunca vê. Era o que barrava um processo de 120 folhas com
+  // "somam ~22 MB — acima do limite" num modelo de 1,3 milhão de tokens. Aqui
+  // o texto é extraído LOCALMENTE (pdf.js para a camada de texto, PP-OCR para a
+  // folha digitalizada — o mesmo caminho do modo sigiloso, sem a máscara) e vai
+  // como bloco de texto: ~3 KB por folha em vez de ~140 KB, e o tamanho do
+  // arquivo deixa de importar.
+  //
+  // A invariante "texto extraído nunca entra no payload" continua valendo para
+  // quem LÊ o PDF: lá o arquivo é mais barato (o Gemini cobra a página, não o
+  // texto) e traz a imagem da folha. Ela é POR CAP, e esta é a exceção por cap.
+  // O sigilo tem precedência (`entradaDoc` devolve o mascarado antes).
+  // ---------------------------------------------------------------------------
+  function precisaTextoLocal(d) {
+    if (modoSigiloso || !modelCaps || !d) return false;
+    if (d.kind === "pdf") return modelCaps.aceitaPdf === false;
+    if (d.kind === "img") return modelCaps.aceitaImagem === false;
+    return false;
+  }
+
+  // A entrada que `entradaDoc` devolve no lugar do arquivo: texto já extraído,
+  // no MESMO formato das peças HTML/RTF (`kind:"text"`), então `podeAnexar`,
+  // `montarBlocos`, o teto de texto e a estimativa a tratam por construção.
+  // `undefined` enquanto não extraída — falha fechada, como no sigilo.
+  function entradaTextoLocal(id, d) {
+    if (!textoCache.has(id)) return undefined;
+    const t = textoCache.get(id);
+    return {
+      kind: "text",
+      fmt: "texto",
+      text:
+        t ||
+        "_[esta peça não teve texto extraível; o modelo escolhido não lê o arquivo original]_",
+      pages: d.pages,
+    };
+  }
+
+  // Extrai o texto das peças do lote que precisam dele. Vive no MESMO funil do
+  // sigilo (`baixarSelecionadas`) e pela mesma razão: três pares baixar→enviar
+  // idênticos, e esquecer um mandaria o PDF a um modelo que não o lê. Peça que
+  // falha na extração NÃO derruba o turno: sai do lote e vai ao relatório com
+  // motivo próprio (`texto:true`), nunca como "falha de download".
+  async function extrairTextoLote(ids) {
+    const falhas = [];
+    const ok = [];
+    const alvo = ids.filter((id) => {
+      const d = docsCache.get(id) || anexos.get(id);
+      return d && precisaTextoLocal(d) && !textoCache.has(id);
+    });
+    pagsOcrSigilo = 0; // o teto longo do OCR vale para a 1ª folha de cada lote
+    for (const id of ids) {
+      const d = docsCache.get(id) || anexos.get(id);
+      if (!d || !precisaTextoLocal(d) || textoCache.has(id)) {
+        ok.push(id);
+        continue;
+      }
+      const rotulo = (metaDe(id).titulo || String(id)).slice(0, 40);
+      // A peça volta a girar no card e a nota CONTA — é a parte lenta (o OCR de
+      // dezenas de folhas), e um card cheio e parado lê-se como travamento.
+      panel.setPrepState(id, "anon");
+      panel.setPrepNota(
+        "Lendo o texto " + (alvo.indexOf(id) + 1) + " de " + alvo.length + " — " + rotulo
+      );
+      try {
+        await textoDaPeca(id, d, rotulo, "Lendo o texto");
+        panel.setPrepState(id, "done");
+        ok.push(id);
+      } catch (e) {
+        panel.setPrepState(id, "erro");
+        falhas.push({
+          id,
+          titulo: metaDe(id).titulo,
+          erro:
+            "o texto não pôde ser extraído (" + ((e && e.message) || e) + ") — " +
+            "o modelo escolhido não lê o arquivo original",
+          texto: true,
+        });
+      }
+    }
+    panel.setPrepNota("");
+    return { ok, falhas };
+  }
+
   // O que a CAIXA DE AUDITORIA mostra. É a resposta à única pergunta que
   // importa depois de o recurso existir: "como eu SEI que esta peça saiu
   // anonimizada?".
@@ -3293,6 +3859,11 @@
     const itens = mapaSigilo ? mapaSigilo.tabela() : [];
     const pecas = [];
     for (const [id, d] of sigiloCache) {
+      // A auditoria afirma "enviada" e o relatório diz "o texto exato que foi
+      // enviado": peça mascarada que ainda ESPERA a aprovação (ou cujo envio
+      // foi cancelado na caixa) não saiu, e listá-la aqui seria a prova
+      // afirmando o que não aconteceu.
+      if (sigiloAguardando.has(id)) continue;
       pecas.push({
         id,
         // DOIS títulos, e a distinção é o que torna o relatório compartilhável.
@@ -3435,7 +4006,11 @@
     if (!memoriaDisponivel || !casoChave || !mapaSigilo || memoriaMorta) return;
     try {
       CASO.salvar(casoChave, {
-        sigilo: { ligado: modoSigiloso, mapa: mapaSigilo.serializar() },
+        sigilo: {
+          ligado: modoSigiloso,
+          mapa: mapaSigilo.serializar(),
+          liberados: [...liberadosSigilo],
+        },
       });
     } catch (e) {
       console.warn("[PJe IA] não deu para gravar o mapa de sigilo:", (e && e.message) || e);
@@ -3450,6 +4025,10 @@
     if (!g) return;
     try {
       mapaSigilo = PSEUD.hidratar(g.mapa || { processo: casoChave, itens: [] });
+      liberadosSigilo.clear();
+      for (const v of Array.isArray(g.liberados) ? g.liberados : []) {
+        if (typeof v === "string" && v) liberadosSigilo.add(v);
+      }
       modoSigiloso = !!g.ligado;
       if (modoSigiloso) {
         // As pecas mascaradas NAO sao gravadas (so o mapa): o texto mascarado se
@@ -3458,7 +4037,12 @@
         // Ao reabrir, a primeira analise refaz o mascaramento -- o que tambem e'
         // o correto se a peca mudou.
         panel.setSigiloso(true, mapaSigilo.quantos(), dadosAuditoria());
-        armarSigilo();
+        // Sem o catch, worker morto no boot virava unhandled rejection — e o
+        // modo ficava pintado como ligado com a guarda ausente. O próximo envio
+        // re-arma (`onSend` chama `armarSigilo` a cada turno).
+        armarSigilo().catch((e) =>
+          console.warn("[PJe IA] guarda de sigilo não armou na retomada:", (e && e.message) || e)
+        );
       }
     } catch (e) {
       console.warn("[PJe IA] mapa de sigilo ilegível; começando um novo:", (e && e.message) || e);
@@ -3694,6 +4278,15 @@
       for (const f of anon.falhas) falhas.push(f);
       const perdidasAnon = new Set(anon.falhas.map((f) => f.id));
       return { ok: ok.filter((id) => !perdidasAnon.has(id)), falhas };
+    }
+    // MODELO QUE NÃO LÊ PDF/IMAGEM: a peça vira TEXTO aqui, no mesmo funil e
+    // pela mesma razão (ver `precisaTextoLocal`). Só corre quando a cap diz
+    // NÃO explicitamente — os provedores diretos seguem byte a byte.
+    if (modelCaps && (modelCaps.aceitaPdf === false || modelCaps.aceitaImagem === false)) {
+      const tx = await extrairTextoLote(ok);
+      for (const f of tx.falhas) falhas.push(f);
+      const perdidasTexto = new Set(tx.falhas.map((f) => f.id));
+      return { ok: ok.filter((id) => !perdidasTexto.has(id)), falhas };
     }
     return { ok, falhas };
   }
@@ -4107,6 +4700,9 @@
   // histórico contém blocos de ferramenta e o count_tokens sem as tools
   // declaradas seria rejeitado (o medidor e a guarda de 90% morreriam mudos).
   async function estimarContexto(messages, opts) {
+    // O pré-voo é uma requisição ao PROVEDOR com o corpo do request dentro —
+    // o mesmo portão do `stream` vale aqui (ver `confirmarEnvioSigiloso`).
+    exigirAprovacaoSigilo(opts && opts.ids);
     // PROVEDOR SEM CONTAGEM DE TOKENS (OpenRouter). Deixar de guardar seria
     // trocar uma recusa explicada por um erro da API — e ali o erro chega DEPOIS
     // de o navegador ter subido dezenas de MB de peças, porque naquele provedor
@@ -4857,10 +5453,19 @@
       // (Sem esta guarda o ramo de fallback faria `d.b64.length` e o TypeError
       // derrubaria o turno inteiro por causa de uma peça.)
       if (!podeAnexar(id)) {
-        semConteudo.push({
+        const orig = docsCache.get(id) || anexos.get(id);
+        // Anexo cujo texto não pôde ser extraído para um modelo que não lê o
+        // arquivo vai pelo canal de SUPORTE ("o modelo escolhido não lê…"),
+        // não pelo de conteúdo — este diz "o envio anterior expirou · envie de
+        // novo", e as duas metades seriam falsas: reenviar falharia igual, e o
+        // que resolve é trocar de modelo (mesma razão que separou `semSuporte`
+        // das falhas de download).
+        (precisaTextoLocal(orig) ? semSuporte : semConteudo).push({
           id,
           titulo: metaDe(id).titulo,
-          erro: "o arquivo enviado antes não está mais disponível no provedor",
+          erro: precisaTextoLocal(orig)
+            ? "o texto não pôde ser extraído, e o modelo escolhido não lê o arquivo original"
+            : "o arquivo enviado antes não está mais disponível no provedor",
         });
         continue;
       }
@@ -4952,12 +5557,21 @@
         : provAtual === "openai"
           ? MAX_TOTAL_B64_CHARS_OPENAI
           : provAtual === "openrouter"
-            ? MAX_TOTAL_B64_CHARS_OPENROUTER
+            ? (modelCaps && modelCaps.tetoB64Chars) || MAX_TOTAL_B64_CHARS_OPENROUTER
             : MAX_TOTAL_B64_CHARS;
     if (totalB64 > tetoB64) {
       const mb = Math.round(totalB64 / 1024 / 1024);
+      const tetoMb = Math.round(tetoB64 / 1024 / 1024);
+      // No OpenRouter o arquivo viaja inline em TODO turno e o teto é o do
+      // provedor upstream (por autor do slug, `tetoB64Chars`). A saída não é
+      // só desmarcar: um modelo que não lê PDF recebe o texto extraído aqui,
+      // sem teto de bytes — e a mensagem diz isso, senão "o OpenRouter é
+      // inútil num processo de 120 folhas" é a conclusão natural.
       throw new Error(
-        `as peças selecionadas somam ~${mb} MB — acima do limite da análise. Desmarque algumas peças maiores e tente de novo.`
+        `as peças selecionadas somam ~${mb} MB de arquivo — acima do limite de ~${tetoMb} MB` +
+          (provAtual === "openrouter"
+            ? ` de ${(modelCaps && modelCaps.nome) || "este modelo"} pelo OpenRouter, que recebe o PDF inteiro a cada mensagem. Desmarque peças maiores, ou escolha um modelo de texto (DeepSeek, GLM): para esses a extensão extrai o texto no seu computador e o tamanho do arquivo deixa de importar.`
+            : ` da análise. Desmarque algumas peças maiores e tente de novo.`)
       );
     }
     // Breakpoint de cache é conceito EXCLUSIVO da Anthropic; Gemini e OpenAI
@@ -5086,6 +5700,10 @@
   // repetição custa uma fração. handlers.onReinicio(n) zera a UI do turno
   // (o novo envio re-streama tudo desde o início).
   function stream(messages, handlers, opts, tipo) {
+    // PORTÃO DURO do modo sigiloso: peça mascarada que o usuário ainda não
+    // aprovou não sai por aqui (ver `confirmarEnvioSigiloso`). Lança SÍNCRONO,
+    // antes da porta abrir — o `await stream(...)` do chamador cai no catch.
+    exigirAprovacaoSigilo(opts && opts.ids);
     const MAX_REENVIOS = 2;
     return new Promise((resolve, reject) => {
       let reenvios = 0;
@@ -5185,7 +5803,16 @@
             finished = true;
             limpar();
             port.disconnect();
-            reject(new Error(m.error));
+            const err = new Error(m.error);
+            // Bloqueio da guarda de saída: os campos precisam sobreviver à
+            // travessia da porta, senão o content trata como erro comum e o
+            // usuário perde o texto e a saída ("liberar").
+            if (m.vazamento) {
+              err.vazamento = true;
+              err.rotulo = m.rotulo || null;
+              err.tipo = m.tipo || null;
+            }
+            reject(err);
           }
         });
         port.onDisconnect.addListener(() => {
@@ -5605,7 +6232,11 @@
     // mesmo vazamento que o modo existe para impedir (e a guarda de saída a
     // bloquearia, enchendo o console de erro a cada clique). A camada 1, a
     // estimativa LOCAL, continua rodando: ela é de graça e não sai da máquina.
-    if (modoSigiloso && ids.some((id) => !sigiloCache.has(id))) {
+    // E "mascarada" não basta: peça cujo texto ainda espera a APROVAÇÃO do
+    // usuário (um envio cancelado na conferência deixa o texto no cache)
+    // também não pode ir ao provedor "só para contar" — seria enviar o que ele
+    // acabou de recusar.
+    if (modoSigiloso && ids.some((id) => !sigiloCache.has(id) || sigiloAguardando.has(id))) {
       panel.setStatus("");
       return;
     }
@@ -5872,7 +6503,7 @@
           ...anexosNovos.map((id) => "📎 " + metaDe(id).titulo),
         ]
       : null;
-    panel.addMessage("user", text, atts);
+    const userEl = panel.addMessage("user", text, atts);
     panel.lockInput(true);
     panel.setStatus("");
 
@@ -5960,9 +6591,38 @@
         if (modoSigiloso && anexosNovos.length) {
           const anonAnexos = await anonimizarLote(anexosNovos);
           if (anonAnexos.falhas.length) panel.mostrarFalhasPecas(anonAnexos.falhas);
+        } else if (
+          anexosNovos.length &&
+          modelCaps &&
+          (modelCaps.aceitaPdf === false || modelCaps.aceitaImagem === false)
+        ) {
+          // O anexo do input não passa por `baixarSelecionadas`: o gancho do
+          // texto local precisa alcançá-lo aqui, como o do sigilo.
+          const txAnexos = await extrairTextoLote(anexosNovos);
+          if (txAnexos.falhas.length) panel.mostrarFalhasPecas(txAnexos.falhas);
         }
+        // CONFERÊNCIA HUMANA antes de qualquer rede: depois de peças E anexos
+        // mascarados, antes do upload dos anexos, do pré-voo e do stream.
+        // Cancelar lança `cancelado` (tratado no catch: o texto volta ao campo).
+        await confirmarEnvioSigiloso(idsNovosParaBlocos);
         await subirAnexos(anexosNovos);
         stripOldCacheControl();
+        // O TEXTO DIGITADO É RE-MASCARADO DEPOIS das peças, e a ordem importa.
+        // A primeira máscara (no topo do handler) roda com o mapa de ANTES do
+        // turno; o NER só encontra a "Cooperativa X" dentro da peça durante o
+        // `baixarSelecionadas`, que vem depois. Sem esta segunda passada a
+        // pergunta "a Cooperativa X pagou?" saía em claro ao lado da peça com
+        // `[ORGANIZACAO_1]` — e a guarda de saída bloqueava o turno inteiro por
+        // um valor que a própria extensão acabara de aprender. A bolha do
+        // usuário acompanha: ela mostra o que FOI à API, e não pode exibir uma
+        // coisa e enviar outra.
+        if (modoSigiloso) {
+          const remascarado = mascararCurto(textCru);
+          if (remascarado !== text) {
+            text = remascarado;
+            panel.atualizarTextoUsuario(userEl, text);
+          }
+        }
         userContent = [...montarBlocos(idsNovosParaBlocos), { type: "text", text }];
       } else {
         // Acompanhamento sem peça/anexo novo (ou todas as novas falharam, mas há
@@ -6342,6 +7002,19 @@
           "Os arquivos enviados antes não estão mais disponíveis no provedor. " +
             "Envie a mensagem de novo — as peças serão reenviadas."
         );
+      } else if (e && e.cancelado) {
+        // O usuário CANCELOU na conferência do modo sigiloso: decisão, não
+        // falha. Mesmo tratamento do bloqueio da guarda — a bolha sai do
+        // transcript (o reenvio a recriaria) e o texto volta ao campo. As
+        // peças mascaradas ficam prontas e esperando; o próximo envio pergunta
+        // de novo.
+        if (userEl) panel.removeMessage(userEl);
+        if (textCru) panel.restaurarTexto(textCru);
+        panel.setStatus(e.message);
+      } else if (tratarBloqueioSigilo(e, textCru, () => panel.enviarAgora(), userEl)) {
+        // A guarda de saída bloqueou: o texto voltou ao campo e a conversa
+        // ganhou o aviso com a decisão — nada a acrescentar no status.
+        panel.setStatus("");
       } else {
         panel.setStatus("Erro: " + (e && e.message ? e.message : e));
       }
@@ -7056,7 +7729,7 @@
       busy = false;
       panel.lockInput(false);
       panel.endPrep(true);
-      panel.setStatus("Erro: " + ((e && e.message) || e));
+      if (!tratarBloqueioSigilo(e, null, null)) panel.setStatus("Erro: " + ((e && e.message) || e));
     });
     return true;
   });
@@ -7115,6 +7788,9 @@
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
       const dl = await baixarSelecionadas(selectedIds);
       if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      // Conferência humana do modo sigiloso, antes de qualquer rede (a minuta
+      // não tem anexos do input: o delta é o que acabou de ser mascarado).
+      await confirmarEnvioSigiloso(dl.ok);
       // Teto de páginas do modelo que vai REDIGIR: o do chat barraria em 100
       // páginas (Haiku) uma minuta que vai rodar no Sonnet 5, que aceita 600.
       guardaPaginas(dl.ok, capsMinuta);
@@ -7297,7 +7973,9 @@
       panel.setStatus("");
     } catch (e) {
       panel.endPrep(true);
-      panel.setStatus("Erro: " + (e && e.message ? e.message : e));
+      // Cancelado na conferência do modo sigiloso: decisão, não erro.
+      if (e && e.cancelado) panel.setStatus(e.message);
+      else panel.setStatus("Erro: " + (e && e.message ? e.message : e));
       // contexto cheio: o pré-voo agora existe também aqui, e o usuário precisa
       // AGIR (desmarcar peças, mandar menos modelos ou recomeçar)
       if (e && e.ctxCheio) {
@@ -7360,6 +8038,12 @@
         md,
         titulo: titulo || "Minuta",
         processo,
+        // A chave do caso e o modo: é por ela que o editor lê o mapa de
+        // reidentificação no casodb e oferece "Restaurar nomes" — uma minuta
+        // gerada em modo sigiloso chega cheia de [PESSOA_1], e não há como
+        // levá-la ao PJe assim.
+        casoChave: casoChave || null,
+        sigiloso: !!modoSigiloso,
         origem,
         criadoEm: Date.now(),
         atualizadoEm: Date.now(),
@@ -7489,7 +8173,7 @@
       busy = false;
       panel.lockInput(false);
       panel.endPrep(true);
-      panel.setStatus("Erro: " + ((e && e.message) || e));
+      if (!tratarBloqueioSigilo(e, null, null)) panel.setStatus("Erro: " + ((e && e.message) || e));
     });
     return true;
   });
@@ -7514,6 +8198,8 @@
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
       const dl = await baixarSelecionadas(selectedIds);
       if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      // Conferência humana do modo sigiloso, antes de qualquer rede.
+      await confirmarEnvioSigiloso(dl.ok);
       guardaPaginas(dl.ok);
       await subirPecas(dl.ok);
       const blocos = montarBlocos(dl.ok);
@@ -7636,7 +8322,9 @@
       panel.setStatus("");
     } catch (e) {
       panel.endPrep(true);
-      panel.setStatus("Erro: " + (e && e.message ? e.message : e));
+      // Cancelado na conferência do modo sigiloso: decisão, não erro.
+      if (e && e.cancelado) panel.setStatus(e.message);
+      else panel.setStatus("Erro: " + (e && e.message ? e.message : e));
       if (e && e.ctxCheio) {
         ultimaChaveEst = "";
         panel.setAlerta(ALERTA_CTX_CHEIO);
@@ -7977,6 +8665,9 @@
       mapaSigilo = null;
       sigiloCache.clear();
       sigiloFeitas.clear();
+      sigiloPendentes.clear();
+      sigiloAguardando.clear();
+      liberadosSigilo.clear();
       conversaSigilosa = null;
       panel.setSigiloso(false, 0, { itens: [], pecas: [] });
       // A segunda frase não é enfeite: `memoriaMorta` desliga a gravação até o

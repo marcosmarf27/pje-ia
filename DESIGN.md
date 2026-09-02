@@ -136,6 +136,16 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 | `--ok-bg` | `#eaf4ef` | Fundo de confirmação suave (marca da peça em texto) |
 | `--ok-line` | `#cbe3d8` | Borda do banner de estado "Pronto para usar" |
 | `--ok-ink` | `#1e5c44` | Texto sobre confirmação suave |
+| `--sig-hd` | `#143f33` | Cabeçalho do painel no modo sigiloso |
+| `--sig-mark-de` / `--sig-mark-para` | `#35946e` / `#1d6248` | Quadrado da marca no modo sigiloso |
+| `--sig-btn-de` / `--sig-btn-para` | `#2f9268` / `#1f6a4b` | Botão primário e launcher no modo sigiloso (hover `#35a074` / `#1a5c41`) |
+| `--sig-tarja` | `#a7d2bd` | Hachura da tarja do modo sigiloso |
+| `--sig-halo` | `rgba(47,146,104,.28)` | Halo externo da janela e do campo em foco no modo sigiloso |
+| `--sig-hd` | `#143f33` | Cabeçalho do painel no modo sigiloso |
+| `--sig-mark-de` / `--sig-mark-para` | `#35946e` / `#1d6248` | Quadrado da marca no modo sigiloso |
+| `--sig-btn-de` / `--sig-btn-para` | `#2f9268` / `#1f6a4b` | Botão primário e launcher no modo sigiloso (hover `#35a074` / `#1a5c41`) |
+| `--sig-tarja` | `#a7d2bd` | Hachura da tarja do modo sigiloso |
+| `--sig-halo` | `rgba(47,146,104,.28)` | Halo externo da janela e do campo em foco no modo sigiloso |
 | `--warn` | `#de8b2c` | Alerta, contexto quase cheio |
 | `--warn-bg` | `#fbead2` | Fundo de aviso suave |
 | `--warn-line` | `#eeddba` | Borda de aviso suave |
@@ -416,11 +426,41 @@ aviso secundário.
 > e, com especificidade maior, devolvia `flex-wrap: wrap` em repouso: a fileira
 > única existia no papel e não na tela.
 
-### Movimento: três durações, três curvas, e nada fora delas
+### Movimento: quatro durações, três curvas, e nada fora delas
 
-`--dur-1` (120ms) para feedback e SAÍDAS, `--dur-2` (180ms) para ENTRADAS de
-interface, `--dur-3` (240ms) para mudanças de layout. `--ease-out` entra e
-assenta, `--ease-in` sai do caminho, `--ease-move` liga dois estados.
+`--dur-1` (140ms) para feedback e saídas curtas, `--dur-2` (220ms) para
+ENTRADAS de interface e para a saída da janela, `--dur-3` (300ms) para mudanças
+de layout (colapso da lista, backdrop) e `--dur-4` (380ms) para a JANELA —
+abrir, e a troca de modo. `--ease-out` entra e assenta, `--ease-in` sai do
+caminho, `--ease-move` liga dois estados.
+
+**Os números subiram na v0.56, e a razão é uma medição.** A v0.55 tinha três
+degraus de 120 a 240ms, com a janela abrindo de `scale(0.985)` e 6px. O usuário
+relatou "nenhuma animação" numa máquina em que `prefers-reduced-motion` estava
+DESLIGADO — conferido pelo Chrome dele — e o headless mostrou as transições
+correndo com esses valores. Isto é: o CSS estava certo e era **invisível**.
+Movimento que só um teste enxerga não comunica nada, e o objetivo de animar é
+comunicar (de onde a janela veio, para onde a lista foi). Hoje a janela nasce
+do botão a 72% e 20px, em 380ms; fecha em 220ms voltando para ele. Ainda sem
+bounce — o teto de "acima de ~300ms parece lento" vale para feedback, não para
+a única transição da tela que reposiciona 400×600px.
+
+**A troca de modo é um FLIP** (`flipJanela` em panel.js): os modos trocam
+`position`, tamanho, `top/left` e até o `transform` de centragem — nada disso
+interpola entre `absolute` e `fixed` por transição CSS. Mede-se o retângulo
+antes, aplica-se o modo, mede-se depois, e uma animação WAAPI no `transform`
+leva do velho ao novo. Corre no compositor. A `transform` BASE do modo de
+destino (o `translate(-50%, -50%)` do expandido) entra nos dois keyframes, lida
+já em px do estilo computado — sem ela o primeiro frame perde a centragem.
+Desligado sob `prefers-reduced-motion`.
+
+**Cada modo largo tem o próprio estado FECHADO** (`.wrap.expanded:not(.open)
+.panel` etc.). `.wrap.expanded .panel` fixa `transform: translate(-50%, -50%)`
+com a mesma especificidade da regra de fechado e vinha depois no arquivo: no
+expandido, no lateral e no livre a janela abria e fechava sem movimento nenhum,
+só um corte de opacidade. O `:not(.open)` sobe a especificidade e dá a cada modo
+uma partida coerente com a origem — o modal encolhe no centro, a lateral desliza
+da borda direita, a janela livre encolhe onde está.
 
 O limite é o mesmo da tipografia: sete degraus em vez de treze tamanhos com
 meio-pixel. **Variação sem intenção é o que faz a interface parecer poluída
@@ -449,9 +489,11 @@ OCR), e abrir processos com Ctrl+clique em várias abas é o padrão de trabalho
 PJe. Transições correm na linha do tempo do documento e não têm esse modo de
 falha.
 
-**Onde há movimento hoje, e por quê**: a janela (abrir/fechar), o painel erguido
-no arrasto, o colapso da lista de peças, a tarja do modo sigiloso, as **bolhas do
-chat** e a **barra de alerta**. As bolhas eram o elemento mais visto do produto e
+**Onde há movimento hoje, e por quê**: a janela (abrir/fechar e a troca de
+modo), o backdrop do modal (esmaece em `--dur-3`, com `allow-discrete`), o
+launcher (volta crescendo de `scale(0.5)`), o painel erguido no arrasto, o
+colapso da lista de peças, a tarja do modo sigiloso, as **bolhas do chat** e a
+**barra de alerta**. As bolhas eram o elemento mais visto do produto e
 o único sem movimento nenhum; elas SOBEM nos dois papéis, porque a do usuário vem
 do campo e a do assistente vem do fim da conversa — as duas nascem de onde a
 atenção já está. A `.alertbar` faz o contrário e CAI: ela é interrupção, e a
@@ -482,34 +524,52 @@ discreta e deixar um painel preso em `display:flex`. A regra do projeto é "meno
 movimento, não menos informação" — a sombra do arrasto, por exemplo, permanece,
 porque ela não é movimento, é profundidade.
 
-### Modo sigiloso: a tarja e a moldura da janela (`.wrap.sigiloso`)
+### Modo sigiloso: o painel troca de cor (`.wrap.sigiloso`)
 
 Um MODO que muda **o que sai da máquina** não pode viver só num botão. O botão
 responde "eu liguei isto"; o que se precisa é "eu **estou** aqui" — e essa é a
 diferença entre um controle e um ambiente. Por isso a classe veste o painel
 INTEIRO, e não só o controle que a ligou.
 
-**Moldura, nunca superfície.** O §2 decidiu que a conversa é branca e a lista é
-que fica tingida, para o peso visual ficar onde está a leitura. Tingir o fundo do
-chat reverteria isso e passaria a competir com o texto da resposta, que é o
-trabalho. Então a marca fica toda na *chrome*: a tarja, a borda da janela e a
-borda do campo de mensagem.
+**A chrome inteira muda de família, o conteúdo não.** A v0.55 apostou em
+"moldura, nunca superfície" com uma borda de 1px, uma faixa clara e o campo
+de mensagem — e o usuário leu aquilo como "uma coisinha verde", sem destaque e
+sem mudar a janela. Estava certo: uma borda de 1px não anuncia um estado, e o
+estado aqui é o que decide se o PDF sai da máquina. Hoje, com o modo ligado, o
+**cabeçalho** troca o azul institucional pelo verde profundo (`--sig-hd`), o
+quadrado da marca e o botão primário (Enviar, e o launcher com a janela
+fechada) vão para o mesmo gradiente (`--sig-btn-*`), a janela ganha borda de
+2px em `--ok` com um halo externo (`--sig-halo`), e a tarja fica mais funda,
+com cadeado e com a **contagem do que está protegido** (`.sb-n`). O toggle
+ligado é sólido em `--ok`. O que continua intocado é a **conversa** — branca,
+como o §2 decidiu, porque o peso visual segue no texto da resposta. A regra
+virou: *a moldura pode ser ambiente; a superfície da leitura, não.*
+
+Nos modos sem borda (tela cheia e lateral) a marca vai para a **aresta que
+encosta na página** — `border-top` e `border-left` de 4px —, declaradas com a
+classe do modo para vencer o `border: none` daquelas regras por
+especificidade, e não por ordem no arquivo.
+
+**O campo de mensagem fica na família do modo também no foco.** A primeira
+versão voltava ao azul ao digitar, e o resultado era uma janela verde com um
+campo azul — a "cor e borda horríveis" do relato. Foco é um halo mais forte da
+MESMA cor (`--ok-ink` + `--sig-halo`).
 
 **A tarja vem do mundo do assunto**, e não de um "estado verde" genérico: autos
 em segredo de justiça levam uma tarja na CAPA — uma faixa de lado a lado, vista
-antes de abrir o processo. Daí o hachurado (`--ok-tarja` sobre `--ok-bg`, passo
-de 8px a −45°): é ele que a faz ler como marca de capa em vez de mais uma barra
-de status. Com `--ok-line` no lugar do `--ok-tarja` os dois tons ficam quase
-iguais e a listra some — medido.
+antes de abrir o processo. Daí o hachurado (`--sig-tarja` sobre `--ok-bg`,
+passo de 12px a −45°, borda inferior de 2px em `--ok`): é ele que a faz ler
+como marca de capa em vez de mais uma barra de status. O passo de 8px sobre
+`--ok-tarja` da v0.55 lia de longe como faixa lisa e clara — medido no pixel.
 
 **Ela é irmã do `.content`, não filha do `.main`.** Dentro da coluna do chat a
 faixa começava no meio da janela nos modos largos, e marca de estado que cobre
 parte da tela lê como cabeçalho de seção. Acima do `.content` ela atravessa as
 duas colunas e encosta no cabeçalho escuro, que é onde o olho já está.
 
-**A moldura é a borda que o painel JÁ TEM** (`.wrap.sigiloso .panel {
-border-color: var(--ok) }`), e as alternativas todas falham por um motivo de
-plataforma:
+**A moldura é a borda que o painel JÁ TEM** (`.wrap.sigiloso .panel { border:
+2px solid var(--ok) }`, mais o halo em `box-shadow` externo), e as alternativas
+todas falham por um motivo de plataforma:
 
 - `box-shadow: inset` pinta abaixo dos filhos — o cabeçalho e as duas colunas o
   cobrem inteiro e o anel simplesmente não aparece.
@@ -524,9 +584,6 @@ de layout e contorna também o cabeçalho escuro. **`--ok` e não `--ok-line`**:
 medido no pixel, o `#cbe3d8` some contra o fundo da página do tribunal, e moldura
 que não se vê não é moldura.
 
-**No campo de mensagem o foco continua mandando.** `.inrow` ganha a borda do modo,
-mas `:focus-within` volta para `--pje`: foco é estado momentâneo e o modo é
-permanente — a marca do modo não pode engolir o sinal de "estou digitando aqui".
 
 ### Modo sigiloso: toggle, selo e caixa de auditoria
 
@@ -589,6 +646,78 @@ modelo.
 herdando o estilo do `upload`) e a nota CONTA (`Anonimizando 3 de 12`). Sem isso
 o card ficava em 100% durante a parte lenta — o "parecendo travado" que a v0.50.0
 do OCR já entregou uma vez.
+
+### Modo sigiloso: bloqueio da guarda e liberação local
+
+Quando a última guarda encontra em um request um valor que deveria ter sido
+mascarado, o turno não vira erro de rede nem `.alertbar`: aparece como
+`.sigilo-bloqueio` **dentro da conversa**, no ponto em que o envio foi tentado.
+A conversa não precisa ser zerada; o usuário precisa decidir sobre UM valor.
+
+A bolha usa `--alerta-*`, o mesmo nível máximo dos callouts de alerta, e declara
+três fatos nesta ordem: o envio foi bloqueado, nada chegou à IA e qual valor foi
+encontrado. O valor vem dos autos e entra por `textContent`, nunca por
+`innerHTML`. Se o worker não conseguir apontar um rótulo, a bolha falha fechada:
+explica a ausência e não oferece botão algum.
+
+**A ação diz o escopo inteiro: “Liberar neste processo”.** Ela só serve para
+falso positivo que não seja dado pessoal — por exemplo, o nome de um órgão
+público. A decisão fica no banco local do processo, nunca em storage de
+sincronização. No chat, o texto que havia sido consumido volta ao campo e o
+reenvio ocorre só depois do clique; a bolha anterior é retirada do transcript
+antes disso, para o reenvio não duplicar a pergunta. Minuta e mapa apenas pedem
+uma nova geração, porque não existe um campo de chat a restaurar nesses fluxos.
+
+**Na tabela da auditoria o item liberado fica, riscado, com o selo "liberado —
+sai em claro"** (`.aud-map.liberado` + `.aud-lib`): apagá-lo da tabela afirmaria
+uma proteção que não existe, e ele continua resolvendo o rótulo de uma minuta
+antiga.
+
+Não há segundo botão “manter protegido”: não clicar já é essa decisão. Uma ação
+neutra concorrendo com a única saída segura acrescentaria escolha sem acrescentar
+estado.
+
+### Modo sigiloso: editor de revisão (`.sig-edit`) e ações no relatório
+
+Peça que a pós-condição reprova não pode terminar em "ficou de fora": o
+relatório `.falhas` ganha, por item, botões `.falha-acao` ("Liberar «valor» e
+refazer", "Revisar o texto") no tom do aviso suave — a análise seguiu, e o que
+se oferece é a saída. O editor é um diálogo fixo e centrado (o `.wrap` é
+container de tamanho zero, como a `.audbox`), com a moldura do modo (`--ok` +
+`--sig-halo`) e o cabeçalho em `--sig-hd`: quem está ali está DENTRO do modo
+sigiloso, mexendo no que vai sair. Três zonas, na ordem da dúvida: o que sobrou
+em claro (uma linha por valor, em aviso suave, com "Mascarar todas" e "Liberar
+neste processo"), o texto inteiro num `textarea` monoespaçado, e "Usar este
+texto"/"Cancelar". A mensagem de recusa (`.se-msg`) aparece no próprio editor —
+o texto não entra enquanto houver valor em claro, e o editor diz qual. Esc fecha
+só o editor (`stopPropagation`, como a `.audbox`). Conteúdo dos autos entra por
+`value`/`textContent`, nunca `innerHTML`.
+
+### Modo sigiloso: conferência antes de enviar (`.sigok`)
+
+A caixa que fica **entre** o mascaramento e o request. Reaproveita a casca do
+`.plib` (como a `.gwarn` e a `.prec`), e o que é próprio dela é o **cabeçalho
+em `--sig-hd`** com o cadeado, a borda em `--ok` e o halo `--sig-halo` — a
+mesma moldura do editor `.sig-edit`, porque é a mesma situação: quem está ali
+está DENTRO do modo sigiloso, decidindo o que SAI.
+
+Três zonas, na ordem da dúvida: o **resumo** (quantas peças e quantas
+substituições NESTE envio — o número que muda de um turno para o outro, com os
+chips `.aud-chip` por tipo), a **nota de honestidade** em `--warn-*` (aviso
+suave: informa o limite do detector, não bloqueia; "nada foi enviado ainda" é a
+primeira frase, porque é a pergunta que a caixa responde), e **uma linha por
+peça** (`.sk-row`: título original, contagem, "Ver o texto" e "Editar"). O texto
+(`.sk-txt`) tem a MESMA anatomia do `.aud-texto` e é pintado por `pintarMarcas`:
+o que se aprova aqui e o que se confere depois na auditoria são a mesma coisa
+aos olhos. O corpo é a única região que rola — no painel flutuante uma peça de
+40 folhas empurraria o "Enviar" para fora do card, e um modal sem a ação
+principal à vista é um beco sem saída.
+
+O botão primário diz **quantas peças saem** ("Enviar 3 peças") e usa o
+gradiente do modo (`--sig-btn-*`); "Cancelar envio" nomeia a consequência. O
+"Não perguntar de novo" vive na própria caixa (checkbox, como o da `.gwarn`) e
+a volta está nas Configurações — uma dispensa sem caminho de volta não é
+preferência, é armadilha.
 
 ### Aviso dentro do card de progresso (`.prep-nota`)
 Nota em aviso suave abaixo da barra, usada quando o download passa de 12 s por

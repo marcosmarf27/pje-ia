@@ -518,6 +518,18 @@ async function* sseEvents(resp) {
 // por causa deste: são caminhos diferentes, medidos separadamente.
 const TOKENS_PAGINA_POR_AUTOR = { google: 532 };
 
+// TETO DE BASE64 do PDF inline, por AUTOR do slug. O OpenRouter não publica
+// limite de corpo; quem recebe o arquivo é o provedor upstream, e ESSE limite
+// é conhecido nos três diretos: Google ~20 MB por request inline (teto de 15,
+// o mesmo do caminho direto), Anthropic 32 MB (teto de 24), OpenAI 50 MB (teto
+// de 40). Sem fonte para o autor, fica AUSENTE e vale o padrão conservador do
+// content.js (20 MB). Modelo de texto não passa por aqui: recebe texto.
+const TETO_B64_POR_AUTOR = {
+  google: 15 * 1024 * 1024,
+  anthropic: 24 * 1024 * 1024,
+  openai: 40 * 1024 * 1024,
+};
+
 export async function capsDoCatalogoOpenRouter(model) {
   const slug = slugOpenRouter(model);
   const resp = await fetch(API + "/model/" + slug, { headers: { accept: "application/json" } });
@@ -565,6 +577,7 @@ export async function capsDoCatalogoOpenRouter(model) {
     // Só vai no objeto quando há fonte: `undefined` faz o content.js cair no
     // padrão dele, e um campo presente com valor errado é pior que ausente.
     tokensPagina: TOKENS_PAGINA_POR_AUTOR[String(slug).split("/")[0]],
+    tetoB64Chars: TETO_B64_POR_AUTOR[String(slug).split("/")[0]],
     preco: precoDoCatalogo(d.pricing),
   };
 }
@@ -670,4 +683,5 @@ export const _internos = {
   mensagemErroOpenRouter,
   nomeArquivoDe,
   TOKENS_PAGINA_POR_AUTOR,
+  TETO_B64_POR_AUTOR,
 };

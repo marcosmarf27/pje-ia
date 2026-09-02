@@ -56,6 +56,16 @@
   --ok-bg: #eaf4ef;
   --ok-line: #cbe3d8;
   --ok-ink: #1e5c44;
+  /* Modo sigiloso (espelho do panel.css; ver DESIGN.md §2) */
+  --sig-hd: #143f33;
+  --sig-mark-de: #35946e;
+  --sig-mark-para: #1d6248;
+  --sig-btn-de: #2f9268;
+  --sig-btn-para: #1f6a4b;
+  --sig-btn-de-h: #35a074;
+  --sig-btn-para-h: #1a5c41;
+  --sig-tarja: #a7d2bd;
+  --sig-halo: rgba(47, 146, 104, 0.28);
   --warn: #de8b2c;
   --warn-bg: #fbead2;
   /* Espelham panel.css (ver DESIGN.md §1) — aviso suave, que informa sem

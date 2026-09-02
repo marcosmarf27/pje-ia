@@ -86,16 +86,24 @@
     return p.normalizar;
   }
 
-  function VazamentoBloqueado(tipo, posicao) {
+  // `rotulo` ([ORGANIZACAO_3]) viaja no erro e o VALOR não: o rótulo não é o
+  // dado, então o log continua limpo — e é o que permite ao content script
+  // resolver `paraValor(rotulo)` na própria máquina do usuário e perguntar a
+  // ELE se aquilo é sigiloso. Um bloqueio que só diz "ORGANIZACAO, posição
+  // 5637" não dá ao usuário nenhuma saída além de desligar o modo.
+  function VazamentoBloqueado(tipo, posicao, rotulo) {
     const e = new Error(
       'um valor do tipo "' +
         tipo +
-        '" apareceu no que seria enviado (posição ' +
+        '"' +
+        (rotulo ? " (" + rotulo + ")" : "") +
+        " apareceria no que seria enviado (posição " +
         posicao +
         "); nada foi enviado"
     );
     e.name = "VazamentoBloqueadoError";
     e.tipo = tipo;
+    e.rotulo = rotulo || null;
     e.posicao = posicao;
     e.vazamento = true;
     // EXPLICITO, e nao por `undefined` ser falsy: `executarTurno` re-tenta
@@ -159,7 +167,7 @@
           !ehLetraOuDigito(alvo[ate]) &&
           !dentroDeAlguma(de, ate, trechosIsentos)
         ) {
-          throw VazamentoBloqueado(p.tipo || "desconhecido", de);
+          throw VazamentoBloqueado(p.tipo || "desconhecido", de, p.rotulo);
         }
         de = alvo.indexOf(agulha, de + 1);
       }

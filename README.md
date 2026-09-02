@@ -437,6 +437,9 @@ em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o text
 - **Barreira final.** Antes de cada envio a extensão **confere o que sairia** e recusa o
   envio se algum valor original tiver escapado — o turno inteiro é bloqueado, nada vai pela
   metade.
+- **Você aprova antes de sair.** Quando o envio traz peça recém-anonimizada, uma caixa
+  mostra o texto exatamente como vai sair, peça por peça, e espera a sua aprovação — dá
+  para editar, mascarar à mão ou liberar um valor antes de enviar; cancelar não manda nada.
 - **A tabela que desfaz a anonimização** fica só no seu computador, por processo, e nunca
   sai dele.
 
@@ -448,7 +451,8 @@ em todas as peças), e o **PDF não sai da máquina**: o que viaja é só o text
 
 **Limite dito com honestidade:** nenhum anonimizador automático é perfeito, e o que escapar
 da detecção vai inteiro para o provedor. A conferência final cobre o que a extensão
-reconheceu; ela não inventa o que não detectou. **A revisão do que sai continua sendo sua.**
+reconheceu; ela não inventa o que não detectou. **A revisão do que sai continua sendo sua**
+— e a caixa de conferência antes do envio é o momento de fazê-la.
 
 O **[TecJustiça Sigilo](https://github.com/marcosmarf27/tecjustica-sigilo)** — programa
 separado e gratuito, 100% local — continua útil para o que está **fora** dos autos: ele grava

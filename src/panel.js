@@ -113,8 +113,37 @@ var PjePanel = (function () {
     return l.split("|").map((c) => c.trim());
   }
 
+  // REIDENTIFICAÇÃO NA TELA. O modo sigiloso manda `[PESSOA_1]` à API e a
+  // resposta volta com o rótulo; a tabela que o desfaz está NESTE computador,
+  // e mostrá-lo cru era pedir ao usuário que traduzisse a resposta de cabeça
+  // (o relato: "temos a tabela de identificação, mas parece que não
+  // utilizamos"). `reidentificador(rotulo)` devolve o valor ou null; o content
+  // o instala com o mapa vivo. A troca é só de EXIBIÇÃO: o transcript, a
+  // exportação e o histórico continuam com o rótulo — foi ele que saiu.
+  // O valor entra por placeholder na área de uso privado (como as citações):
+  // atravessa o escape e a formatação inline sem ser interpretado.
+  let reidentificador = null;
+  const RE_ROTULO_ANON = /\[([A-Z][A-Z0-9]*_\d+)\]/g;
+  function marcaReid(rotulo, valor) {
+    return (
+      '<mark class="reid" title="' +
+      escapeHtml("[" + rotulo + "] — nome restaurado neste computador; a IA recebeu só o rótulo") +
+      '">' + escapeHtml(valor) + "</mark>"
+    );
+  }
   function renderMd(text, cites) {
-    const src = escapeHtml(text);
+    const reids = [];
+    let bruto = String(text == null ? "" : text);
+    if (reidentificador) {
+      bruto = bruto.replace(RE_ROTULO_ANON, (m, rot) => {
+        let v = null;
+        try { v = reidentificador("[" + rot + "]"); } catch { v = null; }
+        if (v == null || v === "") return m;
+        reids.push({ rot, v });
+        return "\uE020" + (reids.length - 1) + "\uE021";
+      });
+    }
+    const src = escapeHtml(bruto);
     const lines = src.split(/\r?\n/);
     const out = [];
     let i = 0;
@@ -227,6 +256,12 @@ var PjePanel = (function () {
     }
 
     let html = out.join("");
+    if (reids.length) {
+      html = html.replace(new RegExp("\\uE020(\\d+)\\uE021", "g"), (m, n) => {
+        const r = reids[Number(n)];
+        return r ? marcaReid(r.rot, r.v) : m;
+      });
+    }
     // Marcadores de citação: o content script injeta placeholders na área de
     // uso privado do Unicode (U+E000 n U+E001) — eles atravessam o escapeHtml
     // intactos e só aqui, DEPOIS do escape, viram sobrescritos [n].
@@ -845,7 +880,7 @@ var PjePanel = (function () {
           </div>
           <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
         </div>
-        <div class="sigbar" hidden><span class="sb-t"></span></div>
+        <div class="sigbar" hidden>${SVG.cadeado}<span class="sb-t"></span><span class="sb-n" hidden></span></div>
         <div class="content">
           <button type="button" class="docs-rail" title="Exibir a lista de peças" aria-label="Exibir a lista de peças">
             <span class="rail-i">${SVG.docsshow}</span>
@@ -1096,6 +1131,27 @@ var PjePanel = (function () {
             <div class="plib-form-acts">
               <button class="gwarn-cancel plib-cancel">Agora não</button>
               <button class="gwarn-ok plib-save">Carregar lista</button>
+            </div>
+          </div>
+        </div>
+        <div class="sigok plib" hidden>
+          <div class="sigok-card plib-card" role="dialog" aria-modal="true" aria-label="Conferir antes de enviar" tabindex="-1">
+            <div class="plib-hd">
+              <span class="t">${SVG.cadeado}Conferir antes de enviar</span>
+              <button class="sigok-close plib-close" title="Fechar (Esc)" aria-label="Fechar">${SVG.close}</button>
+            </div>
+            <div class="sigok-body">
+              <p class="sigok-resumo"></p>
+              <div class="sigok-chips"></div>
+              <div class="sigok-nota"><b>Nada foi enviado ainda.</b> A detecção automática pode deixar
+              passar um nome ou um número, e o que escapar vai inteiro para a IA. Abra cada
+              peça e confira o texto que sai — edite ou libere o que for preciso.</div>
+              <div class="sigok-list"></div>
+            </div>
+            <label class="sigok-nao"><input type="checkbox" class="sigok-cb"> Não perguntar de novo (dá para reativar nas Configurações)</label>
+            <div class="plib-form-acts">
+              <button class="sigok-cancel plib-cancel">Cancelar envio</button>
+              <button class="sigok-ok plib-save">Enviar</button>
             </div>
           </div>
         </div>
@@ -1615,8 +1671,95 @@ var PjePanel = (function () {
       docQ.placeholder = estreito ? PH_BUSCA_CURTO : PH_BUSCA_LONGO;
     }
 
+    // TROCA DE MODO ANIMADA (FLIP). Os modos trocam `position`, `width`,
+    // `height`, `top/left` e até o `transform` de centragem — nada disso
+    // interpola por transição CSS entre `absolute` e `fixed`. O que interpola é
+    // a DIFERENÇA: mede-se a janela ANTES, aplica-se o modo, mede-se DEPOIS, e
+    // uma animação WAAPI no `transform` leva do retângulo velho ao novo. Corre
+    // no compositor (não é o rAF de biblioteca que o Chrome congela em aba de
+    // fundo — e em aba de fundo ninguém está olhando de todo jeito).
+    //
+    // `transform-origin: 0 0` inline durante a animação, porque a conta abaixo
+    // é feita no canto superior esquerdo; e a transform BASE do modo de destino
+    // (o `translate(-50%, -50%)` do expandido) entra nos DOIS keyframes, lida
+    // do estilo computado já em px, senão o primeiro frame perderia a
+    // centragem e a janela pularia.
+    let flipAnim = null;
+    // A origem inline que estava ANTES de qualquer FLIP, capturada UMA vez
+    // enquanto nenhum está ativo. Dois cliques rápidos no mesmo botão de modo
+    // cancelam o primeiro FLIP com o segundo já em voo; `cancel()` dispara o
+    // handler de forma assíncrona, e se cada chamada capturasse "a origem de
+    // agora" a segunda leria o "0 0" da primeira e o gravaria para sempre —
+    // toda abertura seguinte encolheria para o canto superior esquerdo em vez
+    // de voltar ao botão. Por isso a origem é única e os handlers só agem se a
+    // animação que terminou é a CORRENTE.
+    let origemFlip = null;
+    function flipJanela(antes) {
+      if (!antes || !panelEl.animate) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // A TRANSIÇÃO CSS DE `transform` É DESLIGADA PARA MEDIR. A troca de classe
+      // muda a transform base (nenhuma → `translate(-50%, -50%)` no expandido),
+      // e o `.panel` tem `transition: transform`: no instante seguinte à troca a
+      // transform COMPUTADA ainda é a antiga (a transição está no frame zero),
+      // e `getBoundingClientRect` também. Medido: a base lida era a identidade,
+      // o FLIP terminava com a janela no canto e ela SALTAVA para o centro no
+      // fim — "vai para a esquerda e volta para o meio". Com a transição
+      // desligada e um reflow, o computado é o destino de verdade; a transição
+      // volta no tick seguinte, quando já não há mudança a que reagir.
+      const transAntes = panelEl.style.transition;
+      panelEl.style.transition = "none";
+      void panelEl.offsetWidth;
+      const depois = panelEl.getBoundingClientRect();
+      const religar = () => {
+        panelEl.style.transition = transAntes;
+      };
+      if (!depois.width || !depois.height || !antes.width || !antes.height) return religar();
+      const dx = antes.left - depois.left;
+      const dy = antes.top - depois.top;
+      const sx = antes.width / depois.width;
+      const sy = antes.height / depois.height;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.002 && Math.abs(sy - 1) < 0.002) return religar();
+      const cs = getComputedStyle(panelEl);
+      const base = cs.transform && cs.transform !== "none" ? cs.transform + " " : "";
+      setTimeout(religar, 0);
+      if (flipAnim) {
+        const velha = flipAnim;
+        flipAnim = null;
+        velha.cancel();
+      } else {
+        origemFlip = panelEl.style.transformOrigin;
+      }
+      panelEl.style.transformOrigin = "0 0";
+      const anim = panelEl.animate(
+        [
+          { transform: base + "translate(" + dx + "px, " + dy + "px) scale(" + sx + ", " + sy + ")" },
+          { transform: base || "none" },
+        ],
+        { duration: 380, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+      flipAnim = anim;
+      const fim = () => {
+        if (flipAnim !== anim) return; // uma mais nova assumiu; ela restaura
+        panelEl.style.transformOrigin = origemFlip || "";
+        origemFlip = null;
+        flipAnim = null;
+      };
+      anim.onfinish = fim;
+      anim.oncancel = fim;
+    }
+    // O FLIP está em voo? O ResizeObserver do modo livre pergunta antes de
+    // gravar geometria.
+    function flipEmVoo() {
+      return flipAnim !== null;
+    }
+
     function aplicarModo(modo) {
       hidePreview(); // a posição do popover fica inválida ao trocar o layout
+      // Só há o que animar se a janela está aberta e o modo muda de verdade.
+      const antes =
+        wrap.classList.contains("open") && modoAtual() !== modo
+          ? panelEl.getBoundingClientRect()
+          : null;
       const eraLivre = wrap.classList.contains("livre");
       // Captura a geometria ANTES de tirar a classe (sem .livre o .panel volta
       // a position:absolute e o rect muda) — cobre o resize pela alça nativa
@@ -1641,6 +1784,7 @@ var PjePanel = (function () {
       // numa janela estreita têm os mesmos 420px), e é ele quem chama o
       // ajustarPlaceholderBusca.
       atualizarLargura();
+      flipJanela(antes);
       try {
         chrome.storage.local.set({ layoutModo: modo === "cheia" ? "expandido" : modo });
       } catch {
@@ -1791,10 +1935,16 @@ var PjePanel = (function () {
     // e com o painel aberto (fechado, o rect é 0x0 e apagaria a geometria).
     const roLivre = new ResizeObserver(() => {
       atualizarLargura();
+      // Durante o FLIP da troca de modo o painel está com um `transform` de
+      // escala, e `getBoundingClientRect` o INCLUI (a mesma razão de o arrasto
+      // passar uma geometria conhecida): gravar aqui persistiria uma janela
+      // pela metade. `aplicarGeoLivre` já escreveu os valores certos inline;
+      // a saída do modo e o próximo resize gravam de novo.
       if (
         wrap.classList.contains("livre") &&
         wrap.classList.contains("open") &&
-        !arrasto
+        !arrasto &&
+        !flipEmVoo()
       )
         salvarGeoLivre();
     });
@@ -1818,7 +1968,7 @@ var PjePanel = (function () {
     // Espelha `--dur-1` do panel.css: é quanto dura a saída do painel. Só o
     // valor pode divergir, e o pior caso de divergência é cosmético (desmontar
     // o layout cedo demais aparece como um salto no fim da saída).
-    const MS_SAIDA = 120;
+    const MS_SAIDA = 220;
     let saidaTimer = null;
     closeBtn.addEventListener("click", () => {
       hidePreview();
@@ -1864,7 +2014,7 @@ var PjePanel = (function () {
     const docsRail = $(".docs-rail");
     // Espelha `--dur-3` (240ms) do panel.css com uma folga: é quanto dura o
     // colapso da lista. Conferido por teste, como o MS_SAIDA.
-    const MS_COLAPSO = 260;
+    const MS_COLAPSO = 320;
     let colapsoTimer = null;
     function setDocsOcultas(on, persistir) {
       // O clipe só existe durante a transição (e no repouso colapsado, por CSS):
@@ -1993,7 +2143,16 @@ var PjePanel = (function () {
       if (barra) {
         barra.hidden = !sigiloOn;
         barra.querySelector(".sb-t").textContent =
-          "Modo sigiloso — as peças saem anonimizadas deste computador";
+          "MODO SIGILOSO — as peças saem anonimizadas deste computador; o PDF não sai da máquina";
+        // A contagem também na tarja: é a única marca do modo que fica no campo
+        // de visão o tempo todo, e "o que está sendo protegido?" é a pergunta
+        // que ela precisa responder sem que ninguém abra nada.
+        const nEl = barra.querySelector(".sb-n");
+        if (nEl) {
+          const n = Number(quantos) || 0;
+          nEl.hidden = !n;
+          nEl.textContent = n + (n === 1 ? " dado protegido" : " dados protegidos");
+        }
       }
       if (dados !== undefined) audDados = dados;
       // A caixa nunca pode mostrar o retrato de um estado anterior — a mesma
@@ -2101,10 +2260,12 @@ var PjePanel = (function () {
     // Construído com NÓS, nunca `innerHTML`: isto é conteúdo dos autos, e o
     // `escapeHtml` do painel não escapa aspa simples. Um `<mark>` por rótulo e
     // nós de texto para o resto — seguro por construção.
-    function pintarMarcas(el, texto) {
+    function pintarMarcas(el, texto, itens) {
       el.textContent = "";
       const valorDe = new Map();
-      for (const it of (audDados && audDados.itens) || []) valorDe.set(it.rotulo, it.valor);
+      // `itens` explícito é a caixa de conferência (que tem a tabela do
+      // instante); sem ele vale a da auditoria.
+      for (const it of itens || (audDados && audDados.itens) || []) valorDe.set(it.rotulo, it.valor);
       // Regex LOCAL: a do PSEUD é global e carrega `lastIndex` entre chamadas.
       const re = /\[([A-Z][A-Z0-9]*)_(\d+)\]/g;
       let ultimo = 0;
@@ -2248,6 +2409,16 @@ var PjePanel = (function () {
           v.textContent = it.valor;
           row.appendChild(r);
           row.appendChild(v);
+          // Liberado pelo usuário: continua na tabela (uma minuta antiga pode
+          // carregar o rótulo), mas sai em claro daqui em diante — e a linha
+          // diz isso, senão a tabela afirmaria uma proteção que não existe.
+          if (it.liberado) {
+            row.classList.add("liberado");
+            const l = document.createElement("span");
+            l.className = "aud-lib";
+            l.textContent = "liberado — sai em claro";
+            row.appendChild(l);
+          }
           lista.appendChild(row);
         }
       }
@@ -3304,6 +3475,146 @@ var PjePanel = (function () {
       });
     }
     tipLoad.addEventListener("click", () => carregarTLCb && carregarTLCb());
+
+    // -------------------------------------------------------------------------
+    // CONFERÊNCIA ANTES DE ENVIAR (modo sigiloso) — ver `confirmarEnvioSigiloso`
+    // no content.js. Promessa única, como a `.gwarn`: ✕, "Cancelar envio", Esc
+    // e o backdrop respondem `false`; só "Enviar" responde `true`. A lista de
+    // peças é construída com NÓS (conteúdo dos autos, nunca innerHTML) e o
+    // texto de cada peça é pintado por `pintarMarcas` — as MESMAS marcas da
+    // auditoria, para o que se aprova aqui e o que se confere depois serem a
+    // mesma coisa aos olhos.
+    // -------------------------------------------------------------------------
+    const sigokBox = $(".sigok");
+    const sigokCard = $(".sigok-card");
+    const sigokCb = $(".sigok-cb");
+    const sigokList = $(".sigok-list");
+    const sigokResumo = $(".sigok-resumo");
+    const sigokChips = $(".sigok-chips");
+    const sigokOk = $(".sigok-ok");
+    let sigokResolve = null;
+    let sigokInfo = null;
+    // ids cujo texto está aberto — preservado no repintar (editar uma peça não
+    // pode fechar as outras que o usuário estava lendo)
+    const sigokAbertos = new Set();
+    function responderSigok(v) {
+      const r = sigokResolve;
+      sigokResolve = null;
+      sigokInfo = null;
+      sigokBox.hidden = true;
+      sigokList.textContent = "";
+      sigokAbertos.clear();
+      if (r) r(v);
+    }
+    $(".sigok-close").addEventListener("click", () => responderSigok(false));
+    $(".sigok-cancel").addEventListener("click", () => responderSigok(false));
+    sigokBox.addEventListener("click", (e) => {
+      if (e.target === sigokBox) responderSigok(false);
+    });
+    sigokCard.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        responderSigok(false);
+      }
+    });
+    sigokOk.addEventListener("click", () => {
+      const info = sigokInfo;
+      if (sigokCb.checked && info && typeof info.onNaoPerguntar === "function") info.onNaoPerguntar();
+      responderSigok(true);
+    });
+    const RE_ROTULO_SK = /\[([A-Z][A-Z0-9]*)_(\d+)\]/g;
+    function pintarSigok(d) {
+      const pecas = (d && d.pecas) || [];
+      const itens = (d && d.itens) || [];
+      // Resumo: quantas peças e quantas SUBSTITUIÇÕES neste envio — o número
+      // que muda de um turno para o outro, e não o total do processo.
+      let subs = 0;
+      const porTipo = new Map(); // tipo -> rótulos distintos neste envio
+      for (const pe of pecas) {
+        const t = String(pe.texto || "");
+        let m;
+        RE_ROTULO_SK.lastIndex = 0;
+        while ((m = RE_ROTULO_SK.exec(t)) !== null) {
+          subs++;
+          if (!porTipo.has(m[1])) porTipo.set(m[1], new Set());
+          porTipo.get(m[1]).add(m[0]);
+        }
+      }
+      sigokResumo.textContent =
+        (pecas.length === 1 ? "1 peça vai sair" : pecas.length + " peças vão sair") +
+        " como texto anonimizado, com " +
+        subs + (subs === 1 ? " substituição" : " substituições") + ".";
+      sigokChips.textContent = "";
+      for (const [tipo, set] of [...porTipo].sort((a, b) => b[1].size - a[1].size)) {
+        const c = document.createElement("span");
+        c.className = "aud-chip";
+        c.textContent = nomeTipo(tipo, set.size);
+        sigokChips.appendChild(c);
+      }
+      sigokChips.hidden = !porTipo.size;
+      sigokOk.textContent = "Enviar " + (pecas.length === 1 ? "1 peça" : pecas.length + " peças");
+
+      sigokList.textContent = "";
+      for (const pe of pecas) {
+        const row = document.createElement("div");
+        row.className = "sk-row";
+        const cab = document.createElement("div");
+        cab.className = "sk-cab";
+        const nome = document.createElement("span");
+        nome.className = "sk-t";
+        nome.textContent = pe.titulo || String(pe.id);
+        const meta = document.createElement("span");
+        meta.className = "sk-m";
+        const n = (String(pe.texto || "").match(/\[[A-Z][A-Z0-9]*_\d+\]/g) || []).length;
+        meta.textContent =
+          (pe.chars || 0) + " caracteres · " + n + (n === 1 ? " substituição" : " substituições");
+        const acts = document.createElement("span");
+        acts.className = "sk-acts";
+        const ver = document.createElement("button");
+        ver.type = "button";
+        ver.className = "sk-ver";
+        const corpo = document.createElement("pre");
+        corpo.className = "sk-txt";
+        pintarMarcas(corpo, pe.texto || "", itens);
+        const aberto = sigokAbertos.has(pe.id);
+        corpo.hidden = !aberto;
+        ver.textContent = aberto ? "Ocultar" : "Ver o texto";
+        ver.addEventListener("click", () => {
+          corpo.hidden = !corpo.hidden;
+          if (corpo.hidden) sigokAbertos.delete(pe.id);
+          else sigokAbertos.add(pe.id);
+          ver.textContent = corpo.hidden ? "Ver o texto" : "Ocultar";
+        });
+        acts.appendChild(ver);
+        const info = sigokInfo;
+        if (info && typeof info.onEditar === "function") {
+          const ed = document.createElement("button");
+          ed.type = "button";
+          ed.className = "sk-edit";
+          ed.textContent = "Editar";
+          ed.title = "Abre o texto para mascarar, liberar ou corrigir à mão antes de enviar";
+          ed.addEventListener("click", async () => {
+            ed.disabled = true;
+            try {
+              await info.onEditar(pe.id);
+            } finally {
+              ed.disabled = false;
+              // a caixa pode já ter sido respondida enquanto o editor estava aberto
+              if (sigokInfo === info && typeof info.recarregar === "function") {
+                pintarSigok(info.recarregar());
+              }
+            }
+          });
+          acts.appendChild(ed);
+        }
+        cab.appendChild(nome);
+        cab.appendChild(meta);
+        cab.appendChild(acts);
+        row.appendChild(cab);
+        row.appendChild(corpo);
+        sigokList.appendChild(row);
+      }
+    }
 
     // -------------------------------------------------------------------------
     // "Baixar .zip": exporta as peças MARCADAS — ou todas as da lista, quando
@@ -6178,6 +6489,33 @@ var PjePanel = (function () {
       }
     });
 
+    // Texto do USUÁRIO com os rótulos reidentificados na tela — por nós de DOM,
+    // nunca innerHTML (é texto do usuário).
+    function preencherComReid(el, texto) {
+      el.textContent = "";
+      const t = String(texto || "");
+      if (!reidentificador) {
+        el.textContent = t;
+        return;
+      }
+      let ult = 0;
+      RE_ROTULO_ANON.lastIndex = 0;
+      let m;
+      while ((m = RE_ROTULO_ANON.exec(t)) !== null) {
+        let v = null;
+        try { v = reidentificador("[" + m[1] + "]"); } catch { v = null; }
+        if (v == null || v === "") continue;
+        el.appendChild(document.createTextNode(t.slice(ult, m.index)));
+        const mk = document.createElement("mark");
+        mk.className = "reid";
+        mk.title = "[" + m[1] + "] — nome restaurado neste computador; a IA recebeu só o rótulo";
+        mk.textContent = v;
+        el.appendChild(mk);
+        ult = m.index + m[0].length;
+      }
+      el.appendChild(document.createTextNode(t.slice(ult)));
+    }
+
     // -------------------------------------------------------------------------
     // Card de preparo: progresso por peça enquanto os PDFs são baixados.
     // -------------------------------------------------------------------------
@@ -6242,13 +6580,19 @@ var PjePanel = (function () {
       // guarda, um "done" repetido — fácil de acontecer agora que a peça passa
       // por mais de uma fase — levaria o contador além de N/N e a barra além
       // de 100%. Vale também para a exportação, que usa os mesmos estados.
-      const jaTerminou = /(^|\s)(done|erro)(\s|$)/.test(ic.className);
+      //
+      // A marca vive em `row.dataset.fim`, NÃO na className do ícone: a
+      // primeira versão lia a classe, e a peça que passa por `done → anon →
+      // done` (modo sigiloso: baixa, depois mascara) apagava a marca ao entrar
+      // em `anon` e era contada DUAS vezes — o card chegou a mostrar 25/15.
+      const jaTerminou = row.dataset.fim === "1";
       ic.className = "prep-ic " + state;
       ic.innerHTML = state === "done" ? SVG.check : "";
       // "erro" também ADIANTA o contador: a peça terminou de ser tentada. Sem
       // isso a barra de uma exportação com falhas nunca chegaria ao fim, e o
       // usuário ficaria olhando um progresso travado sem saber que acabou.
       if ((state === "done" || state === "erro") && !jaTerminou) {
+        row.dataset.fim = "1";
         prepDone++;
         prepEl.querySelector(".prep-n").textContent = prepDone + "/" + prepTotal;
         prepEl.querySelector(".prep-bar i").style.width =
@@ -6817,7 +7161,7 @@ var PjePanel = (function () {
         } else {
           const txt = document.createElement("div");
           txt.className = "txt";
-          txt.textContent = text;
+          preencherComReid(txt, text);
           el.appendChild(txt);
           if (attachments && attachments.length) {
             const at = document.createElement("div");
@@ -6965,6 +7309,201 @@ var PjePanel = (function () {
       },
       // O relatório de conferência: quem monta é o content (ele tem o texto e a
       // ficha); o painel só oferece o gesto.
+      // Reescreve o texto de uma bolha do USUÁRIO já na tela (e no transcript
+      // que a exportação e a memória gravam). Usado pelo modo sigiloso quando a
+      // máscara da pergunta muda DEPOIS de as peças serem anonimizadas: a bolha
+      // tem de mostrar exatamente o que foi à API. `textContent`, nunca
+      // innerHTML — é texto do usuário.
+      atualizarTextoUsuario(el, texto) {
+        if (!el) return;
+        const txt = el.querySelector(".txt");
+        if (txt) preencherComReid(txt, texto || "");
+        if (el.__entry) el.__entry.text = texto || "";
+      },
+      // Instala quem resolve `[PESSOA_1]` → nome na TELA (ver `renderMd`).
+      // Repinta o que já está na conversa: uma retomada da memória de caso
+      // monta as bolhas antes de o mapa chegar.
+      setReidentificador(fn) {
+        reidentificador = typeof fn === "function" ? fn : null;
+        for (const el of msgs.querySelectorAll(".msg.user .txt")) {
+          const m = el.closest(".msg");
+          if (m && m.__entry) preencherComReid(el, m.__entry.text || "");
+        }
+      },
+      // EDITOR DE REVISÃO do texto anonimizado de UMA peça. O usuário vê o
+      // texto exatamente como sairia, o que sobrou em claro (com rótulo e
+      // valor), e decide: mascarar todas as ocorrências à mão, liberar o valor
+      // neste processo, ou editar livremente e usar. `onSalvar(texto)` devolve
+      // {ok} ou {ok:false, msg, sobras} — é o content que confere.
+      // Conteúdo dos autos: só textContent/value, nunca innerHTML.
+      // CONFERÊNCIA antes de enviar (modo sigiloso). `info.dados` = {itens,
+      // pecas:[{id,titulo,texto,chars}]}, `info.recarregar()` devolve o mesmo
+      // shape relido, `info.onEditar(id)` abre o editor e resolve ao fechar,
+      // `info.onNaoPerguntar()` grava a dispensa. Resolve true só no "Enviar".
+      confirmarEnvioSigiloso(info) {
+        return new Promise((resolve) => {
+          // Uma chamada nova com outra pendente deixaria a primeira promessa
+          // pendurada — mesma regra da `.gwarn`.
+          if (sigokResolve) responderSigok(false);
+          sigokResolve = resolve;
+          sigokInfo = info || {};
+          sigokCb.checked = false;
+          pintarSigok(sigokInfo.dados || {});
+          sigokBox.hidden = false;
+          sigokCard.focus();
+        });
+      },
+      abrirEditorSigilo(info) {
+        const i = info || {};
+        const antigo = wrap.querySelector(".sig-edit");
+        if (antigo) antigo.remove();
+        const box = document.createElement("div");
+        box.className = "sig-edit";
+        // Todo fechamento passa por aqui: quem abriu pode precisar saber
+        // (a caixa de conferência repinta a linha da peça ao fechar).
+        const fechar = () => {
+          box.remove();
+          if (typeof i.onFechar === "function") i.onFechar();
+        };
+        box.setAttribute("role", "dialog");
+        box.setAttribute("aria-label", "Revisar texto anonimizado");
+        const hd = document.createElement("div");
+        hd.className = "se-hd";
+        const t = document.createElement("span");
+        t.className = "se-t";
+        t.textContent = "Revisar texto anonimizado — " + (i.titulo || "");
+        hd.appendChild(t);
+        const x = document.createElement("button");
+        x.type = "button";
+        x.className = "se-x";
+        x.setAttribute("aria-label", "Fechar");
+        x.innerHTML = SVG.close;
+        x.addEventListener("click", fechar);
+        hd.appendChild(x);
+        box.appendChild(hd);
+
+        const nota = document.createElement("p");
+        nota.className = "se-nota";
+        nota.textContent =
+          "Este é o texto que sairia para a IA. O que a conferência achou em claro está listado abaixo — " +
+          "mascare, libere ou edite o texto à vontade e clique em Usar este texto.";
+        box.appendChild(nota);
+
+        const ta = document.createElement("textarea");
+        ta.className = "se-ta";
+        ta.spellcheck = false;
+        ta.value = i.texto || "";
+
+        const sobras = document.createElement("div");
+        sobras.className = "se-sobras";
+        const pintarSobras = (lista) => {
+          sobras.textContent = "";
+          if (!lista || !lista.length) {
+            const okEl = document.createElement("span");
+            okEl.className = "se-ok";
+            okEl.textContent = "Nada em claro do que o mapa conhece.";
+            sobras.appendChild(okEl);
+            return;
+          }
+          for (const s of lista) {
+            const linha = document.createElement("div");
+            linha.className = "se-sobra";
+            const v = document.createElement("b");
+            v.textContent = "«" + s.valor + "»";
+            linha.appendChild(v);
+            const r = document.createElement("code");
+            r.textContent = s.rotulo;
+            linha.appendChild(r);
+            const bm = document.createElement("button");
+            bm.type = "button";
+            bm.textContent = "Mascarar todas";
+            bm.title = "Troca todas as ocorrências deste valor pelo rótulo, no texto acima";
+            bm.addEventListener("click", () => {
+              // literal, sem caixa: é o mesmo critério do mapa
+              const re = new RegExp(String(s.valor).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+              ta.value = ta.value.replace(re, s.rotulo);
+              linha.remove();
+              if (!sobras.querySelector(".se-sobra")) pintarSobras([]);
+            });
+            linha.appendChild(bm);
+            if (typeof i.onLiberar === "function") {
+              const bl = document.createElement("button");
+              bl.type = "button";
+              bl.textContent = "Liberar neste processo";
+              bl.title = "Não é dado pessoal: passa a sair em claro neste processo";
+              bl.addEventListener("click", async () => {
+                bl.disabled = true;
+                try {
+                  await i.onLiberar(s.rotulo);
+                  linha.remove();
+                  if (!sobras.querySelector(".se-sobra")) pintarSobras([]);
+                } catch (e) {
+                  bl.disabled = false;
+                  msg.textContent = "Não deu para liberar: " + ((e && e.message) || e);
+                }
+              });
+              linha.appendChild(bl);
+            }
+            sobras.appendChild(linha);
+          }
+        };
+        pintarSobras(i.sobras || []);
+        box.appendChild(sobras);
+        box.appendChild(ta);
+
+        const msg = document.createElement("div");
+        msg.className = "se-msg";
+        box.appendChild(msg);
+
+        const acts = document.createElement("div");
+        acts.className = "se-acts";
+        const usar = document.createElement("button");
+        usar.type = "button";
+        usar.className = "se-usar";
+        usar.textContent = "Usar este texto";
+        usar.addEventListener("click", async () => {
+          usar.disabled = true;
+          msg.textContent = "";
+          try {
+            const r = await (i.onSalvar ? i.onSalvar(ta.value) : { ok: true });
+            if (r && r.ok === false) {
+              msg.textContent = "Ainda não dá para usar — " + (r.msg || "há valores em claro.");
+              if (r.sobras) pintarSobras(r.sobras);
+              usar.disabled = false;
+              return;
+            }
+            fechar();
+          } catch (e) {
+            msg.textContent = "Não deu: " + ((e && e.message) || e);
+            usar.disabled = false;
+          }
+        });
+        acts.appendChild(usar);
+        const canc = document.createElement("button");
+        canc.type = "button";
+        canc.className = "se-canc";
+        canc.textContent = "Cancelar";
+        canc.addEventListener("click", fechar);
+        acts.appendChild(canc);
+        box.appendChild(acts);
+        // Esc fecha só o editor (stopPropagation: a cascata do painel fecharia
+        // o modo minuta junto).
+        box.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            fechar();
+          }
+        });
+        wrap.appendChild(box);
+        ta.focus();
+        return box;
+      },
+      // Abre a caixa de auditoria (o que o clique no selo faz). Existe para o
+      // aviso de bloqueio poder levar o usuário direto ao que foi mascarado.
+      abrirAuditoria() {
+        if (!sigiloOn) return;
+        abrirAud();
+      },
       onBaixarAuditoria(cb) {
         audBaixarCb = cb;
       },
@@ -7209,6 +7748,23 @@ var PjePanel = (function () {
         statusEl.classList.toggle("busy", !!busy && !!s);
         statusEl.classList.toggle("buscando", !!busy && !!s && icone === "busca");
       },
+      // Repõe um turno bloqueado no composer. O texto volta inteiro e os dois
+      // popups contextuais são recalculados, como numa digitação normal.
+      restaurarTexto(texto) {
+        inEl.value = String(texto || "");
+        autoresize();
+        updateMention();
+        updateSlash();
+        inEl.focus();
+      },
+      // Usado só depois de uma decisão explícita na bolha de bloqueio. Passa
+      // pelo mesmo `doSend` do clique/Enter; não existe um segundo caminho de
+      // montagem da mensagem para divergir.
+      enviarAgora() {
+        if (inEl.disabled || sendBtn.disabled) return false;
+        doSend();
+        return true;
+      },
       // Nota dentro do card de progresso — hoje usada para avisar que o
       // download está lento. Aparece DURANTE a espera, que é quando a
       // informação vale: um aviso estático sobre Wi-Fi seria ignorado por quem
@@ -7249,8 +7805,22 @@ var PjePanel = (function () {
         el.className = "falhas";
         const n = falhas.length;
         const sum = document.createElement("summary");
+        // Falha de ANONIMIZAÇÃO (modo sigiloso) não é falha de download: a
+        // peça baixou, o mascaramento é que não fechou. Dizer "não pôde ser
+        // baixada" mandava o usuário abrir a peça na linha do tempo — conselho
+        // falso para um problema que está em outro lugar.
+        const anon = falhas.filter((f) => f && f.anon).length;
+        const tituloAnon =
+          anon === n
+            ? n === 1
+              ? "1 peça não pôde ser anonimizada e ficou de fora desta análise"
+              : n + " peças não puderam ser anonimizadas e ficaram de fora desta análise"
+            : anon
+              ? n + " peças ficaram de fora desta análise (" + anon + " por falha na anonimização)"
+              : null;
         sum.textContent =
           o.titulo ||
+          tituloAnon ||
           (n === 1
             ? "1 peça não pôde ser baixada e ficou de fora desta análise"
             : n + " peças não puderam ser baixadas e ficaram de fora desta análise");
@@ -7265,6 +7835,31 @@ var PjePanel = (function () {
           const m = document.createElement("span");
           m.textContent = " — " + (f.erro || "falha ao baixar");
           li.appendChild(m);
+          // AÇÕES por item (modo sigiloso): liberar o valor que reprovou a
+          // peça, ou revisar o texto num editor. Uma falha que só se anuncia
+          // deixa o usuário sem saída além de desmarcar a peça.
+          if (Array.isArray(f.acoes) && f.acoes.length) {
+            const acts = document.createElement("div");
+            acts.className = "falha-acoes";
+            for (const a of f.acoes) {
+              const b = document.createElement("button");
+              b.type = "button";
+              b.className = "falha-acao";
+              b.textContent = a.rotulo;
+              b.addEventListener("click", async () => {
+                b.disabled = true;
+                try {
+                  await a.fn();
+                } catch (e) {
+                  statusEl.textContent = "Não deu: " + ((e && e.message) || e);
+                } finally {
+                  b.disabled = false;
+                }
+              });
+              acts.appendChild(b);
+            }
+            li.appendChild(acts);
+          }
           ul.appendChild(li);
         }
         el.appendChild(ul);
@@ -7272,8 +7867,95 @@ var PjePanel = (function () {
         p.className = "falhas-dica";
         p.textContent =
           o.dica ||
-          "Elas continuam marcadas: no próximo envio a extensão tenta de novo. Se persistir, abra a peça na linha do tempo do PJe uma vez e envie outra vez.";
+          (anon
+            ? "No modo sigiloso a peça só sai como texto anonimizado; quando o mascaramento não fecha, ela fica de fora em vez de sair como arquivo. Marque-a de novo para tentar outra vez, ou abra o selo «sigiloso» no rodapé para ver o que foi mascarado."
+            : "Elas continuam marcadas: no próximo envio a extensão tenta de novo. Se persistir, abra a peça na linha do tempo do PJe uma vez e envie outra vez.");
         el.appendChild(p);
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
+      },
+
+      // A guarda de saída barrou um valor ANTES da rede. Isto vive no chat —
+      // onde nasceu a ação — e não na `.alertbar`: não exige recomeçar a
+      // conversa, exige uma decisão sobre UM valor. Conteúdo do processo entra
+      // sempre por textContent; o HTML abaixo é só estrutura constante.
+      mostrarBloqueioSigilo(info) {
+        const o = info || {};
+        clearEmptyHint();
+        const el = document.createElement("section");
+        el.className = "msg sigilo-bloqueio";
+        el.setAttribute("role", "alert");
+        el.innerHTML =
+          '<div class="sb-h">' + SVG.coAlerta +
+          '<span>A proteção bloqueou este envio</span></div>' +
+          '<p class="sb-p"></p>' +
+          '<div class="sb-valor" hidden><span>Valor encontrado</span><strong></strong></div>' +
+          '<p class="sb-nota"></p>' +
+          '<div class="sb-acts"></div>';
+
+        const tipo = o.tipo && NOME_TIPO[o.tipo]
+          ? NOME_TIPO[o.tipo][0]
+          : String(o.tipo || "dado protegido").toLowerCase();
+        el.querySelector(".sb-p").textContent =
+          "A guarda encontrou no conteúdo que seria enviado um valor identificado como " +
+          tipo + ". Nada foi enviado à IA.";
+
+        const valorEl = el.querySelector(".sb-valor");
+        if (o.valor) {
+          valorEl.querySelector("strong").textContent = "“" + o.valor + "”";
+          valorEl.hidden = false;
+        }
+
+        const nota = el.querySelector(".sb-nota");
+        const acts = el.querySelector(".sb-acts");
+        if (o.valor && typeof o.onLiberar === "function") {
+          nota.textContent =
+            "Se este valor identifica apenas um órgão público ou outro dado não pessoal, " +
+            "você pode liberá-lo somente para este processo.";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sb-liberar";
+          btn.textContent = "Liberar neste processo";
+          btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            btn.textContent = "Liberando…";
+            try {
+              const liberado = await o.onLiberar();
+              if (liberado == null) {
+                btn.disabled = false;
+                btn.textContent = "Tentar liberar novamente";
+                return;
+              }
+              el.classList.add("liberado");
+              el.querySelector(".sb-h span").textContent = "Valor liberado neste processo";
+              nota.textContent = o.reenvia
+                ? "A pergunta foi reenviada com este valor em claro."
+                : "Gere novamente quando quiser continuar.";
+              btn.textContent = "Liberado neste processo";
+            } catch (e) {
+              btn.disabled = false;
+              btn.textContent = "Tentar liberar novamente";
+              nota.textContent = "Não foi possível liberar o valor. A proteção continua ativa.";
+            }
+          });
+          acts.appendChild(btn);
+        } else {
+          nota.textContent =
+            "Não foi possível identificar com segurança qual rótulo causou o bloqueio. " +
+            "Confira a auditoria do modo sigiloso antes de tentar novamente.";
+        }
+        // A segunda saída, sempre: ver a tabela do que foi mascarado. É lá que
+        // se confere se o valor é mesmo o do órgão, e é o mesmo gesto do selo.
+        if (sigiloOn) {
+          const ver = document.createElement("button");
+          ver.type = "button";
+          ver.className = "sb-aud";
+          ver.textContent = "Ver o que foi mascarado";
+          ver.addEventListener("click", () => abrirAud());
+          acts.appendChild(ver);
+        }
+
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
         return el;

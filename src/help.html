@@ -254,13 +254,15 @@
           <li><strong>“Leem o PDF como documento”</strong> — o modelo recebe a página como
           página: carimbo, assinatura, tabela e documento digitalizado inclusive. É o grupo a
           usar quando você não sabe o que vem pela frente.</li>
-          <li><strong>“Mais baratos (o PDF é convertido em texto)”</strong> — o OpenRouter
-          converte o arquivo antes, de graça, e manda o texto. Custa de <strong>10 a 25 vezes
-          menos</strong> e serve muito bem para peças do editor do PJe e PDFs com texto. O que se
-          perde é a imagem da página: <strong>peça digitalizada sai vazia</strong> — para ela, use
-          antes a <a class="link" href="#texto">extração de texto com OCR</a>. Repare também no
-          aviso “não lê imagens” de alguns: com eles, anexo em foto não entra na análise (a
-          extensão avisa quais ficaram de fora).</li>
+          <li><strong>“Mais baratos (o texto do PDF é extraído no seu computador)”</strong> —
+          o modelo não lê arquivo, então a extensão extrai o texto <strong>localmente</strong>:
+          a camada de texto do PDF e, nas folhas digitalizadas, o mesmo OCR local do modo
+          sigiloso. O arquivo não sai da máquina e o tamanho dele deixa de importar (um processo
+          de 120 folhas passa). Custa de <strong>10 a 25 vezes menos</strong>. O que se perde é
+          a imagem da página: carimbo, assinatura e o desenho de uma tabela chegam como texto.
+          Nos marcados “não lê imagens”, um anexo em foto entra pelo OCR local — o texto que
+          houver nela, e só ele. A primeira análise de um processo digitalizado leva alguns
+          minutos por causa do OCR; o card de preparo mostra o andamento.</li>
         </ul>
         <p>Dentro de cada grupo a ordem é do mais barato para o mais caro — na análise de autos
         quem manda na conta é o preço de <em>entrada</em>. Todos são atendidos pelo próprio
@@ -385,6 +387,14 @@
         de nomes que roda no seu navegador. Antes de cada envio, a extensão ainda
         <strong>confere o que sairia</strong> e recusa o envio se algum valor original tiver
         escapado — o turno inteiro é bloqueado, nada vai pela metade.</p>
+        <p><strong>Você aprova antes de sair (v0.56).</strong> Quando o envio traz peça
+        recém-anonimizada, uma caixa mostra o texto <strong>exatamente como vai sair</strong>,
+        peça por peça, com cada rótulo marcado — e espera. Dá para abrir cada peça, editar,
+        mascarar à mão ou liberar um valor, e só então clicar em <strong>Enviar</strong>;
+        cancelar devolve a pergunta ao campo e não manda nada. As peças já aprovadas em
+        mensagens anteriores não voltam à caixa. Se preferir enviar sem conferir, marque
+        “não perguntar de novo” na própria caixa; a opção volta em <strong>Configurações →
+        Modo sigiloso: conferir antes de enviar</strong>.</p>
         <p><strong>O que esperar.</strong> A primeira análise de cada peça demora mais,
         porque o documento é lido inteiro (e as páginas digitalizadas passam por OCR). Depois
         disso o texto fica em memória e as perguntas seguintes são normais. Como as peças vão
@@ -401,7 +411,8 @@
         <p><strong>Limite dito com honestidade:</strong> nenhum anonimizador automático é
         perfeito. O que escapar da detecção vai inteiro para o provedor. A conferência final
         cobre o que a extensão reconheceu; ela não inventa o que não detectou.
-        <strong>A revisão do que sai continua sendo sua.</strong></p>
+        <strong>A revisão do que sai continua sendo sua</strong> — e a caixa de
+        conferência antes do envio é o momento de fazê-la.</p>
       </div>
       <p>O <strong>TecJustiça Sigilo</strong>, descrito abaixo, continua útil e válido: ele é
       um programa separado, trabalha sobre arquivos fora do PJe e produz um <code>.txt</code>

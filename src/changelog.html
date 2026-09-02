@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>90 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>92 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,7 +103,83 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.54.0</span> <strong>OpenRouter</strong>: uma chave, centenas de modelos</h2>
+        <h2><span class="v novo">v0.56.0</span> <strong>Modo sigiloso</strong> que funciona, se vê e deixa você decidir</h2>
+        <p>
+          A v0.55.0 trouxe a <strong>anonimização local</strong>: com o botão <strong>Sigiloso</strong>
+          ligado, as peças deixam de ir como arquivo e vão como texto com nomes, CPF, OAB e o
+          número do processo trocados por rótulos (<code>[PESSOA_1]</code>), tudo reconhecido no
+          seu computador. Em uso real ela travava: o envio era bloqueado por “um valor do tipo
+          ORGANIZACAO apareceu” e peças ficavam de fora como se não tivessem baixado. Esta versão
+          corrige a causa.
+        </p>
+        <p>
+          <strong>O que estava errado.</strong> A lista de termos que nunca devem ser mascarados
+          (“Ministério Público”, “Tribunal de Justiça”) não carregava por uma falta no manifesto;
+          e o que o reconhecedor achava dentro de uma peça não era aplicado nos outros lugares em
+          que o mesmo nome aparece — a ficha do processo, o título da peça, a sua pergunta. O
+          órgão julgador ia mascarado na peça e em claro na ficha, e a última barreira, que
+          confere tudo o que sai, barrava o envio inteiro.
+        </p>
+        <p>
+          <strong>O que mudou.</strong> Tudo o que já foi mascarado passa a valer em todas as
+          peças e em todos os canais; órgãos públicos (“Vara Única de…”, “Tribunal de Justiça
+          do Estado…”, “Ministério Público do…”) saem em claro por prefixo, porque não são dado
+          pessoal; e quando a barreira ainda barrar algo, a conversa mostra <strong>qual valor</strong>
+          foi e oferece <strong>“Liberar neste processo”</strong> — a sua pergunta volta ao campo e é
+          reenviada sozinha. Peça que não pôde ser anonimizada agora diz isso, e não “não pôde ser
+          baixada” — e traz, por peça, os botões <strong>“Liberar … e refazer”</strong> e
+          <strong>“Revisar o texto”</strong>, que abre um editor com o texto exatamente como
+          sairia, o que sobrou em claro, e a opção de mascarar à mão ou liberar. O mascaramento
+          passou a rodar até convergir (um nome que nasce na própria peça e se repete nela em
+          outra forma era o que ainda reprovava peças). O card de preparo parou de contar 25 de 15.
+        </p>
+        <p>
+          <strong>OpenRouter: modelo de texto lê o processo inteiro.</strong> Um processo de 120
+          folhas digitalizadas era barrado com “as peças somam ~22 MB — acima do limite” num
+          DeepSeek de 1,3 milhão de tokens. Para um modelo que não lê PDF, mandar o arquivo não
+          servia para nada: o OpenRouter o convertia em texto sem OCR (folha digitalizada chegava
+          vazia) e o pedido carregava 20 MB que o modelo nunca via. Agora, para esses modelos, a
+          extensão extrai o texto <strong>no seu computador</strong> — camada de texto do PDF e
+          OCR local nas folhas digitalizadas, o mesmo motor do modo sigiloso — e envia o texto.
+          O tamanho do arquivo deixou de importar. O DeepSeek da lista passou a ser o
+          <strong>V4 Flash 0731</strong> (1,3M de contexto, mais barato); o GLM 5.3 Flash já
+          tinha 1,3M. Para os modelos que leem PDF, o limite de tamanho passa a ser o do
+          fabricante (Google, Anthropic ou OpenAI) e a mensagem, quando bater nele, diz qual é a
+          saída. Liberar um nome libera todas as formas dele; uma peça de texto longa deixou de
+          ser cortada quando o conjunto cabe na janela.
+        </p>
+        <p>
+          <strong>Você aprova antes de sair.</strong> A anonimização automática é a primeira
+          passada — e ela pode deixar passar um nome. Até aqui a extensão mascarava e enviava
+          no mesmo gesto; a auditoria mostrava o que <em>tinha saído</em>. Agora, quando o envio
+          traz peça recém-anonimizada, uma caixa mostra o texto <strong>exatamente como vai
+          sair</strong>, peça por peça, com cada rótulo marcado, e espera: dá para abrir, editar,
+          mascarar à mão ou liberar um valor, e só então <strong>Enviar</strong>. Cancelar devolve
+          a pergunta ao campo e não manda nada. Vale para o chat, a minuta e o mapa; peças já
+          aprovadas antes não voltam à caixa. Quem preferir enviar sem conferir desliga em
+          “não perguntar de novo” — e religa em Configurações.
+        </p>
+        <p>
+          <strong>E os nomes voltam na tela.</strong> A IA recebe <code>[PESSOA_1]</code>; a
+          resposta aparece com o nome restaurado pela tabela deste computador (marcado, com o
+          rótulo ao passar o mouse). A minuta ganhou <strong>“Restaurar nomes”</strong> no editor.
+          E o mesmo nome escrito de formas diferentes (“BANCO X”, “Banco X S.A.”) recebe um
+          rótulo só — antes cada forma virava uma “parte” diferente para a IA.
+        </p>
+        <p>
+          <strong>E o modo se vê.</strong> Com ele ligado, o cabeçalho do painel fica verde, a
+          tarja sob ele mostra quantos dados estão protegidos, e a janela, o botão Enviar e o
+          campo de mensagem acompanham. Não é mais uma borda fina que passa despercebida.
+        </p>
+        <p>
+          <strong>Animações que dá para ver.</strong> Abrir, fechar, expandir, ir para a lateral
+          e recolher a lista de peças ganharam movimento perceptível — antes as transições
+          existiam com 120 ms e 6 px, e ninguém as via.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.54.0</span> <strong>OpenRouter</strong>: uma chave, centenas de modelos</h2>
         <p>
           Até aqui, usar um modelo novo significava abrir conta no fornecedor dele e colar mais
           uma chave. O <strong>OpenRouter</strong> é um intermediário que resolve isso: você cria
@@ -1865,6 +1941,8 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.56.0</span> <span class="dot-marco"></span></td><td>02/09/2026</td><td><strong>Modo sigiloso corrigido, visível e negociável.</strong> A lista de termos nunca mascarados não carregava (faltava no manifesto); o que o reconhecedor achava numa peça não era aplicado na ficha, nos títulos e na pergunta, e a última barreira bloqueava o envio por um órgão público. Agora tudo o que já foi mascarado vale em todos os canais, órgãos públicos saem em claro por prefixo, e um bloqueio vira decisão na conversa: “Liberar neste processo” devolve a pergunta ao campo e reenvia. Peça que não pôde ser anonimizada diz isso; o card não conta além do total. Os nomes voltam na tela (a resposta chega com rótulos e é reidentificada pela tabela local, marcada) e no editor de minutas (“Restaurar nomes”); formas diferentes do mesmo nome recebem um rótulo só. O painel inteiro muda de cor com o modo ligado (cabeçalho verde, tarja com a contagem, botão Enviar). Abrir, fechar, trocar de modo e recolher a lista ganharam animações perceptíveis. OpenRouter: modelo que não lê PDF (DeepSeek, GLM) recebe o texto extraído no computador do usuário, com OCR local — o processo de 120 folhas que batia em “~22 MB” passa; DeepSeek atualizado para o V4 Flash 0731 (1,3M); teto de tamanho por fabricante nos modelos que leem PDF; liberar um nome libera todas as formas dele. E o envio passou a pedir aprovação: uma caixa mostra o texto anonimizado exatamente como vai sair, peça por peça, com editar/mascarar/liberar, antes de qualquer coisa ir ao provedor (chat, minuta e mapa; desligável nas Configurações)</td></tr>
+            <tr><td><span class="v">0.55.0</span></td><td>01/09/2026</td><td><strong>Anonimização local antes do envio (modo sigiloso).</strong> Com o botão Sigiloso ligado, as peças vão como texto com nomes, CPF, CNPJ, OAB, e-mail, telefone e o número do processo substituídos por rótulos estáveis, reconhecidos no próprio computador por regras com dígito verificador, pela ficha do processo e por um modelo de entidades em português; o PDF não sai da máquina. Uma guarda no serviço da extensão confere cada requisição antes de sair. Caixa de auditoria mostra o texto exatamente como foi enviado e a tabela de reidentificação, que fica só na tela; relatório de conferência para baixar sem a tabela</td></tr>
             <tr><td><span class="v">0.54.0</span> <span class="dot-marco"></span></td><td>01/09/2026</td><td><strong>OpenRouter como quarto provedor.</strong> Uma chave passa a dar acesso a centenas de modelos de vários fornecedores, incluindo os que a extensão não lista — basta colar o identificador. As capacidades de cada modelo (janela, preço, se lê PDF) vêm do catálogo público do próprio OpenRouter, então modelo novo não exige atualização da extensão. O <strong>custo do rodapé passa a ser medido</strong>, não calculado por tabela: é o valor debitado da conta. Em todo envio a extensão exige fornecedores que <strong>não retenham os dados</strong> para treino — autos não podem virar material de treinamento. Como ele não recebe arquivos por referência, as peças são reenviadas a cada mensagem, e há um teto de ~15 MB por conversa avisado antes do envio. Claude, Gemini e GPT diretos seguem intocados</td></tr>
             <tr><td><span class="v">0.53.1</span></td><td>29/08/2026</td><td><strong>Anexo em foto ou print agora passa pelo OCR.</strong> O mesmo documento fotografado tinha sorte diferente conforme tivesse chegado ao processo: como PDF, era lido; como JPEG ou PNG, saía do arquivo de texto com a linha <em>“anexo em imagem — o texto depende do OCR”</em> e <strong>ninguém tinha chamado o motor</strong>. O rótulo foi escrito quando a extensão ainda não tinha OCR, e virou promessa quando ele entrou — quem lia entendia que o reconhecimento havia falhado. Agora a imagem vai ao mesmo motor das páginas digitalizadas, com a confiança marcada; quando ela realmente não tem texto legível (a foto de uma estrada, por exemplo), o arquivo diz isso, que é diferente de dizer que não tentou</td></tr>
             <tr class="marco"><td><span class="v">0.53.0</span></td><td>29/08/2026</td><td><span class="dot-marco"></span><strong>O texto das peças pode sair um arquivo por documento, com índice.</strong> A extração entregava um <code>.md</code> só, com o processo inteiro dentro — indivisível: para trabalhar uma peça era preciso carregar todas, uma busca não dizia de qual documento veio o resultado e não dava para pedir a uma ferramenta de IA “leia só a contestação”. O menu do ⬇ Baixar .zip ganhou <strong>“Extrair o texto (um .md por peça)…”</strong>: um <code>.zip</code> com um arquivo por peça, numerado na ordem do processo e com o id no nome, e um <strong><code>indice.md</code></strong> com link para cada uma, quantas páginas tem e quantas o OCR leu. Cada arquivo traz os dados da peça no topo, então se explica sozinho fora da pasta. <strong>Nada foi tirado</strong>: o arquivo único continua no mesmo lugar e ainda vai junto, dentro do pacote</td></tr>

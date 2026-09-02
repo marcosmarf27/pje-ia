@@ -103,6 +103,59 @@
     // para impedir, com outro disfarce.
     const proximo = new Map();
 
+    // A CHAVE de uma pessoa ou organização é CANÔNICA, não a string normalizada
+    // crua. "BANCO BRADESCO", "Banco Bradesco S.A." e "BANCO BRADESCO S/A" são
+    // a mesma parte; "MARIA JOSÉ DA SILVA" e "Maria Jose Silva" são a mesma
+    // pessoa. Com uma chave por forma, cada uma ganhava um rótulo — e o modelo,
+    // vendo [ORGANIZACAO_13], [_15], [_23] e [_36], concluía que eram QUATRO
+    // requeridas e escrevia isso na resposta (aconteceu). Sufixo societário e
+    // palavras de ligação saem da chave; o VALOR guardado continua sendo a
+    // primeira forma vista, e as outras formas ficam em `formas` para a guarda
+    // e o gazetteer conhecerem todas.
+    const RE_SUFIXO_SOC = /\s+(s\s*\.?\s*a\.?|s\/a|ltda\.?|me|epp|eireli|cia\.?|companhia|s\s*\.?\s*s\.?)$/;
+    const STOP = new Set(["de", "da", "do", "das", "dos", "e", "di", "del", "della", "von", "van"]);
+    function chaveDe(rot, valor) {
+      let c = normalizar(valor).trim();
+      if (rot !== "PESSOA" && rot !== "ORGANIZACAO") return c;
+      c = c.replace(/[.,;:()"'“”«»]/g, " ").replace(/\s+/g, " ").trim();
+      if (rot === "ORGANIZACAO") {
+        let antes;
+        do {
+          antes = c;
+          c = c.replace(RE_SUFIXO_SOC, "").trim();
+        } while (c !== antes && c.length);
+      }
+      const toks = c.split(" ").filter((t) => t && !STOP.has(t));
+      return toks.join(" ");
+    }
+
+    // Uma pessoa citada só pelo sobrenome composto ("JOSÉ DA SILVA") depois do
+    // nome completo ("MARIA JOSÉ DA SILVA") é a mesma pessoa — desde que só
+    // UMA entrada do mapa contenha esse trecho. Dois tokens no mínimo dos dois
+    // lados: um nome sozinho ("Maria") casa qualquer Maria e não decide nada.
+    // Ambíguo (duas candidatas) vira rótulo novo: errar para o lado de
+    // separar custa legibilidade; fundir duas pessoas custa a resposta.
+    function procurarVariante(rot, chave) {
+      if (rot !== "PESSOA" && rot !== "ORGANIZACAO") return null;
+      const tabela = porTipo.get(rot);
+      if (!tabela) return null;
+      const toks = chave.split(" ");
+      if (toks.length < 2) return null;
+      const agulha = " " + chave + " ";
+      let achado = null;
+      let quantos = 0;
+      for (const [k, reg] of tabela) {
+        if (k.split(" ").length < 2) continue;
+        const palheiro = " " + k + " ";
+        if (palheiro.includes(agulha) || agulha.includes(palheiro)) {
+          quantos++;
+          achado = reg;
+          if (quantos > 1) return null;
+        }
+      }
+      return achado;
+    }
+
     function anotar(rot, chave, n, valor) {
       let tabela = porTipo.get(rot);
       if (!tabela) {
@@ -112,19 +165,28 @@
       // O VALOR guardado é o PRIMEIRO que apareceu, em caixa original — é ele
       // que a reidentificação devolve. Guardar o normalizado devolveria
       // "joao da silva" para o PJe.
-      const reg = { n: n, valor: String(valor) };
+      const reg = { n: n, valor: String(valor), liberado: false, formas: new Set([String(valor)]) };
       tabela.set(chave, reg);
-      porRotulo.set(rot + "_" + n, { tipo: rot, valor: reg.valor });
+      porRotulo.set(rot + "_" + n, { tipo: rot, valor: reg.valor, reg: reg });
       if (n >= (proximo.get(rot) || 1)) proximo.set(rot, n + 1);
       return reg;
     }
 
     function rotular(tipo, valor) {
       const rot = rotuloDe(tipo);
-      const chave = normalizar(valor).trim();
+      const chave = chaveDe(rot, valor);
       if (!chave) return null;
       const tabela = porTipo.get(rot);
-      const reg = (tabela && tabela.get(chave)) || anotar(rot, chave, proximo.get(rot) || 1, valor);
+      let reg = tabela && tabela.get(chave);
+      if (!reg) reg = procurarVariante(rot, chave);
+      // LIBERADO sai em claro em QUALQUER forma. Sem esta linha, o NER achava
+      // "Banco Bradesco S.A." na peça seguinte, a chave canônica caía no
+      // registro liberado e o texto saía com um rótulo que a guarda já não
+      // procura — uma forma em claro e outra mascarada, para a mesma parte.
+      // `mascarar` pula a ocorrência cujo rótulo é null.
+      if (reg && reg.liberado) return null;
+      if (!reg) reg = anotar(rot, chave, proximo.get(rot) || 1, valor);
+      else reg.formas.add(String(valor));
       return "[" + rot + "_" + reg.n + "]";
     }
 
@@ -134,9 +196,9 @@
     // reescrito, ele já saiu. Medido antes da correção: um mapa {1, 3} voltava
     // como {1, 2}, `[PESSOA_3]` deixava de resolver e `[PESSOA_2]`, que nunca
     // existiu, passava a devolver o nome de quem era o 3.
-    function restaurar(tipo, n, valor) {
+    function restaurar(tipo, n, valor, liberado, formas) {
       const rot = rotuloDe(tipo);
-      const chave = normalizar(valor).trim();
+      const chave = chaveDe(rot, valor);
       if (!chave) return null;
       // MESMO valor sob DOIS números (o arquivo traz {n:1,"JOSÉ"} e {n:4,"José"}):
       // vence o PRIMEIRO, e o segundo número deixa de resolver. Não acontece por
@@ -149,8 +211,14 @@
       if (tabela && tabela.has(chave)) return "[" + rot + "_" + tabela.get(chave).n + "]";
       // Número ausente ou inválido: cai na numeração normal em vez de descartar
       // o item — perder uma entrada do mapa é perder a chave de um nome.
-      if (!Number.isInteger(n) || n < 1) return rotular(tipo, valor);
-      anotar(rot, chave, n, valor);
+      if (!Number.isInteger(n) || n < 1) {
+        const rotNovo = rotular(tipo, valor);
+        if (rotNovo && liberado) liberar(rotNovo);
+        return rotNovo;
+      }
+      const reg = anotar(rot, chave, n, valor);
+      if (liberado) reg.liberado = true;
+      for (const f of Array.isArray(formas) ? formas : []) if (f) reg.formas.add(String(f));
       return "[" + rot + "_" + n + "]";
     }
 
@@ -161,12 +229,53 @@
 
     // A lista que alimenta a TRAVA. Devolve o valor ORIGINAL de cada coisa
     // mascarada: é o que não pode aparecer no que sai.
+    // Cada item leva também o RÓTULO ([PESSOA_1]). É por ele que a trava, ao
+    // bloquear, consegue dizer QUAL valor apareceu sem escrever o valor no erro
+    // — o rótulo não é o dado, e é o que permite ao content resolver
+    // `paraValor(rotulo)` e oferecer ao usuário decidir se aquilo é sigiloso.
+    // Só o que NÃO foi liberado: o liberado pode sair em claro por decisão do
+    // usuário, então a guarda não o procura e o gazetteer do mapa não o mascara.
+    // UMA entrada por FORMA vista: a guarda e o gazetteer procuram literais, e
+    // "Banco Bradesco S.A." não é substring de "BANCO BRADESCO".
     function proibidos() {
       const out = [];
       for (const [tipo, tabela] of porTipo) {
-        for (const reg of tabela.values()) out.push({ tipo: tipo, valor: reg.valor });
+        for (const reg of tabela.values()) {
+          if (reg.liberado) continue;
+          const rotulo = "[" + tipo + "_" + reg.n + "]";
+          for (const f of reg.formas) out.push({ tipo: tipo, valor: f, rotulo: rotulo });
+        }
       }
       return out;
+    }
+
+    // LIBERA um rótulo e devolve o valor que ele designa (ou null). É a saída
+    // do "isto não é dado pessoal": o usuário decidiu que "Tribunal de Justiça
+    // do Estado do Ceará" pode sair em claro.
+    //
+    // O item NÃO é apagado — é MARCADO. Uma minuta gerada antes da liberação
+    // ainda carrega `[ORGANIZACAO_1]`, e o botão de restaurar nomes do editor
+    // precisa continuar resolvendo esse rótulo (`paraValor`/`reidentificar`);
+    // apagar o item deixaria a marca órfã num texto já produzido — a mesma
+    // família do defeito "hidratar renumerava", mais branda. O que muda com a
+    // marca: sai de `proibidos()` (a guarda deixa de procurá-lo), sai de
+    // `quantos()` (a tarja conta o que está PROTEGIDO) e aparece na tabela da
+    // auditoria como liberado. A numeração continua fechada: `rotular` usa
+    // maior + 1, então o número nunca é reaproveitado por outra pessoa.
+    function liberar(rotulo) {
+      const chaveRot = String(rotulo || "").replace(/^\[|\]$/g, "");
+      const r = porRotulo.get(chaveRot);
+      if (!r) return null;
+      r.reg.liberado = true;
+      return r.valor;
+    }
+
+    // Todas as formas já vistas de um rótulo (a canônica inclusive). É o que
+    // `liberarRotulo` põe no `negado`: liberar "BANCO BRADESCO" tem de liberar
+    // "Banco Bradesco S.A." junto, senão a variante volta pelo detector.
+    function formasDe(rotulo) {
+      const r = porRotulo.get(String(rotulo || "").replace(/^\[|\]$/g, ""));
+      return r ? [...r.reg.formas] : [];
     }
 
     // A tabela que a caixa de auditoria mostra e que o editor usa para
@@ -176,16 +285,24 @@
       const out = [];
       for (const [tipo, tab] of porTipo) {
         for (const reg of tab.values()) {
-          out.push({ rotulo: "[" + tipo + "_" + reg.n + "]", tipo: tipo, n: reg.n, valor: reg.valor });
+          out.push({
+            rotulo: "[" + tipo + "_" + reg.n + "]",
+            tipo: tipo,
+            n: reg.n,
+            valor: reg.valor,
+            liberado: !!reg.liberado,
+            formas: [...reg.formas].filter((f) => f !== reg.valor),
+          });
         }
       }
       out.sort((a, b) => (a.tipo === b.tipo ? a.n - b.n : a.tipo < b.tipo ? -1 : 1));
       return out;
     }
 
+    // Conta o que está PROTEGIDO: item liberado sai em claro e não conta.
     function quantos() {
       let n = 0;
-      for (const tab of porTipo.values()) n += tab.size;
+      for (const tab of porTipo.values()) for (const reg of tab.values()) if (!reg.liberado) n++;
       return n;
     }
 
@@ -195,6 +312,8 @@
       restaurar: restaurar,
       paraValor: paraValor,
       proibidos: proibidos,
+      liberar: liberar,
+      formasDe: formasDe,
       tabela: tabela,
       quantos: quantos,
       serializar: () => ({ processo: processo || null, itens: tabela() }),
@@ -212,7 +331,7 @@
     // um mapa que só `rotular` construiu, e deixa de valer no instante em que
     // um item é apagado. A ordenação ficou só para a leitura sair estável.
     const ordenados = bruto.itens.slice().sort((a, b) => a.n - b.n);
-    for (const it of ordenados) m.restaurar(it.tipo, it.n, it.valor);
+    for (const it of ordenados) m.restaurar(it.tipo, it.n, it.valor, !!it.liberado, it.formas);
     return m;
   }
 
@@ -336,14 +455,32 @@
   // que acabaram de ser mascarados. É a mesma ideia da trava, no nível da peça
   // — medir o resultado em vez de confiar no processo. A trava do envio
   // continua existindo porque esta aqui não vê os outros doze canais.
+  //
+  // A busca exige FRONTEIRA DE PALAVRA dos dois lados — a MESMA regra da trava
+  // (`verificarSaida`) e do gazetteer (`acharGazetteer`). Sem ela esta
+  // conferência era mais dura que as outras duas: uma parte chamada "Ana"
+  // fazia a peça inteira ser DESCARTADA por causa de uma "Fernanda" no texto,
+  // e o usuário via "a anonimização desta peça não ficou completa" sobre um
+  // texto que estava completo. Três verificadores, uma regra.
   function conferir(mascarado, mapa) {
     const alvo = normalizar(mascarado);
     for (const p of mapa.proibidos()) {
       const agulha = normalizar(p.valor).trim();
       if (agulha.replace(/[^\p{L}\p{N}]/gu, "").length < 3) continue;
-      if (alvo.includes(agulha)) return { ok: false, tipo: p.tipo };
+      let de = alvo.indexOf(agulha);
+      while (de !== -1) {
+        const ate = de + agulha.length;
+        if (!ehLetraOuDigito(alvo[de - 1]) && !ehLetraOuDigito(alvo[ate])) {
+          return { ok: false, tipo: p.tipo, rotulo: p.rotulo };
+        }
+        de = alvo.indexOf(agulha, de + 1);
+      }
     }
     return { ok: true };
+  }
+
+  function ehLetraOuDigito(c) {
+    return c !== undefined && /[\p{L}\p{N}]/u.test(c);
   }
 
   const api = {

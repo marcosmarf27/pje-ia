@@ -185,12 +185,14 @@
               - `data-pdf="nativo"`: o modelo lê o arquivo (input_modalities tem
                 "file"). A página vai como PÁGINA — carimbo, assinatura, tabela
                 e documento digitalizado inclusive.
-              - `data-pdf="conversor"`: o modelo é de TEXTO. O OpenRouter
-                converte o PDF antes, de graça (plugin file-parser, engine
-                cloudflare-ai — ver ENGINE_PDF_CONVERSOR; o padrão DELE é o
-                mistral-ocr, que é pago por página). Custa 10× a 25× menos e
-                perde a imagem da página: peça digitalizada sai vazia, e para
-                ela o caminho é o OCR local (⬇ → Extrair o texto).
+              - `data-pdf="conversor"`: o modelo é de TEXTO. Desde a v0.56.0 a
+                EXTENSÃO extrai o texto localmente (pdf.js + OCR local, o mesmo
+                caminho do modo sigiloso, sem a máscara) e manda texto — o
+                conversor do OpenRouter (cloudflare-ai, ENGINE_PDF_CONVERSOR)
+                não faz OCR e o PDF inline era peso morto (o "22 MB" de um
+                processo de 120 folhas). Custa 10× a 25× menos e
+                perde a imagem da página: o que a folha tem de texto chega (a
+                digitalizada, pelo OCR local); carimbo e desenho de tabela, não.
               - `data-pdf="livre"`: o campo do identificador. Não afirma nada —
                 quem descobre as capacidades é o catálogo.
 
@@ -210,9 +212,9 @@
           <option value="or:anthropic/claude-sonnet-5">Claude Sonnet 5 (1M tokens — bom para redigir)</option>
           <option value="or:anthropic/claude-opus-5">Claude Opus 5 (1M tokens — o mais capaz)</option>
         </optgroup>
-        <optgroup label="OpenRouter — mais baratos (o PDF é convertido em texto)" data-prov="openrouter" data-pdf="conversor">
+        <optgroup label="OpenRouter — mais baratos (o texto do PDF é extraído no seu computador)" data-prov="openrouter" data-pdf="conversor">
           <option value="or:z-ai/glm-5.3-flash">GLM 5.3 Flash (1,3M tokens — barato e lê imagens)</option>
-          <option value="or:deepseek/deepseek-v4-flash">DeepSeek V4 Flash (1M tokens — o mais barato; NÃO lê imagens)</option>
+          <option value="or:deepseek/deepseek-v4-flash-0731">DeepSeek V4 Flash 0731 (1,3M tokens — o mais barato; NÃO lê imagens: fotos entram por OCR local)</option>
         </optgroup>
         <optgroup label="OpenRouter — qualquer outro" data-prov="openrouter" data-pdf="livre">
           <option value="or:*">Outro modelo — colar o identificador…</option>
@@ -303,6 +305,23 @@
           texto das peças, a lista do que foi selecionado e as conversas — <b>não</b> os
           PDFs. Tudo é apagado depois de 14 dias, e cada processo tem um botão
           “Esquecer” no próprio painel.</i>
+        </label>
+        <!-- Conferência humana antes de enviar, no modo sigiloso. Ligada por
+             padrão: a anonimização automática erra, e o que escapar vai inteiro
+             ao provedor. A opção existe para quem aceita o risco de propósito
+             — e mora AQUI, e não só na caixa, para a dispensa ter caminho de
+             volta (a caixa oferece "não perguntar de novo"; esta linha é o
+             "voltar a perguntar"). -->
+        <label class="field field-check">
+          <span class="chk">
+            <input type="checkbox" id="sigiloAprovar" checked>
+            <b>Modo sigiloso: conferir as peças anonimizadas antes de enviar</b>
+          </span>
+          <i>Depois do reconhecimento local, uma caixa mostra o texto exatamente como
+          vai sair, peça por peça, e espera a sua aprovação — dá para editar, mascarar
+          à mão ou liberar um valor antes de enviar. A detecção automática pode deixar
+          passar um nome, e o que escapar vai inteiro para a IA. Desligue só se aceitar
+          esse risco; a caixa de auditoria continua mostrando o que saiu.</i>
         </label>
         <!-- Apagar TUDO de uma vez. Existe por duas razões: é a saída para quem
              quer começar do zero sem desligar o recurso, e é o que torna a

@@ -72,6 +72,21 @@
      lê como textura de capa sem virar um bloco verde. Ver DESIGN.md §5. */
   --ok-tarja: #b9d9c8;
   --ok-ink: #1e5c44;  /* texto sobre confirmação suave */
+  /* MODO SIGILOSO — a família que veste o painel inteiro quando ele está
+     ligado (cabeçalho, marca, botão primário, moldura). Verde PROFUNDO no
+     cabeçalho e não só uma borda: o modo muda o que SAI da máquina, e a
+     primeira versão (borda fina + faixa clara) foi lida como "uma coisinha
+     verde" — um estado que não se vê é um estado que se esquece ligado, ou
+     desligado. Ver DESIGN.md §5, "Modo sigiloso". ESPELHADO no ui.css. */
+  --sig-hd: #143f33;        /* cabeçalho no modo */
+  --sig-mark-de: #35946e;   /* quadrado da marca — 180deg */
+  --sig-mark-para: #1d6248;
+  --sig-btn-de: #2f9268;    /* botão primário e launcher */
+  --sig-btn-para: #1f6a4b;
+  --sig-btn-de-h: #35a074;
+  --sig-btn-para-h: #1a5c41;
+  --sig-tarja: #a7d2bd;     /* hachura da tarja, mais funda que --ok-tarja */
+  --sig-halo: rgba(47, 146, 104, 0.28); /* anel externo da janela e foco */
   --warn: #de8b2c;
   --erro: #a5301f;
   /* Aviso SUAVE — informa sem impedir de continuar. Veste o relatório de peças
@@ -164,12 +179,17 @@
      decidiu — segurá-lo é cobrar pedágio pelo próprio clique); movimento entre
      dois estados é simétrico. Nada de bounce: isto é ferramenta de trabalho
      jurídico, não brinquedo. */
-  --dur-1: 120ms;  /* feedback imediato e saídas */
-  --dur-2: 180ms;  /* entradas de interface */
-  --dur-3: 240ms;  /* mudanças de layout (colapsos) */
-  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);   /* entra e assenta */
-  --ease-in: cubic-bezier(0.32, 0, 0.67, 0);    /* sai do caminho */
-  --ease-move: cubic-bezier(0.45, 0, 0.55, 1);  /* de um estado a outro */
+  /* Quatro durações. A v0.55 tinha três, de 120 a 240ms, e o usuário relatou
+     "nenhuma animação" numa máquina SEM prefers-reduced-motion — medido: o CSS
+     rodava, e 120ms com 6px de deslocamento é invisível para quem não está
+     procurando. Movimento que só um teste enxerga não comunica nada. */
+  --dur-1: 140ms;  /* feedback imediato e saídas curtas */
+  --dur-2: 220ms;  /* entradas de interface, saída da janela */
+  --dur-3: 300ms;  /* mudanças de layout (colapsos, backdrop) */
+  --dur-4: 380ms;  /* a JANELA: abrir, e a troca de modo (FLIP) */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);   /* entra e assenta */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);        /* sai do caminho */
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);  /* de um estado a outro */
   position: fixed;
   right: 18px;
   bottom: 18px;
@@ -207,7 +227,7 @@ button > svg { flex: none; }
     display var(--dur-2) allow-discrete;
 }
 @starting-style {
-  .wrap:not(.open) .launcher { opacity: 0; transform: scale(0.92); }
+  .wrap:not(.open) .launcher { opacity: 0; transform: scale(0.5); }
 }
 /* o emoji da balança; --fs-lg é o degrau da escala mais próximo do 16px que
    estava aqui — literal fora da escala era a única violação restante */
@@ -263,7 +283,7 @@ button > svg { flex: none; }
 .wrap.open .launcher {
   display: none;
   opacity: 0;
-  transform: scale(0.92);
+  transform: scale(0.5);
   transition:
     opacity var(--dur-1) var(--ease-in),
     transform var(--dur-1) var(--ease-in),
@@ -271,8 +291,17 @@ button > svg { flex: none; }
 }
 
 /* ---------- Backdrop (modo expandido) ---------- */
-.backdrop { display: none; position: fixed; inset: 0; background: rgba(5, 32, 46, 0.45); z-index: -1; }
-.wrap.expanded .backdrop { display: block; }
+.backdrop {
+  display: none; position: fixed; inset: 0; background: rgba(5, 32, 46, 0.45); z-index: -1;
+  opacity: 0;
+  transition:
+    opacity var(--dur-3) var(--ease-out),
+    display var(--dur-3) allow-discrete;
+}
+.wrap.expanded .backdrop { display: block; opacity: 1; }
+@starting-style {
+  .wrap.expanded .backdrop { opacity: 0; }
+}
 
 /* ---------- Painel ---------- */
 .panel {
@@ -310,27 +339,29 @@ button > svg { flex: none; }
      sai e é para lá que ele volta, então a janela CRESCE do botão em vez de
      aparecer no meio do nada. Os outros modos redefinem a origem. */
   opacity: 0;
-  transform: translateY(6px) scale(0.985);
+  /* 72% e 20px: a janela NASCE do botão e VOLTA para ele. A v0.55 usava 98,5% e
+     6px — tecnicamente uma animação, na prática um piscar. */
+  transform: translateY(20px) scale(0.72);
   transform-origin: bottom right;
   transition:
-    opacity var(--dur-1) var(--ease-in),
-    transform var(--dur-1) var(--ease-in),
-    display var(--dur-1) allow-discrete;
+    opacity var(--dur-2) var(--ease-in),
+    transform var(--dur-2) var(--ease-in),
+    display var(--dur-2) allow-discrete;
 }
 .wrap.open .panel {
   display: flex;
   opacity: 1;
   transform: none;
   transition:
-    opacity var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-out),
-    display var(--dur-2) allow-discrete;
+    opacity var(--dur-4) var(--ease-out),
+    transform var(--dur-4) var(--ease-out),
+    display var(--dur-4) allow-discrete;
 }
 /* O estado de PARTIDA da entrada. Sem isto o painel nasce já opaco: o
    `@starting-style` é o que dá ao navegador um "antes" para interpolar quando o
    elemento passa de `display:none` a renderizado. */
 @starting-style {
-  .wrap.open .panel { opacity: 0; transform: translateY(6px) scale(0.985); }
+  .wrap.open .panel { opacity: 0; transform: translateY(20px) scale(0.72); }
 }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -406,6 +437,23 @@ button > svg { flex: none; }
    errado faz a entrada parecer um salto lateral. */
 .wrap.expanded .panel, .wrap.livre .panel { transform-origin: center; }
 .wrap.lateral .panel { transform-origin: right center; }
+/* CADA MODO LARGO PRECISA DO PRÓPRIO ESTADO FECHADO. `.wrap.expanded .panel`
+   fixa `transform: translate(-50%, -50%)` para centrar — e, por vir depois no
+   arquivo com a mesma especificidade, vencia o `.panel` fechado: no expandido,
+   no lateral e no livre a janela abria e fechava SEM movimento nenhum, só um
+   corte de opacidade. O `:not(.open)` sobe a especificidade e dá a cada modo
+   uma partida coerente com a sua origem: o modal encolhe no centro, a lateral
+   desliza da borda direita, a janela livre encolhe onde está. */
+.wrap.expanded:not(.open) .panel { transform: translate(-50%, -50%) scale(0.85); }
+.wrap.full:not(.open) .panel { transform: scale(0.96); }
+.wrap.lateral:not(.open) .panel { transform: translateX(48px); }
+.wrap.livre:not(.open) .panel { transform: scale(0.85); }
+@starting-style {
+  .wrap.expanded.open .panel { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  .wrap.full.open .panel { opacity: 0; transform: scale(0.96); }
+  .wrap.lateral.open .panel { opacity: 0; transform: translateX(48px); }
+  .wrap.livre.open .panel { opacity: 0; transform: scale(0.85); }
+}
 
 /* ---------- A JANELA ERGUIDA (arrasto) ----------
    Sombra mais funda e 0,5% de escala: o gesto ganha peso e a janela descola da
@@ -1277,9 +1325,198 @@ button > svg { flex: none; }
 .falhas li { margin: 3px 0; line-height: 1.4; word-break: break-word; }
 .falhas li b { font-weight: 600; color: var(--text); }
 .falhas li span { color: var(--muted); }
+/* Ações por peça no relatório (modo sigiloso): liberar o valor que reprovou,
+   ou revisar o texto. Botões secundários, no tom do aviso. */
+.falha-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.falha-acao {
+  border: 1px solid var(--warn-line); background: var(--surface); color: var(--warn-ink);
+  border-radius: var(--r-md); padding: 3px 9px; font: inherit; font-size: var(--fs-micro);
+  font-weight: 600; cursor: pointer;
+}
+.falha-acao:hover:not(:disabled) { border-color: var(--warn); }
+.falha-acao:disabled { opacity: 0.6; cursor: default; }
+
+/* EDITOR DE REVISÃO do texto anonimizado. Fixo e centrado na viewport (o
+   `.wrap` é um container de tamanho zero, como a `.audbox` e o `.selmenu`). */
+.sig-edit {
+  position: fixed; z-index: 2147483646;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, calc(100vw - 24px)); height: min(80vh, 680px);
+  background: var(--surface); border: 2px solid var(--ok);
+  border-radius: var(--r-md); box-shadow: var(--sh-pop), 0 0 0 4px var(--sig-halo);
+  display: flex; flex-direction: column; overflow: hidden;
+  font-size: var(--fs-meta); color: var(--text);
+}
+.se-hd {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px;
+  background: var(--sig-hd); color: #fff;
+}
+.se-t { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-x { border: none; background: transparent; color: #fff; cursor: pointer; opacity: 0.8; display: inline-flex; padding: 4px; border-radius: var(--r-ctrl); }
+.se-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+.se-nota { margin: 0; padding: 8px 14px 6px; color: var(--text-2); font-size: var(--fs-micro); line-height: 1.45; }
+.se-sobras { padding: 0 14px 6px; display: flex; flex-direction: column; gap: 4px; }
+.se-sobra {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 5px 8px; background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-left: 3px solid var(--warn); border-radius: var(--r-sm);
+}
+.se-sobra b { color: var(--ink); overflow-wrap: anywhere; }
+.se-sobra code { font-family: var(--ff-mono); font-size: var(--fs-nano); background: var(--surface); padding: 1px 5px; border-radius: 4px; }
+.se-sobra button {
+  border: 1px solid var(--warn-line); background: var(--surface); color: var(--warn-ink);
+  border-radius: var(--r-md); padding: 2px 8px; font: inherit; font-size: var(--fs-nano); font-weight: 600; cursor: pointer;
+}
+.se-sobra button:hover:not(:disabled) { border-color: var(--warn); }
+.se-ok { color: var(--ok-ink); font-size: var(--fs-micro); font-weight: 600; }
+.se-ta {
+  flex: 1; min-height: 120px; margin: 0 14px; padding: 8px 10px;
+  border: 1px solid var(--line-input); border-radius: var(--r-sm);
+  font-family: var(--ff-mono); font-size: var(--fs-micro); line-height: 1.5;
+  color: var(--text); background: var(--surface-2); resize: none; outline: none;
+}
+.se-ta:focus { border-color: var(--ok-ink); box-shadow: 0 0 0 3px var(--sig-halo); }
+.se-msg { padding: 4px 14px 0; min-height: 18px; color: var(--erro); font-size: var(--fs-micro); font-weight: 600; }
+.se-acts { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 14px 12px; }
+.se-usar {
+  border: none; border-radius: var(--r-ctrl); padding: 7px 16px; cursor: pointer;
+  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); color: #fff;
+  font: inherit; font-size: var(--fs-ui); font-weight: 600; box-shadow: var(--sh-btn);
+}
+.se-usar:disabled { opacity: 0.6; cursor: default; }
+.se-canc {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  border-radius: var(--r-ctrl); padding: 7px 14px; font: inherit; font-size: var(--fs-ui); cursor: pointer;
+}
+
+/* CONFERÊNCIA ANTES DE ENVIAR (`.sigok`). Reaproveita a casca do `.plib` (como a
+   `.gwarn`); o que é próprio é o cabeçalho no verde do modo — quem está nesta
+   caixa está DENTRO do modo sigiloso, decidindo o que SAI — e a lista de peças
+   com o texto exato, pintado pelas MESMAS marcas da auditoria (`.aud-rot`). O
+   corpo é a única região que rola: no painel flutuante uma peça de 40 folhas
+   empurraria os botões para fora do card, e um modal sem "Enviar" à vista é um
+   beco sem saída. A nota de honestidade usa `--warn-*` (aviso suave, não
+   bloqueio): ela informa o limite do detector, e a decisão é do usuário. */
+.sigok .plib-hd { background: var(--sig-hd); border-bottom-color: var(--sig-hd); }
+.sigok .plib-hd .t { color: #fff; display: inline-flex; align-items: center; gap: 8px; }
+.sigok .plib-close { color: rgba(255, 255, 255, 0.85); }
+.sigok .plib-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.sigok-card {
+  border-color: var(--ok);
+  box-shadow: 0 18px 48px rgba(5, 32, 46, 0.3), 0 0 0 4px var(--sig-halo);
+}
+.sigok-body {
+  padding: 0 var(--sp-4) var(--sp-2);
+  font-size: var(--fs-ui); line-height: 1.5; color: var(--ink);
+  overflow: auto; flex: 1 1 auto; min-height: 0;
+}
+.sigok-resumo { margin: var(--sp-3) 0 var(--sp-2); font-weight: 600; }
+.sigok-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: var(--sp-2b); }
+.sigok-nota {
+  font-size: var(--fs-meta); color: var(--warn-ink); line-height: 1.45;
+  background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-2b);
+}
+.sk-row { border-top: 1px dashed var(--line); padding: var(--sp-2) 0; }
+.sk-cab { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: var(--fs-meta); }
+.sk-t { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.sk-m { color: var(--muted); font-size: var(--fs-nano); }
+.sk-acts { margin-left: auto; display: inline-flex; gap: 6px; }
+.sk-acts button {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  border-radius: var(--r-md); padding: 2px 8px; font: inherit; font-size: var(--fs-nano);
+  font-weight: 600; cursor: pointer;
+}
+.sk-acts button:hover:not(:disabled) { border-color: var(--ok-ink); color: var(--ok-ink); }
+.sk-acts button:disabled { opacity: 0.6; cursor: default; }
+/* O texto que vai sair: monoespaçado, quebrando linha, com rolagem PRÓPRIA —
+   mesma anatomia do `.aud-texto`, porque é a mesma prova. */
+.sk-txt {
+  margin: 6px 0 2px; padding: 8px; max-height: 260px; overflow: auto;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  font-family: var(--ff-mono); font-size: var(--fs-nano); line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word;
+}
+.sigok-nao {
+  flex: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-meta); color: var(--muted); cursor: pointer;
+}
+.sigok-nao input { width: 14px; height: 14px; accent-color: var(--ok-ink); }
+.sigok-card .plib-form-acts { flex: none; padding: var(--sp-2b) var(--sp-4) var(--sp-3); }
+.sigok .plib-save { background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para)); }
+
 .falhas-dica {
   margin: 8px 0 0; font-size: var(--fs-micro); color: var(--muted);
   line-height: 1.45;
+}
+
+/* Bloqueio da guarda de saída: atenção máxima DENTRO da conversa. Não é a
+   `.alertbar` do rodapé porque a conversa não precisa ser zerada — o usuário
+   decide se UM valor é de fato pessoal. A bolha usa os mesmos tokens dos
+   callouts de alerta, preservando uma única escala de gravidade. */
+.msg.sigilo-bloqueio {
+  align-self: flex-start; color: var(--alerta-ink);
+  background: var(--alerta-bg); border: 1px solid var(--alerta-line);
+  border-left: 4px solid var(--alerta); border-bottom-left-radius: var(--r-xs);
+}
+.sigilo-bloqueio .sb-h {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-meta); font-weight: 600; color: var(--alerta-ink);
+}
+.sigilo-bloqueio .sb-h svg { flex: none; }
+.sigilo-bloqueio .sb-p,
+.sigilo-bloqueio .sb-nota {
+  margin: var(--sp-2b) 0 0; color: var(--text); font-size: var(--fs-meta);
+}
+.sigilo-bloqueio .sb-nota { color: var(--text-2); }
+.sigilo-bloqueio .sb-valor {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  margin-top: var(--sp-2b); padding: var(--sp-2b) var(--sp-3);
+  background: var(--surface); border: 1px solid var(--alerta-line);
+  border-radius: var(--r-sm);
+}
+.sigilo-bloqueio .sb-valor > span {
+  font-size: var(--fs-micro); font-weight: 600; color: var(--muted);
+}
+.sigilo-bloqueio .sb-valor > strong {
+  font-size: var(--fs-body); font-weight: 600; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sigilo-bloqueio .sb-acts { margin-top: var(--sp-3); }
+.sigilo-bloqueio .sb-liberar {
+  border: 1px solid var(--alerta); background: var(--surface); color: var(--alerta);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
+  font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.sigilo-bloqueio .sb-liberar:hover:not(:disabled) {
+  background: var(--alerta); color: var(--surface);
+}
+.sigilo-bloqueio .sb-liberar:focus-visible {
+  outline: none; border-color: var(--line-focus); box-shadow: var(--ring);
+}
+.sigilo-bloqueio .sb-liberar:disabled { opacity: 0.72; cursor: default; }
+.sigilo-bloqueio .sb-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.sigilo-bloqueio .sb-aud {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3b);
+  font-family: inherit; font-size: var(--fs-meta); font-weight: 600; cursor: pointer;
+}
+.sigilo-bloqueio .sb-aud:hover { border-color: var(--line-focus); color: var(--pje-2); }
+.sigilo-bloqueio.liberado { border-left-color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+.sigilo-bloqueio.liberado .sb-h { color: var(--ok-ink); }
+/* Item LIBERADO na tabela da auditoria: fica (uma minuta antiga pode carregar
+   o rótulo) mas sai em claro — a linha diz isso em vez de afirmar proteção. */
+.aud-map.liberado code { opacity: 0.55; text-decoration: line-through; }
+.aud-lib {
+  font-size: var(--fs-nano); font-weight: 600; color: var(--ok-ink);
+  background: var(--ok-bg); border: 1px solid var(--ok-line);
+  border-radius: var(--r-pill); padding: 1px 7px; white-space: nowrap;
 }
 
 
@@ -1401,6 +1638,16 @@ button > svg { flex: none; }
 .mapacard-hint { font-size: var(--fs-meta); color: var(--muted); margin-top: 4px; }
 .wrap.expanded .msg { font-size: var(--fs-lg); max-width: 82%; }
 .msg.user { background: var(--pje-2); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+/* NOME REIDENTIFICADO NA TELA (modo sigiloso). A IA recebeu `[PESSOA_1]`; o
+   nome é restaurado aqui, pela tabela deste computador. A marca diz que o
+   trecho passou por isso (fundo de confirmação suave + traço pontilhado, e o
+   rótulo no title) — sem ela, o usuário não saberia que o nome nunca saiu. */
+.msg .reid {
+  background: var(--ok-bg); color: inherit;
+  border-bottom: 1px dotted var(--ok-ink); border-radius: 3px;
+  padding: 0 2px; cursor: help;
+}
+.msg.user .reid { background: rgba(255, 255, 255, 0.18); border-bottom-color: #fff; }
 .msg.user .txt { white-space: pre-wrap; }
 .msg.assistant { background: #fff; border: 1px solid var(--line); align-self: flex-start; border-bottom-left-radius: 4px; }
 
@@ -2316,23 +2563,36 @@ button > svg { flex: none; }
 }
 .sigbar {
   flex: none;
-  display: flex; align-items: center; gap: 6px;
-  padding: 3px 16px;
-  border-bottom: 1px solid var(--ok-line);
-  /* O hachurado da tarja: passo de 8px (4 claros + 4 do tom), a −45°. Fino o
-     bastante para ler como textura de capa, largo o bastante para não cintilar
-     na rolagem. */
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 2px solid var(--ok);
+  /* O hachurado da tarja: passo de 12px (6 claros + 6 do tom), a −45°. Mais
+     largo e mais fundo que a primeira versão (8px sobre --ok-tarja), que de
+     longe lia como uma faixa lisa e clara — a listra é o que faz a faixa ser
+     tarja de capa e não mais uma barra de status. */
   background-image: repeating-linear-gradient(
     -45deg,
-    var(--ok-bg) 0 4px,
-    var(--ok-tarja) 4px 8px
+    var(--ok-bg) 0 6px,
+    var(--sig-tarja) 6px 12px
   );
 }
+.sigbar > svg { width: 14px; height: 14px; flex: none; color: var(--ok-ink); }
 .sb-t {
-  font-size: var(--fs-nano); font-weight: 600; color: var(--ok-ink);
-  background: var(--surface); padding: 1px 7px; border-radius: var(--r-pill);
-  border: 1px solid var(--ok-line);
+  font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.02em;
+  color: var(--ok-ink);
+  background: var(--surface); padding: 2px 9px; border-radius: var(--r-pill);
+  border: 1px solid var(--ok);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+/* A contagem do que está protegido, na própria tarja: é a única marca do modo
+   que fica no campo de visão o tempo todo, e "está protegendo o quê?" é a
+   pergunta que ela responde sem que se abra nada. Sólida, sobre --ok. */
+.sb-n {
+  margin-left: auto; flex: none;
+  font-size: var(--fs-nano); font-weight: 700; letter-spacing: 0.03em;
+  color: #fff; background: var(--ok); border-radius: var(--r-pill); padding: 2px 9px;
+  white-space: nowrap;
 }
 /* A MOLDURA da janela. Duas rotas foram tentadas antes e as duas falham por um
    motivo de plataforma — nenhum aparece no `getComputedStyle`, que reporta tudo
@@ -2357,14 +2617,47 @@ button > svg { flex: none; }
 
    `--ok` e não `--ok-line`: medido no pixel, o `#cbe3d8` da linha some contra o
    fundo da página do tribunal. Moldura que não se vê não é moldura. */
-.wrap.sigiloso .panel { border-color: var(--ok); }
+.wrap.sigiloso .panel {
+  border: 2px solid var(--ok);
+  box-shadow: var(--sh-pop), 0 0 0 4px var(--sig-halo);
+}
+/* Os modos sem borda (tela cheia e lateral) ganham a marca na ARESTA que
+   encosta na página: é a única borda que eles têm. Declarados com a classe do
+   modo para vencer o `border: none` daquelas regras por especificidade, e não
+   por ordem no arquivo. */
+.wrap.sigiloso.full .panel { border: none; border-top: 4px solid var(--ok); box-shadow: none; }
+.wrap.sigiloso.lateral .panel {
+  border: none; border-left: 4px solid var(--ok);
+  box-shadow: -14px 0 40px rgba(5, 32, 46, 0.28);
+}
+/* O CABEÇALHO troca de cor. É a metade da janela que mais se olha, e um modo
+   que muda o que sai da máquina não pode viver numa borda de 1px: o verde
+   profundo no lugar do azul institucional é o que faz o estado ser visto de
+   relance, de qualquer canto da tela. O quadrado da marca e o botão primário
+   acompanham — uma família, um sinal. */
+.wrap.sigiloso .hd { background: var(--sig-hd); }
+.wrap.sigiloso .hd .mark {
+  background: linear-gradient(180deg, var(--sig-mark-de), var(--sig-mark-para));
+}
+.wrap.sigiloso .send,
+.wrap.sigiloso .launcher {
+  background: linear-gradient(180deg, var(--sig-btn-de), var(--sig-btn-para));
+}
+.wrap.sigiloso .send:hover:not(:disabled),
+.wrap.sigiloso .launcher:hover {
+  background: linear-gradient(180deg, var(--sig-btn-de-h), var(--sig-btn-para-h));
+}
 /* O CAMPO DE MENSAGEM é o lugar mais significativo da marca: é ali que se
    escreve o que vai sair. O foco continua mandando (`--pje`), porque foco é
    estado momentâneo e o modo é permanente — a borda do modo não pode engolir o
    sinal de "estou digitando aqui". */
-.wrap.sigiloso .inrow { border-color: var(--ok); }
+/* O campo fica na família do modo também no foco: a primeira versão voltava
+   ao azul ao digitar, e o resultado era uma janela verde com um campo azul —
+   lido como "a cor e a borda estão horríveis". Foco é um halo mais forte da
+   MESMA cor. */
+.wrap.sigiloso .inrow { border: 1.5px solid var(--ok); background: #fbfdfc; }
 .wrap.sigiloso .inrow:focus-within {
-  border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  border-color: var(--ok-ink); box-shadow: 0 0 0 3px var(--sig-halo);
 }
 /* Em 420px a frase inteira não cabe ao lado do padding; ela trunca com ellipsis
    (regra do `.sb-t`) e o hachurado sozinho já carrega o estado. */
@@ -2379,7 +2672,7 @@ button > svg { flex: none; }
   .panel, .wrap.open .panel,
   .launcher, .wrap.open .launcher,
   .docs, .wrap.expanded .docs, .wrap.livre-wide .docs,
-  .docs-rail, .sigbar, .msg, .alertbar {
+  .docs-rail, .sigbar, .msg, .alertbar, .backdrop {
     transition-duration: 1ms;
   }
   .panel, .wrap.open .panel { transform: none; }
@@ -2616,10 +2909,11 @@ button > svg { flex: none; }
    amarra botão, tarja e selo numa coisa só — o usuário aprende um sinal, não
    três. */
 .tgl-sigilo.on {
-  background: var(--ok-bg); border-color: var(--ok-line);
-  color: var(--ok-ink); font-weight: 600;
+  background: var(--ok); border-color: var(--ok);
+  color: #fff; font-weight: 600;
 }
-.tgl-sigilo.on:hover { border-color: var(--ok); }
+.tgl-sigilo.on svg { color: #fff; }
+.tgl-sigilo.on:hover { background: var(--sig-btn-para); border-color: var(--sig-btn-para); }
 /* Selo do MODO SIGILOSO. Usa os tokens --ok-*, e a escolha e' deliberada:
    sigiloso ligado nao e' aviso nem alerta, e' CONFIRMACAO de que uma protecao
    esta valendo. Pintado de --warn ele competiria com a .sel-nota e com o

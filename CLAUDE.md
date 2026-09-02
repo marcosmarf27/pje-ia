@@ -365,8 +365,11 @@ desenho, e as diferenças abaixo não são detalhes de implementação.
   **PDF Inputs** — a autoridade sobre entrada de PDF numa chat completion —
   documenta só `file_data` (URL pública ou data URL). **Conferido em
   01/09/2026.** As peças do PJe também não podem ir por URL: exigem cookie de
-  sessão. Logo, **todo PDF viaja INLINE em base64, em TODO turno** (a API é
-  stateless). Consequências, todas por CAP e nenhuma por nome de provedor:
+  sessão. Logo, **para o modelo que LÊ PDF, o arquivo viaja INLINE em base64,
+  em TODO turno** (a API é stateless); **para o modelo que NÃO lê
+  (`aceitaPdf:false`), a peça vira TEXTO extraído localmente** — ver "Modelo
+  que não lê PDF" abaixo. Consequências, todas por CAP e nenhuma por nome de
+  provedor:
   - cap **`filesApi: false`** → `precisaUpload` (content.js) sai na primeira
     linha, `montarBlocos` cai sozinho no ramo base64 (o `fileProvider` nunca
     casa) e `podeAnexar` passa a exigir bytes. Peça vinda da memória de caso só
@@ -375,11 +378,60 @@ desenho, e as diferenças abaixo não são detalhes de implementação.
     chave do OpenRouter nunca sair num request para `api.anthropic.com`.
   - **`MAX_TOTAL_B64_CHARS_OPENROUTER` (20 MB) não é teto de fallback, é o teto
     do caminho NORMAL.** Conservador porque quem recebe o request no fim é o
-    provedor upstream que o OpenRouter escolher, e esse limite ele não publica.
+    provedor upstream que o OpenRouter escolher, e esse limite ele não publica
+    (conferido de novo em 02/09/2026: a doc só diz que existe um 413). O que se
+    SABE é o limite dos provedores diretos, por isso a cap **`tetoB64Chars`**
+    (`TETO_B64_POR_AUTOR` em openrouter.js: google 15 MB, anthropic 24,
+    openai 40) o substitui por autor do slug; sem fonte, vale o padrão. E a
+    **mensagem do teto nomeia o modelo e a SAÍDA** (modelo de texto) — sem
+    isso "o OpenRouter é inútil num processo de 120 folhas" era a conclusão
+    natural, e foi a relatada.
   - **Se um dia o content part aceitar `file_id`, o ponto de mudança é ÚNICO**:
     `montarBlocos` já prefere `d.fileId` quando `d.fileProvider` casa — basta a
     cap deixar de ser `false`. A nota existe para essa porta ficar aberta sem
     que ninguém precise redescobrir o caminho.
+- **MODELO QUE NÃO LÊ PDF (OU IMAGEM) RECEBE O TEXTO EXTRAÍDO AQUI**
+  (`precisaTextoLocal` + `entradaTextoLocal` + `extrairTextoLote` + `textoCache`
+  em content.js, v0.56.0). Caso real que abriu a rodada: processo de 34 peças e
+  120 folhas digitalizadas, "~22 MB — acima do limite" num DeepSeek de 1,3
+  milhão de tokens. Para um modelo de texto mandar o arquivo não compra NADA:
+  o OpenRouter o converte antes de entregar (engine `cloudflare-ai`, que **não
+  faz OCR** — a folha digitalizada chega vazia) e o corpo carrega 20 MB de
+  base64 que o modelo nunca vê. Agora o texto sai do pdf.js (camada de texto)
+  e do PP-OCR local (folha digitalizada) — o MESMO caminho do modo sigiloso,
+  sem a máscara — e vai como bloco `document` de texto: ~3 KB por folha em vez
+  de ~140 KB. Regras:
+  - **Decidido POR CAP** (`aceitaPdf === false` para PDF, `aceitaImagem ===
+    false` para imagem — só o `false` EXPLÍCITO): os provedores diretos seguem
+    byte a byte. O sigilo tem precedência (`entradaDoc` devolve o mascarado
+    antes de olhar isto).
+  - **Mesmo funil do sigilo** (`baixarSelecionadas`, depois do bloco do sigilo)
+    e o gancho dos ANEXOS do input no `onSend` (eles não passam pelo funil).
+    `entradaDoc` **falha fechada**: sem texto extraído a peça não vai — o
+    arquivo nunca é a saída certa para quem não o lê. Falha de extração vira
+    item de `falhas` com `texto:true` e motivo próprio, nunca "falha de
+    download" nem "expirou no provedor" (`semConteudo` distingue).
+  - **`textoDaPeca` é o ponto ÚNICO da extração**, cacheado em `textoCache` (no
+    TOPO do IIFE, junto do `sigiloCache`, pela zona morta temporal: a
+    estimativa o lê do callback de seleção). Uma extração por peça e por
+    sessão: trocar de modo ou de modelo não refaz o OCR; o sigilo mascara o
+    texto já extraído. Folha cujo OCR FALHOU não fixa o cache (a falha pode ser
+    transitória; `MARCA_OCR_FALHOU`).
+  - **`CAPS_OR_PADRAO` tem `aceitaPdf:false`**: catálogo fora do ar ⇒ um modelo
+    nativo recebe texto naquela sessão. Degradação aceita — erra para o lado
+    que funciona em qualquer modelo.
+  - **`tetoTextoDe` passou a cortar SÓ quando a soma não cabe** no orçamento
+    (0,55 × janela): dividir por N cortava a inicial de 40 folhas com 34 peças
+    ocupando 8% da janela. Se não cabe, vale a repartição de antes.
+  - **`estimativaLocalTokens` mede o TEXTO** (via `entradaParaMedir`) assim que
+    ele existe; antes, páginas × `tokensPagina`. O `maxPages` não se aplica ao
+    texto (`paginasDe` conta só `kind:"pdf"`); a guarda por tokens continua.
+  - O rótulo do grupo do conversor mudou para "o texto do PDF é extraído no
+    seu computador", e "NÃO lê imagens" ganhou "fotos entram por OCR local".
+  - Coberto por `t-texto-local.mjs` (jsdom, content.js real): modelo de texto
+    (nenhum base64, OCR local rodou, `## Página n` no bloco), NÃO-REGRESSÃO do
+    modelo nativo (base64 como sempre, zero OCR), PDF de 25 MB passando no
+    modelo de texto e barrado no nativo com a mensagem que aponta a saída.
 - **NÃO HÁ CONTAGEM DE TOKENS.** Nenhum análogo ao `count_tokens` da Anthropic
   ou ao `/responses/input_tokens` da OpenAI. Cap **`contagemTokens: false`**, e
   o worker responde `{tokens: null, semContagem: true, contextTokens}` em vez de
@@ -495,9 +547,14 @@ desenho, e as diferenças abaixo não são detalhes de implementação.
     página**, então peça digitalizada sai vazia (o caminho dela é o OCR local).
     `livre`: só o marcador `or:*`, que não afirma nada.
     - **Exigir PDF nativo de TODA a lista foi a primeira versão, e era exigir
-      demais**: os modelos mais baratos do catálogo (DeepSeek V4 Flash a US$
-      0,079/0,159, GLM 5.3 Flash a 0,075/0,250, os dois com 1M+) são de texto, e
-      o próprio provedor resolve o PDF por eles. O que muda não é "funciona ou
+      demais**: os modelos mais baratos do catálogo (DeepSeek V4 Flash 0731 a
+      US$ 0,065/0,18, GLM 5.3 Flash a 0,075/0,25, os dois com 1,31M) são de
+      texto — e desde a v0.56.0 é a EXTENSÃO que extrai o texto para eles (ver
+      "Modelo que não lê PDF"), não o conversor do provedor. ARMADILHA do
+      catálogo: o slug curto `deepseek/deepseek-v4-flash` aponta para a revisão
+      VELHA (0423, 1M, mais cara); a nova tem sufixo de data
+      (`deepseek-v4-flash-0731`, 1,31M). O alias `~deepseek/…-latest` não serve:
+      o `~` não passa em `modeloConhecido`. O que muda não é "funciona ou
       não", é a qualidade do que chega — e isso é escolha do usuário, desde que
       o rótulo diga. Por isso o grupo do conversor promete sobre IMAGEM no
       rótulo ("lê imagens" / "NÃO lê imagens"): é a diferença que se sente, e o
@@ -2000,11 +2057,15 @@ Regras deste par:
     vai no cabeçalho do `.md` e não pode inflar com anexos que saíram vazios.
     Vazio é resultado LEGÍTIMO numa foto (a estrada rural não tem texto) e entra
     em `pagsSemOcr`, com rótulo que distingue "não achou" de "não tentou".
-- **INVARIANTE: o texto extraído NUNCA entra no payload de um request.** A extração
-  da v0.21.0 foi removida (`6248c2c`) exatamente por isso: no Gemini, que cobra 258
-  tokens fixos por página de PDF e **não cobra o texto nativo**, mandar o texto
-  extraído levou o contexto de 59% para 153%. A aritmética não mudou. O destino aqui
-  é o disco do usuário; `montarBlocos` não conhece este caminho.
+- **INVARIANTE: o texto extraído NUNCA entra no payload de um request A UM
+  MODELO QUE LÊ PDF.** A extração da v0.21.0 foi removida (`6248c2c`) exatamente
+  por isso: no Gemini, que cobra 258 tokens fixos por página de PDF e **não
+  cobra o texto nativo**, mandar o texto extraído levou o contexto de 59% para
+  153%. A aritmética não mudou. O destino aqui é o disco do usuário;
+  `montarBlocos` não conhece este caminho. **As DUAS exceções são por CAP**, e
+  em nenhuma o arquivo seria a alternativa: o modo sigiloso (o arquivo não pode
+  sair) e o modelo que NÃO lê PDF (`aceitaPdf:false` — o provedor converteria
+  sem OCR; ver "Modelo que não lê PDF" na seção OpenRouter).
 - **Roda no DOCUMENTO OFFSCREEN**, não no content script (1,7 MB de pdf.js em toda
   página `jus.br`, expostos ao tribunal) nem no service worker (sem `new Worker`, e
   morto no meio). Permissão `offscreen` **não gera aviso de instalação**; a CSP
@@ -2669,12 +2730,19 @@ acha (nomes de terceiros no meio do texto). `ANON.fundir` junta os dois e
   mapa silenciosamente incompleto.
 - **A deny list é ESTRUTURAL, não polimento** (`src/config/deny-list.json`):
   mascarar "Ministério Público" ou "Banco do Brasil" não protege ninguém e
-  arruína a leitura jurídica. **LIMITAÇÃO CONHECIDA**: ela casa o valor INTEIRO
-  normalizado, então `"Ministério Público do Estado do Ceará"` — a forma que
-  aparece nos autos — NÃO casa e é mascarada. Erra na direção segura; alargar
-  (prefixo com fronteira de palavra, exigindo ≥ 2 palavras no termo, senão
-  `"ac"`/`"ce"` negariam demais) mexe no envelope de segurança e é decisão a
-  tomar com medição.
+  arruína a leitura jurídica. Há DUAS formas deliberadas de casar: as listas
+  simples (`*`, `PERSON`, `ORGANIZATION`, `LOCATION`) exigem o valor INTEIRO
+  normalizado; `prefixos` aceita o termo no começo com fronteira de palavra.
+  É o que cobre `"Ministério Público do Estado do Ceará"`, `"Tribunal de
+  Justiça do Estado do Ceará"` e `"Vara Única de Ocara"` sem liberar
+  `"TribunalX"`. Prefixos de uma palavra só existem na lista curada de
+  instituições (`vara`, `comarca`, `delegacia`); cabeça que uma EMPRESA também
+  usa (`escola`, `fundação`, `agência`, `câmara` — a CDL é "Câmara de
+  Dirigentes Lojistas" —, `sistema`, `central`, `núcleo`) NÃO entra solta, só
+  qualificada (`câmara cível`, `seção judiciária`, `agência nacional`): o
+  `negado` vale TAMBÉM para o gazetteer da ficha, e um prefixo largo mandaria
+  "Fundação Bradesco" ou "Escola X Ltda" — parte com CNPJ — em claro. A regra
+  tem teste caso a caso (`t-v56-unit`).
 
 **O mapa de pseudônimos é a CHAVE DE REIDENTIFICAÇÃO** — o artefato mais
 sensível que a extensão produz. `[PESSOA_1]` tem de ser a MESMA pessoa em todas
@@ -2740,10 +2808,12 @@ silêncio. Uma pós-condição sobre o corpo serializado não envelhece.
   dar para inspecionar não é razão para liberar. A URL é conferida
   **DECODIFICADA** — `Elioneudo%20Evaristo` não casa `elioneudo evaristo`,
   porque a normalização colapsa espaço em branco e não `%20`.
-- **O erro NUNCA mostra o valor encontrado** (só o tipo e a posição) e **nunca é
-  `retryable`** — explicitamente `false`, não por `undefined` ser falsy: o filtro
-  é determinístico pelo conteúdo, e re-tentar é o mesmo bloqueio com o custo do
-  backoff.
+- **O erro que cruza o worker NUNCA mostra o valor encontrado**: leva tipo,
+  posição e o rótulo (`[ORGANIZACAO_3]`), que não é o dado. O content resolve o
+  rótulo contra o mapa que já está na máquina e só então mostra o valor ao dono
+  dos autos. E **nunca é `retryable`** — explicitamente `false`, não por
+  `undefined` ser falsy: o filtro é determinístico pelo conteúdo, e re-tentar
+  sem uma decisão seria o mesmo bloqueio com o custo do backoff.
 - **`isentas`**: as regiões de texto CONSTANTE do próprio programa (os dois
   system prompts). Sem elas, bastaria o detector rotular "Brasil" ou "Justiça"
   numa peça para a guarda encontrar o valor DENTRO do nosso próprio system e
@@ -2756,13 +2826,176 @@ palavra da extensão — e a palavra da extensão não é auditoria. O sinal de 
 peça faltava estava no próprio código: `PSEUD.tabela()` existe com o comentário
 "a tabela que a caixa de auditoria mostra" e **não tinha um único consumidor**.
 
+**Falso positivo da guarda vira decisão LOCAL, não erro de rede.** A bolha
+`.sigilo-bloqueio` mostra o valor resolvido localmente e oferece “Liberar neste
+processo”. A escolha entra em `casodb` junto do mapa (`sigilo.liberados`) e o
+item é MARCADO como liberado no mapa (`PSEUD.liberar`), nunca apagado: sai de
+`proibidos()` (a guarda deixa de procurá-lo) e de `quantos()` (a tarja conta o
+que está protegido), mas `paraValor`/`reidentificar` continuam resolvendo o
+rótulo — uma minuta gerada ANTES da liberação ainda carrega `[ORGANIZACAO_1]`,
+e apagar o item deixaria a marca órfã num texto já produzido (a família do
+"hidratar renumerava"). A tabela da auditoria mostra a linha como liberada. O
+valor passa a alimentar o mesmo `negado` usado por regex, gazetteer e NER —
+**em TODAS as formas vistas** (`PSEUD.formasDe`): liberado só pela forma
+canônica, "Banco Bradesco S.A." voltava pelo NER na peça seguinte, `chaveDe`
+caía no registro liberado e o texto saía com um rótulo que a guarda já não
+procurava. Por isso **`rotular` devolve `null` para registro liberado** (em
+qualquer forma, inclusive a variante que `procurarVariante` fundiria) e
+`mascarar` pula a ocorrência. E **`sobrasDoMapa` NÃO escreve no mapa**: o
+rótulo viaja no achado (`acharGazetteer` copia `it.rotulo` dos itens do mapa),
+porque rotular num caminho que só mostra o que sobrou criava forma nova em
+silêncio. As peças PENDENTES de revisão recebem a liberação como o
+`sigiloCache`. Os textos já mascarados no `sigiloCache` recebem o valor de
+volta sem repetir OCR/NER; a guarda é re-armada antes do reenvio. No chat, a
+bolha do turno bloqueado sai também do transcript antes de o texto voltar ao
+campo — sem isso a liberação criaria duas perguntas iguais na conversa gravada.
+
+**O mapa já conhecido participa das peças seguintes e dos canais curtos.** O
+NER não é determinístico: pode achar um nome na contestação e deixá-lo passar na
+réplica. `achadosDoMapa` reaplica o gazetteer com tudo o que o mapa já conhece,
+e `mascararCurto` faz o mesmo na ficha, títulos e pergunta. É o que mantém UM
+rótulo por valor e evita que a pós-condição descarte a peça seguinte por uma
+ocorrência que o NER dela não viu. Era a causa REAL dos dois sintomas da
+v0.55.0 em uso: o bloqueio "um valor do tipo ORGANIZACAO apareceu (posição
+5637)" — o órgão julgador vai na ficha do system em TODO request, o NER o
+rotulava dentro da peça, e `mascararCurto` (só detectores determinísticos)
+nunca o via — e as "7 peças não puderam ser baixadas", que na verdade tinham
+baixado e caído na pós-condição `PSEUD.conferir` por um valor que o mapa
+conhecia de outra peça. **`PSEUD.conferir` passou a exigir fronteira de
+palavra**, a MESMA regra da trava e do gazetteer: sem ela "Ana" dentro de
+"Fernanda" reprovava a peça inteira. Três verificadores, uma regra.
+
+**O MASCARAMENTO DE UMA PEÇA RODA ATÉ CONVERGIR** (`mascararAteConvergir`):
+a primeira passada mascara o que os detectores acharam, mas o mapa CRESCE
+durante ela — uma pessoa vista pela primeira vez nesta peça ganha rótulo ali —
+e a mesma pessoa reaparece no mesmo texto numa forma que o NER não marcou
+("BANCO BRADESCO S.A." depois de "Banco Bradesco"). Era o que ainda derrubava
+peças depois do gazetteer do mapa ("um valor do tipo PESSOA, [PESSOA_31],
+sobrou": o valor nascera na própria peça). As passadas seguintes reaplicam o
+gazetteer com o mapa atualizado até não sobrar nada (teto de 4; o mapa é
+finito). Coberto pela 3ª peça do `t-sigilo-56`.
+
+**O ENVIO PEDE APROVAÇÃO HUMANA — a conferência fica ENTRE o mascaramento e o
+request** (`sigiloAguardando` + `confirmarEnvioSigiloso` + `exigirAprovacaoSigilo`
+em content.js; `.sigok` em panel.js). Até aqui a extensão mascarava e ENVIAVA no
+mesmo gesto: a auditoria mostrava o que tinha SAÍDO, e conferir depois não
+desfaz um vazamento — o próprio guia dizia "a revisão do que sai continua sendo
+sua" sem dar o momento de fazê-la. Agora, quando o turno tem peça recém-mascarada,
+uma caixa mostra o texto exatamente como vai sair (peça por peça, com as MESMAS
+marcas da auditoria, via `pintarMarcas`), oferece "Ver o texto"/"Editar" (o
+editor `.sig-edit` abre POR CIMA da caixa, e a linha repinta ao fechar — daí o
+`onFechar` do editor) e só sai no "Enviar N peças". Regras que não podem cair:
+- **NÃO mora em `baixarSelecionadas`**, ao contrário do gancho do mascaramento:
+  no chat os ANEXOS do input são anonimizados DEPOIS daquele funil, e uma caixa
+  lá dentro ou não os mostraria ou apareceria duas vezes por turno. É chamada
+  nos TRÊS fluxos (chat, minuta, mapa), depois de tudo o que mascara e antes de
+  qualquer rede — inclusive antes do `subirAnexos` e do pré-voo.
+- **Três call sites são uma lista, e o que garante a regra é o PORTÃO DURO**:
+  `stream` e `estimarContexto` recusam request cujo `opts.ids` contenha peça em
+  `sigiloAguardando`. Quem esquecer de chamar a caixa recebe um erro, nunca um
+  envio. `refinarContexto` trata peça aguardando como peça sem máscara — sem
+  isso, um envio CANCELADO na caixa deixava o texto no `sigiloCache` e o próximo
+  clique num checkbox mandava `count_tokens` ao provedor com o que o usuário
+  acabara de recusar (coberto por teste).
+- **Só o DELTA do turno** (interseção do conjunto com o que vai no request): o
+  que já saiu antes não volta à caixa; peça mascarada e depois desmarcada
+  continua esperando sem travar nada.
+- **Cancelar é decisão, não erro** (`e.cancelado`): o chat tira a bolha do
+  transcript e devolve o texto ao campo (mesmo tratamento do bloqueio da
+  guarda); minuta e mapa só escrevem no status. As peças FICAM no conjunto — o
+  próximo envio pergunta de novo, e sem refazer OCR nem NER.
+- **`chrome.storage.local.sigiloAprovar`** (default ligado, `!== false`):
+  "não perguntar de novo" na própria caixa e a volta em Configurações →
+  privacidade. Desligada, `confirmarEnvioSigiloso` ESVAZIA o conjunto sem caixa
+  — sem isso o portão duro barraria o envio.
+- **A auditoria só lista o que SAIU**: `dadosAuditoria` pula peça em
+  `sigiloAguardando` (a caixa e o relatório afirmam "enviada"), e a aprovação
+  repinta o selo — sem isso o retrato era o de `anonimizarLote`, tirado antes.
+- Coberto em `t-turno-sigiloso.mjs` (a caixa aparece antes de qualquer porta ou
+  `countTokens`; editar de dentro dela muda o request; modos `cancelar` e
+  `semaprovar`; a auditoria conta 0 após cancelar e 1 após aprovar) e em
+  `t-sigilo-56.mjs` (as três peças do turno na caixa). Minuta e mapa chamam a
+  MESMA função e passam no `node --check`, mas o portão deles não tem teste de
+  ponta a ponta.
+
+**PEÇA REPROVADA NA PÓS-CONDIÇÃO VIRA DECISÃO, não só relatório.** O texto
+mascarado até onde deu fica em `sigiloPendentes` (jogá-lo fora obrigaria a
+refazer OCR e NER só para o usuário olhar o que sobrou), e o relatório do chat
+traz por peça as AÇÕES (`f.acoes`): "Liberar «valor» e refazer" (libera e
+devolve a peça à seleção — o próximo envio a anonimiza de novo sem aquele
+valor) e "Revisar o texto", que abre `panel.abrirEditorSigilo`: o texto exato
+que sairia, o que sobrou em claro com rótulo e valor, "Mascarar todas"
+(troca literal, sem caixa), "Liberar neste processo" e um textarea livre.
+"Usar este texto" passa por `aceitarTextoRevisado` — que CONFERE de novo
+(`PSEUD.conferir`) antes de gravar no `sigiloCache` e remarcar a peça; texto
+que ainda tem valor em claro não entra, e o editor diz qual. É a resposta ao
+pedido do usuário de "ver e editar ele mesmo para continuar a análise": a
+anonimização automática é a primeira passada, a conferência final é humana, e
+a interface precisa dar a mão para essa conferência em vez de só desmarcar a
+peça.
+
+**A TABELA DESFAZ A ANONIMIZAÇÃO NA TELA** (`panel.setReidentificador` +
+`renderMd`/`preencherComReid`): a resposta volta com `[PESSOA_1]` e o painel
+mostra o NOME, numa `<mark class="reid">` com o rótulo no `title`. Até aqui a
+tabela existia e a tela não a usava — o usuário lia "[ORGANIZACAO_13]" numa
+resposta sobre o processo dele. A troca é só de EXIBIÇÃO: transcript,
+exportação e histórico continuam com o rótulo (foi ele que saiu). O valor entra
+por placeholder PUA (`\uE020 n \uE021`, sempre como escape no fonte), a mesma
+técnica das citações: atravessa o escape e o inline sem ser interpretado. A
+bolha do usuário faz o mesmo por nós de DOM. A MINUTA ganhou o botão
+"Restaurar nomes" no editor: `guardarMinuta` grava `casoChave`, e o editor pede
+o mapa ao worker (`casoLer`) e troca os rótulos nos NÓS DE TEXTO do documento
+(nunca por replace no HTML). O mapa mental ainda mostra os rótulos crus.
+
+**VARIANTES DO MESMO NOME RECEBEM O MESMO RÓTULO** (`chaveDe` +
+`procurarVariante` em pseudonimos.js). "BANCO BRADESCO", "Banco Bradesco
+S.A." e "BANCO BRADESCO S/A" ganhavam TRÊS rótulos, e o modelo, vendo
+[ORGANIZACAO_13], [_15], [_23] e [_36], concluía que eram quatro requeridas e
+escrevia isso na resposta (aconteceu). A chave canônica tira sufixo societário
+e palavras de ligação; um trecho de ≥ 2 tokens contido em (ou contendo) UMA
+única entrada funde com ela ("JOSÉ DA SILVA" depois de "MARIA JOSÉ DA SILVA");
+ambíguo vira rótulo novo, e um token só nunca funde. As formas vistas ficam em
+`reg.formas` e `proibidos()` emite UMA entrada por forma — a guarda e o
+gazetteer procuram literais. `hidratar` preserva as formas.
+
+**O FLIP LÊ A BASE COM A TRANSIÇÃO CSS DESLIGADA.** O `.panel` tem
+`transition: transform`, e a troca de classe muda a transform base (nenhuma →
+`translate(-50%, -50%)`): no instante seguinte à troca a transform computada
+ainda era a ANTIGA (frame zero da transição) e `getBoundingClientRect` também.
+A base lida era a identidade, o FLIP terminava com a janela no canto e ela
+SALTAVA para o centro — "vai para a esquerda e volta para o meio". Com
+`transition: none` inline + reflow antes de medir, o computado é o destino de
+verdade; a transição volta num `setTimeout(0)`, quando já não há mudança a que
+reagir. Medido no headless: `flip-from: matrix(1,0,0,1,-560,-361) …` e UMA
+animação em voo, não duas.
+
+**A PERGUNTA DIGITADA É RE-MASCARADA DEPOIS DAS PEÇAS** (`onSend`, logo antes
+de montar o `userContent`), e a ordem importa: a primeira máscara roda no topo
+do handler com o mapa de ANTES do turno, e o NER só encontra a "Cooperativa X"
+dentro da peça durante `baixarSelecionadas`. Sem a segunda passada, "a
+Cooperativa X pagou?" saía em claro ao lado da peça com `[ORGANIZACAO_1]` e a
+guarda bloqueava o turno por um valor que a própria extensão acabara de
+aprender. A bolha do usuário acompanha (`panel.atualizarTextoUsuario`): ela
+mostra o que FOI à API.
+
+**O `deny-list.json` PRECISA estar em `web_accessible_resources`.** Ele é lido
+por `fetch(chrome.runtime.getURL(...))` de dentro do content script, e o
+Chrome nega recurso de extensão a página de fora sem a entrada no manifest —
+com o `catch` de `carregarDeny` devolvendo `() => false`, a lista simplesmente
+não valia (o console dizia "deny list não carregou; seguindo sem ela") e
+"Ministério Público" virava `[ORGANIZACAO_n]`. Mesma razão de o `panel.css`
+estar lá.
+
 **O MODO VESTE O PAINEL INTEIRO, não só o botão que o ligou** (classe
-`.wrap.sigiloso`, posta por `pintarSigilo`): tarja hachurada de lado a lado sob o
-cabeçalho, borda verde na janela e no campo de mensagem. Um botão aceso responde
-"eu liguei isto"; o que se precisa aqui é "eu **estou** aqui" — e o que muda é o
-que SAI da máquina. A marca fica toda na moldura e nunca no fundo do chat: o §2
-do DESIGN.md pôs o peso visual no texto da resposta, e tingir a conversa
-competiria com ela. Duas armadilhas de plataforma, as duas invisíveis fora de uma
+`.wrap.sigiloso`, posta por `pintarSigilo`): o CABEÇALHO troca de cor (verde
+profundo `--sig-hd`), a marca e o botão Enviar vão para o mesmo gradiente, a
+janela ganha borda de 2px com halo, e a tarja hachurada sob o cabeçalho leva
+cadeado e a contagem do que está protegido. Um botão aceso responde "eu liguei
+isto"; o que se precisa aqui é "eu **estou** aqui" — e o que muda é o que SAI
+da máquina. A v0.55 tentou só a moldura (borda de 1px + faixa clara) e o
+usuário leu como "uma coisinha verde": a marca pode ser ambiente na chrome; o
+que continua branco é a CONVERSA, porque o §2 do DESIGN.md pôs o peso visual no
+texto da resposta. Duas armadilhas de plataforma, as duas invisíveis fora de uma
 captura de pixel (`getComputedStyle` reporta tudo vivo e correto nas duas):
 
 - **`box-shadow: inset` pinta ABAIXO dos filhos** — o cabeçalho e as duas colunas
