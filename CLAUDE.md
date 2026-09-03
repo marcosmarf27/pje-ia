@@ -2775,7 +2775,13 @@ e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
   paleta do outro lado. É o mesmo defeito do teste que lia `.sigbar .sb-n` com
   `|| {}`: verde sem testar. A rede contra a repetição é o `t-temas-coerencia`,
   que lê a lista `TEMAS` do FONTE e exige, para cada id, bloco no CSS com
-  `--hd` e `--surface-painel`.
+  `--hd` e `--surface-painel`, sem token declarado duas vezes, e as duas telas
+  (painel e opções) oferecendo o mesmo conjunto.
+  - **LACUNA CONHECIDA**: a asserção que conferia a amostra do seletor contra a
+    chrome só roda quando `--hd` é hex, e desde que a chrome virou GRADIENTE em
+    cinco dos seis temas ela não roda em nenhum deles. As amostras foram
+    atualizadas à mão para a parada do meio de cada gradiente; nada garante que
+    continuem batendo. Para fechar: exigir que a amostra seja uma das paradas.
   - **A doc também afirmava medições sobre esse tema inexistente** ("o Rosa
     nasceu com 3,5:1 no CNJ e só virou tema depois de dois ajustes"). Nota que
     descreve código que não chegou a existir é pior que nota ausente: a sessão
