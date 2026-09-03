@@ -103,7 +103,34 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.58.2</span> Contraste do <strong>modo sigiloso</strong> em todos os temas</h2>
+        <h2><span class="v novo">v0.58.3</span> O <strong>Vidro</strong> virou vidro de verdade — e o modo sigiloso voltou a ter cor</h2>
+        <p>
+          O tema <strong>Vidro</strong> era uma placa escura e fumê. Ele media bem, mas não
+          era o material que o nome promete: agora é uma <strong>placa branca translúcida</strong>,
+          levemente tingida de azul, com um risco de luz atravessando na diagonal — a página
+          do tribunal aparece desfocada por trás, no flutuante, no lateral, no expandido e na
+          tela cheia. E ficou <em>mais</em> transparente que a versão escura, não menos.
+        </p>
+        <p>
+          O que destravou isso foi trocar a cor do texto. Com texto claro, o fundo difícil é a
+          folha branca do PDF, e a placa só a vence escurecendo. Com texto escuro, o fundo
+          difícil passa a ser a barra azul do tribunal — e ali uma placa clara vence com folga.
+          Cada par de texto e fundo foi medido de novo sobre os três fundos que existem atrás
+          do painel, agora incluindo o <strong>cabeçalho</strong>: nos modos lateral e tela
+          cheia é ele que fica sobre a barra azul, e era justamente ali que o número do
+          processo ficava ilegível.
+        </p>
+        <p>
+          A mesma rodada encontrou um defeito que estava publicado: em <strong>cinco das seis
+          aparências</strong>, ligar o modo sigiloso não pintava o cabeçalho de verde. O
+          cabeçalho ficava transparente, e o sinal mais importante do painel — o de que os
+          autos <em>não</em> estão saindo em claro — simplesmente não aparecia para quem não
+          usava o tema padrão. Corrigido nas seis, com o carimbo, o botão Enviar e a textura
+          do modo legíveis em todas.
+        </p>
+      </div>
+      <div class="card">
+        <h2><span class="v">v0.58.2</span> Contraste do <strong>modo sigiloso</strong> em todos os temas</h2>
         <p>
           A mesma medição que consertou as aparências encontrou dois pontos no modo
           sigiloso: o botão <strong>Enviar</strong> com o modo ligado estava em 3,87:1 (abaixo
@@ -2063,6 +2090,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.58.3</span></td><td>03/09/2026</td><td><strong>O Vidro virou vidro.</strong> A placa fumê escura foi trocada por uma placa BRANCA translúcida, tingida de azul e com um risco de luz na diagonal — e ficou mais transparente que a anterior, não menos. O que destravou foi a cor do texto: com tinta escura o fundo difícil deixa de ser a folha branca e passa a ser a barra azul do tribunal, onde uma placa clara vence com folga. A medição de contraste passou a cobrir também o CABEÇALHO sobre os três fundos — nos modos lateral e tela cheia é ele que encosta na barra. E um defeito publicado: em cinco das seis aparências, ligar o modo sigiloso NÃO pintava o cabeçalho de verde (o token virou gradiente na v0.58.0 e o consumidor só aceitava cor), de modo que o sinal de que os autos não estão saindo em claro não aparecia fora do tema padrão</td></tr>
             <tr><td><span class="v">0.58.2</span></td><td>03/09/2026</td><td><strong>Contraste do modo sigiloso em todos os temas.</strong> O botão Enviar com o modo ligado estava em 3,87:1 — abaixo do mínimo de leitura, e desde antes da rodada de temas — e o carimbo do sigilo ficava fraco sobre a placa do tema Vidro. Os dois passaram a ser medidos junto com o resto do painel</td></tr>
             <tr><td><span class="v">0.58.1</span></td><td>03/09/2026</td><td><strong>Os seis temas funcionando.</strong> O Rosa era oferecido sem existir (nenhuma paleta no CSS); o Noite não pintava o fundo da janela, deixando texto claro sobre branco; o Vidro desligava o efeito ao expandir. Agora cada tema muda cabeçalho, painel, superfícies e ação: chrome em gradiente, Rosa magenta de ponta a ponta, Toga vinho na ação com o alerta deslocado para o tijolo, Noite com acento ciano, Papel em creme quente, Vidro como placa fumê translúcida em todos os modos. Todo par de texto e fundo passa por medição de contraste — incluindo as paradas dos gradientes e o que a placa translúcida mostra por trás</td></tr>
             <tr><td><span class="v">0.58.0</span></td><td>02/09/2026</td><td><strong>Seis aparências para o painel</strong> — Azul TecJustiça (padrão), Noite, Papel, Vidro, Toga e Rosa —, escolhidas no cabeçalho do painel ou em Configurações, com o modo sigiloso derivando a própria paleta de cada uma. A faixa listrada do modo sigiloso deu lugar a um <strong>carimbo na linha do número do processo</strong>: não custa altura, mostra o progresso da anonimização enquanto ela roda e a contagem de dados protegidos depois, e abre a conferência no clique</td></tr>

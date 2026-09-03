@@ -1986,7 +1986,7 @@ var PjePanel = (function () {
       { id: "", nome: "Azul TecJustiça", amostra: ["#0e4459", "#2e7e9c", "#ffffff"] },
       { id: "noite", nome: "Noite", amostra: ["#122734", "#56c2e8", "#14252f"] },
       { id: "papel", nome: "Papel", amostra: ["#efe7d9", "#2c7189", "#fdfbf6"] },
-      { id: "vidro", nome: "Vidro", amostra: ["#3a5f75", "#2e7e9c", "#e8f2f7"] },
+      { id: "vidro", nome: "Vidro", amostra: ["#dbeef9", "#2e7e9c", "#f2f9fd"] },
       { id: "toga", nome: "Toga", amostra: ["#6b2537", "#93374b", "#fffbfc"] },
       { id: "rosa", nome: "Rosa", amostra: ["#c41f6a", "#d5327f", "#fdeff6"] },
     ];

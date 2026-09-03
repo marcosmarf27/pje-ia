@@ -180,7 +180,7 @@ que fez os temas custarem um bloco de tokens em vez de uma arquitetura.
 | Azul TecJustiça | *(ausente)* | `#0e4459` | O padrão. **Byte a byte o de sempre** |
 | Noite | `noite` | `#0a141b → #122734` | Escuro tinta-petróleo com acento **ciano** (`#56c2e8`): sobre fundo escuro o azul institucional some, e tema escuro sem acento visível é tema pela metade |
 | Papel | `papel` | `#f4eee2 → #ebe3d4` | Creme QUENTE com tinta quase preta — a temperatura de um documento impresso. Um tema claro só se distingue do padrão pela temperatura |
-| Vidro | `vidro` | `rgba(4,18,28,.86) → rgba(10,46,68,.8)` | Placa **fumê escura** e translúcida: a página do tribunal atravessa desfocada em TODOS os modos. Acento ciano, bolhas opacas |
+| Vidro | `vidro` | `rgba(226,241,251,.9) → rgba(170,207,232,.84)` | Placa **branca translúcida e tingida de azul**, com risco de luz: a página do tribunal atravessa desfocada em TODOS os modos. Herda a paleta do padrão — bolhas opacas |
 | Toga | `toga` | `#3a141d → #6b2537` | Vinho na chrome **e na ação**; o `--alerta` sai para o tijolo-laranja para a fronteira sobreviver |
 | Rosa | `rosa` | `#9c1250 → #c41f6a` | Magenta de verdade — chrome, ação e corpo rosados |
 
@@ -188,6 +188,22 @@ que fez os temas custarem um bloco de tokens em vez de uma arquitetura.
 componente: `--hd` e `--surface-painel` são consumidos como `background`, então
 um `linear-gradient()` cabe no token. Num tema escuro é o gradiente que dá
 volume — uma chapada em 60px de altura lê como buraco.
+
+> **MAS UM TOKEN QUE VIRA GRADIENTE PRECISA QUE TODO CONSUMIDOR DELE ACEITE
+> IMAGEM, e foi aqui que a v0.58.0 quebrou o modo sigiloso em cinco temas.**
+> `--sig-hd` virou gradiente junto com os outros, e o consumidor era
+> `background-color`, que não aceita imagem: a declaração ficava inválida em
+> tempo de valor computado, caía para `transparent`, e o cabeçalho do modo mais
+> sensível do produto pintava **rgba(0,0,0,0)** — medido nos cinco. O sinal de
+> que os autos NÃO estão saindo em claro simplesmente não acontecia, e nada
+> acusava: o token seguia correto e `getComputedStyle` o reportava vivo. Hoje o
+> consumidor empilha duas camadas de `background-image` (a textura por cima, a
+> chrome por baixo) e **`--sig-hd` é gradiente em TODOS os temas, inclusive no
+> padrão** — um token com duas formas é um token com dois consumidores possíveis.
+> A mesma armadilha apareceu em `border-bottom-color: var(--sig-hd)`, onde só
+> apagava a linha. **Ao promover um token de cor a gradiente, varrer os
+> consumidores: `background-color`, `border-*-color`, `color` e `fill` recusam
+> gradiente em silêncio.**
 
 **ATRIBUTO, não classe.** A especificidade 0,2,0 de `[data-tema]` vence o
 `.wrap` base sem depender da ordem no arquivo, e o tema não entra na mesma
@@ -227,27 +243,55 @@ uma frase: **matiz constante, luminosidade ajustada.**
 > vidro real se comporta. E **não** no `.wrap`: `backdrop-filter` cria bloco de
 > contenção para descendentes `position: fixed`, e os popovers são filhos dele.
 
-> **TRANSPARÊNCIA SÓ SE VÊ ONDE O VÉU DIFERE EM LUMINOSIDADE DO QUE ESTÁ
-> ATRÁS** — é a regra do tema, e ela custou três versões. A página do PJe é
-> papel branco. Um véu quase-branco sobre papel branco é invisível em QUALQUER
-> alfa: o desfoque não tem o que revelar. Por isso a placa inteira — não só a
-> chrome — é **fumê escura**: aí o olho lê "estou olhando ATRAVÉS de algo" na
-> primeira fixação, sem precisar procurar.
+> **TRANSPARÊNCIA SÓ SE VÊ ONDE O VÉU DIFERE DO QUE ESTÁ ATRÁS** — é a regra do
+> tema, e ela custou quatro versões. A página do PJe é papel branco, e um véu
+> quase-branco sobre papel branco é invisível em QUALQUER alfa: o desfoque não
+> tem o que revelar. A diferença pode ser de LUMINOSIDADE (placa escura sobre
+> papel) ou de MATIZ (placa clara mas TINGIDA de azul, que é a versão atual) — o
+> que não existe é véu neutro claro sobre fundo neutro claro.
 
 > **E A RÉGUA É O CONTRASTE SOBRE OS TRÊS FUNDOS QUE EXISTEM ATRÁS DO PAINEL,
-> não a aparência sobre um só.** A segunda versão do Vidro usou véu azul-claro a
-> 0,20: o efeito apareceu sobre a folha do PDF e a legibilidade morreu sobre a
+> não a aparência sobre um só.** Uma versão usou véu azul-claro a 0,20 com tinta
+> CLARA: o efeito apareceu sobre a folha do PDF e a legibilidade morreu sobre a
 > barra institucional do tribunal — **1,04:1, medido**. Um tema legível só sobre
-> um fundo falha no instante em que o usuário rola a página. Com véu escuro a
-> ~0,78 e tintas secundárias claras: folha branca 5,5:1, barra institucional
-> 11,0:1, cinza do visualizador 6,0:1 — e os 22% que passam, desfocados a 30px,
-> são a mancha que dá o efeito.
+> um fundo falha no instante em que o usuário rola a página.
+
+> **QUAL FUNDO É O HOSTIL DEPENDE DA COR DA TINTA, e é isso que decide se a
+> placa pode ser clara.** Com tinta CLARA o inimigo é a folha branca, e a placa
+> só a domina escurecendo — foi essa medição, correta, que produziu a conclusão
+> ERRADA de que vidro claro era impossível aqui. Com tinta ESCURA o inimigo se
+> inverte: passa a ser a barra institucional azul, e ali uma placa CLARA também
+> domina. Medido na versão atual (placa branca tingida, tinta escura, parada
+> mais fraca do gradiente):
+>
+> | | folha branca | barra institucional | cinza do visualizador |
+> |---|---|---|---|
+> | a placa | 5,69:1 | 3,28:1 | 5,37:1 |
+> | a chrome | 4,66:1 | 3,33:1 | 4,49:1 |
+> | a chrome sigilosa | 4,61:1 | 3,44:1 | 4,46:1 |
+>
+> O alfa pôde CAIR de 0,78 para 0,74 — mais translúcido que a placa escura, e
+> ainda com folga. **Ao trocar a cor da tinta de um tema translúcido, refazer a
+> medição da translucidez: as duas decisões não são independentes.**
+
+> **A CHROME ENTRA NA MEDIÇÃO, e não só a placa.** Nos modos lateral e cheia o
+> painel encosta no topo da viewport, e quem fica sobre a barra institucional é
+> o CABEÇALHO. Medindo só o corpo, o teste aprovou um tema cujo CNJ ficava em
+> **2,7:1** exatamente ali — e quem mostrou isso foi a CAPTURA, antes do teste.
+
+> **O RISCO DE LUZ NÃO É UMA FAIXA MAIS CLARA — É UM PAR.** Sobre papel branco,
+> branco sobre branco é invisível, e o brilho sozinho sumiria justamente no
+> fundo mais comum. Vidro real sobre papel aparece como uma aresta ligeiramente
+> mais ESCURA e azulada logo ANTES do brilho: são as duas paradas juntas (30%
+> escurecida, 34,5% brilhante) que fazem o risco existir sobre a folha e sobre a
+> barra. Ele vive dentro do gradiente de `--surface-painel` porque
+> `.panel::before/::after` já têm dono — a pega de arrastar e a alça de
+> redimensionar do modo livre.
 
 > **A receita corrente de glassmorphism ("superfície luminosa") pressupõe fundo
-> escuro ou colorido.** Sobre papel de tribunal ela se inverte. Uma versão deste
-> tema seguiu a receita, clareou a chrome e perdeu o efeito inteiro. Ao portar
-> um padrão visual, conferir a premissa dele sobre o FUNDO — aqui o fundo é dado
-> e não temos como escolhê-lo.
+> escuro ou colorido.** Sobre papel de tribunal ela se inverte. O que a salva
+> aqui não é clarear ou escurecer: é TINGIR, para a placa diferir do papel por
+> matiz quando não pode diferir por luminosidade.
 
 > **Vidro é moldura, não superfície de leitura.** As bolhas da resposta, o campo
 > e os popovers ficam OPACOS: cartões sólidos flutuando sobre a placa, que é a
@@ -255,12 +299,19 @@ uma frase: **matiz constante, luminosidade ajustada.**
 > deixaria o texto do tribunal passar POR TRÁS do texto da resposta, que é o
 > oposto de legibilidade num produto cuja saída é jurídica.
 
+> **O TEMA É O TEMA BASE, TRANSLÚCIDO.** Ele não redefine `--pje`, `--btn-*`,
+> `--mark-*`, `--on-acao`, os estados nem as categorias: o padrão já é um tema
+> CLARO de tinta escura e acento institucional, e uma segunda cópia daquilo aqui
+> divergiria na primeira revisão. O que muda são as SUPERFÍCIES, as LINHAS, os
+> VÉUS e as SOMBRAS. É o único dos cinco temas que não tem paleta própria — e é
+> por isso que ele é o mais curto.
+
 > **O TEMA NÃO DEGRADA AO EXPANDIR, e a nota que dizia o contrário estava errada
 > por MECANISMO.** "Em tela cheia não há nada atrás" é falso: atrás do `.panel`
 > a página do tribunal continua pintada, e o `backdrop-filter` a alcança. Era
 > decisão, não limitação, e entregava o efeito só no modo menor — foi a primeira
 > coisa que o usuário reclamou. Hoje o `.expanded` e o `.full` mostram a folha
-> atravessando a placa. O `.backdrop` do expandido fica em 0,22: a 0,45 ele
+> atravessando a placa. O `.backdrop` do expandido fica em 0,20: a 0,45 ele
 > apaga a página e a placa passa a desfocar um cinza chapado, isto é, deixa de
 > ser vidro justamente onde a janela é maior.
 
