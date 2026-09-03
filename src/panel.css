@@ -81,10 +81,12 @@
   --sig-hd: #143f33;        /* cabeçalho no modo */
   --sig-mark-de: #35946e;   /* quadrado da marca — 180deg */
   --sig-mark-para: #1d6248;
-  --sig-btn-de: #2f9268;    /* botão primário e launcher */
-  --sig-btn-para: #1f6a4b;
-  --sig-btn-de-h: #35a074;
-  --sig-btn-para-h: #1a5c41;
+  /* Escurecido em 03/09/2026: com #2f9268 a tinta branca dava 3,87:1, abaixo
+     do AA. Vale para o padrão e para os temas que herdam a família. */
+  --sig-btn-de: #26805e;    /* botão primário e launcher */
+  --sig-btn-para: #1a5c41;
+  --sig-btn-de-h: #2b8f68;
+  --sig-btn-para-h: #16513a;
   --sig-halo: rgba(47, 146, 104, 0.28); /* anel externo da janela e foco */
   /* O CARIMBO na linha do CNJ. Placa CLARA com tinta escura porque um carimbo é
      tinta sobre papel — e sobre o cabeçalho verde profundo é o contraste máximo
@@ -666,9 +668,9 @@
   --sig-btn-de-h: #43bd8b;
   --sig-btn-para-h: #1a6a4d;
   --sig-halo: rgba(71, 195, 145, 0.34);
-  --sig-carimbo-bg: rgba(71, 195, 145, 0.18);
+  --sig-carimbo-bg: rgba(71, 195, 145, 0.13);
   --sig-carimbo-bg-h: rgba(71, 195, 145, 0.26);
-  --sig-carimbo-ink: #9ae7c4;
+  --sig-carimbo-ink: #c4f2de;
 }
 /* A PLACA. Três coisas fazem vidro parecer vidro, e nenhuma é a transparência
    sozinha: o desfoque com SATURAÇÃO (o que passa fica mais colorido, não mais
