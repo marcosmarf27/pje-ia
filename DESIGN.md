@@ -178,11 +178,16 @@ que fez os temas custarem um bloco de tokens em vez de uma arquitetura.
 | Tema | `data-tema` | Chrome | O que ele é |
 |---|---|---|---|
 | Azul TecJustiça | *(ausente)* | `#0e4459` | O padrão. **Byte a byte o de sempre** |
-| Noite | `noite` | `#0b161d` | Escuro tinta-petróleo, para o trabalho noturno ao lado da página branca do PJe |
-| Papel | `papel` | `#eef3f6` | Chrome clara; só a marca fica saturada |
-| Vidro | `vidro` | `rgba(10,50,68,.52)` | Placa fosca: a página do tribunal atravessa desfocada. Chrome TINGIDA — sobre papel branco, véu claro é véu invisível |
-| Toga | `toga` | `#46202a` | Vinho na chrome; a **ação continua azul** |
-| Rosa | `rosa` | `#a82c63` | Magenta-rosado; aqui a **ação acompanha** |
+| Noite | `noite` | `#0a141b → #122734` | Escuro tinta-petróleo com acento **ciano** (`#56c2e8`): sobre fundo escuro o azul institucional some, e tema escuro sem acento visível é tema pela metade |
+| Papel | `papel` | `#f4eee2 → #ebe3d4` | Creme QUENTE com tinta quase preta — a temperatura de um documento impresso. Um tema claro só se distingue do padrão pela temperatura |
+| Vidro | `vidro` | `rgba(4,18,28,.86) → rgba(10,46,68,.8)` | Placa **fumê escura** e translúcida: a página do tribunal atravessa desfocada em TODOS os modos. Acento ciano, bolhas opacas |
+| Toga | `toga` | `#3a141d → #6b2537` | Vinho na chrome **e na ação**; o `--alerta` sai para o tijolo-laranja para a fronteira sobreviver |
+| Rosa | `rosa` | `#9c1250 → #c41f6a` | Magenta de verdade — chrome, ação e corpo rosados |
+
+**A CHROME É GRADIENTE em cinco dos seis temas**, e isso não custou uma regra de
+componente: `--hd` e `--surface-painel` são consumidos como `background`, então
+um `linear-gradient()` cabe no token. Num tema escuro é o gradiente que dá
+volume — uma chapada em 60px de altura lê como buraco.
 
 **ATRIBUTO, não classe.** A especificidade 0,2,0 de `[data-tema]` vence o
 `.wrap` base sem depender da ordem no arquivo, e o tema não entra na mesma
@@ -197,10 +202,15 @@ que este §2 estabeleceu. O que se ajusta neles é só a LUMINOSIDADE das varian
 `-bg`, `-line` e `-ink`, para o contraste sobreviver ao fundo escuro. A regra em
 uma frase: **matiz constante, luminosidade ajustada.**
 
-> **Toga tinge a chrome, nunca a AÇÃO.** Vermelho neste produto é `--alerta` — o
-> que pode levar a erro de decisão. Um botão primário vinho ao lado de uma barra
-> de alerta vermelha apagaria a fronteira entre "informa" e "impede" que este §2
-> construiu. Por isso `--pje` e `--btn-*` continuam azuis no Toga.
+> **Toga tinge a chrome E a AÇÃO, e o que mantém a fronteira é o DESLOCAMENTO
+> DO ALERTA.** A regra anterior era manter a ação azul, porque vermelho neste
+> produto é `--alerta` e um botão primário vinho ao lado de uma barra de alerta
+> apagaria a fronteira entre "informa" e "impede". O pedido foi explícito — um
+> tema tem de mudar as cores, não só esmaecer —, e a saída não é abandonar a
+> fronteira: é separar os matizes. O vinho da ação fica em ~345° (escuro,
+> dessaturado) e o `--alerta` deste tema vai para o tijolo-laranja (~18°), a
+> ~50° de distância, aparecendo como fundo claro com tinta escura e nunca como
+> botão sólido. A fronteira sobrevive por matiz e por FORMA.
 
 > **O Vidro exigiu uma separação de token, e ela é a lição da rodada.** A
 > primeira versão não era vidro: o `.panel` pintava `var(--surface)` — branco
@@ -218,11 +228,20 @@ uma frase: **matiz constante, luminosidade ajustada.**
 > contenção para descendentes `position: fixed`, e os popovers são filhos dele.
 
 > **TRANSPARÊNCIA SÓ SE VÊ ONDE O VÉU DIFERE EM LUMINOSIDADE DO QUE ESTÁ
-> ATRÁS** — é a regra do tema, e ela custou uma versão. A página do PJe é papel
-> branco. Um véu quase-branco sobre papel branco é invisível em QUALQUER alfa:
-> o desfoque não tem o que revelar, e o resultado é um painel branco. Por isso a
-> chrome é `rgba(10,50,68,.52)`, tingida e mais escura que a página: aí o olho
-> lê "estou olhando ATRAVÉS de algo" na primeira fixação, sem precisar procurar.
+> ATRÁS** — é a regra do tema, e ela custou três versões. A página do PJe é
+> papel branco. Um véu quase-branco sobre papel branco é invisível em QUALQUER
+> alfa: o desfoque não tem o que revelar. Por isso a placa inteira — não só a
+> chrome — é **fumê escura**: aí o olho lê "estou olhando ATRAVÉS de algo" na
+> primeira fixação, sem precisar procurar.
+
+> **E A RÉGUA É O CONTRASTE SOBRE OS TRÊS FUNDOS QUE EXISTEM ATRÁS DO PAINEL,
+> não a aparência sobre um só.** A segunda versão do Vidro usou véu azul-claro a
+> 0,20: o efeito apareceu sobre a folha do PDF e a legibilidade morreu sobre a
+> barra institucional do tribunal — **1,04:1, medido**. Um tema legível só sobre
+> um fundo falha no instante em que o usuário rola a página. Com véu escuro a
+> ~0,78 e tintas secundárias claras: folha branca 5,5:1, barra institucional
+> 11,0:1, cinza do visualizador 6,0:1 — e os 22% que passam, desfocados a 30px,
+> são a mancha que dá o efeito.
 
 > **A receita corrente de glassmorphism ("superfície luminosa") pressupõe fundo
 > escuro ou colorido.** Sobre papel de tribunal ela se inverte. Uma versão deste
@@ -231,12 +250,19 @@ uma frase: **matiz constante, luminosidade ajustada.**
 > e não temos como escolhê-lo.
 
 > **Vidro é moldura, não superfície de leitura.** As bolhas da resposta, o campo
-> e os popovers ficam OPACOS (`--surface` intocado): cartões sólidos flutuando
-> sobre a placa, que é a leitura de profundidade que se quer. A lista fica em
-> 0,22 — subi-la a 0,62 para conter o texto do tribunal por baixo dos nomes
-> apagava o efeito junto, e o ruído não aparece na medição. Em tela cheia não há
-> nada atrás: o desfoque é desligado e o tema degrada para o institucional —
-> comportamento correto, não falta.
+> e os popovers ficam OPACOS: cartões sólidos flutuando sobre a placa, que é a
+> leitura de profundidade que se quer — e, mais que isso, bolha translúcida
+> deixaria o texto do tribunal passar POR TRÁS do texto da resposta, que é o
+> oposto de legibilidade num produto cuja saída é jurídica.
+
+> **O TEMA NÃO DEGRADA AO EXPANDIR, e a nota que dizia o contrário estava errada
+> por MECANISMO.** "Em tela cheia não há nada atrás" é falso: atrás do `.panel`
+> a página do tribunal continua pintada, e o `backdrop-filter` a alcança. Era
+> decisão, não limitação, e entregava o efeito só no modo menor — foi a primeira
+> coisa que o usuário reclamou. Hoje o `.expanded` e o `.full` mostram a folha
+> atravessando a placa. O `.backdrop` do expandido fica em 0,22: a 0,45 ele
+> apaga a página e a placa passa a desfocar um cinza chapado, isto é, deixa de
+> ser vidro justamente onde a janela é maior.
 
 > **Rosa é o único tema em que a AÇÃO acompanha a chrome.** O que impede o Toga
 > de tingir o botão primário é o vinho ficar perto demais do vermelho-tijolo de

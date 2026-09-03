@@ -103,7 +103,35 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.58.0</span> <strong>Seis aparências</strong> para o painel, e o modo sigiloso ganha um <strong>carimbo</strong></h2>
+        <h2><span class="v novo">v0.58.1</span> As aparências <strong>funcionando</strong>: Rosa existe, Noite escurece o painel todo, Vidro é vidro em qualquer tamanho</h2>
+        <p>
+          A v0.58.0 entregou os seis temas pela metade, e esta versão os conserta. O
+          <strong>Rosa</strong> aparecia na lista e não tinha paleta nenhuma: escolhê-lo deixava
+          o painel azul. O <strong>Noite</strong> pintava a paleta escura mas não o fundo da
+          janela, então a conversa ficava branca e o texto claro por cima dela — quase
+          invisível. O <strong>Vidro</strong> perdia o efeito justamente ao expandir, que é
+          quando há mais janela para atravessar.
+        </p>
+        <p>
+          E os temas passaram a <strong>mudar de verdade</strong>: cabeçalho em gradiente,
+          fundo da janela tingido, ação na cor do tema. Rosa é magenta do cabeçalho ao botão
+          Enviar; Toga é vinho na chrome e na ação (com o alerta deslocado para o tijolo, para
+          não confundir “informa” com “impede”); Noite ganhou acento ciano, porque sobre fundo
+          escuro o azul institucional desaparece; Papel virou creme quente com tinta quase
+          preta, em vez de um branco lavado. O <strong>Vidro</strong> é uma placa fumê
+          translúcida que mantém o efeito no flutuante, no expandido e na tela cheia.
+        </p>
+        <p>
+          Nenhum tema entra mais sem <strong>medição de contraste</strong>: cada par de
+          texto e fundo que se encontra na tela é conferido, inclusive as paradas dos
+          gradientes e as camadas translúcidas sobre a página do tribunal. Foi essa medição
+          que mostrou que a versão anterior do Vidro ficava ilegível quando passava sobre a
+          barra azul do PJe.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2><span class="v">v0.58.0</span> <strong>Seis aparências</strong> para o painel, e o modo sigiloso ganha um <strong>carimbo</strong></h2>
         <p>
           O painel agora tem <strong>tema</strong>. Além do azul de sempre, entram
           <strong>Noite</strong> (escuro, para quem trabalha à noite ao lado da página branca do
@@ -2023,6 +2051,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr><td><span class="v">0.58.1</span></td><td>03/09/2026</td><td><strong>Os seis temas funcionando.</strong> O Rosa era oferecido sem existir (nenhuma paleta no CSS); o Noite não pintava o fundo da janela, deixando texto claro sobre branco; o Vidro desligava o efeito ao expandir. Agora cada tema muda cabeçalho, painel, superfícies e ação: chrome em gradiente, Rosa magenta de ponta a ponta, Toga vinho na ação com o alerta deslocado para o tijolo, Noite com acento ciano, Papel em creme quente, Vidro como placa fumê translúcida em todos os modos. Todo par de texto e fundo passa por medição de contraste — incluindo as paradas dos gradientes e o que a placa translúcida mostra por trás</td></tr>
             <tr><td><span class="v">0.58.0</span></td><td>02/09/2026</td><td><strong>Seis aparências para o painel</strong> — Azul TecJustiça (padrão), Noite, Papel, Vidro, Toga e Rosa —, escolhidas no cabeçalho do painel ou em Configurações, com o modo sigiloso derivando a própria paleta de cada uma. A faixa listrada do modo sigiloso deu lugar a um <strong>carimbo na linha do número do processo</strong>: não custa altura, mostra o progresso da anonimização enquanto ela roda e a contagem de dados protegidos depois, e abre a conferência no clique</td></tr>
             <tr><td><span class="v">0.57.0</span></td><td>02/09/2026</td><td><strong>O bloqueio da proteção vira uma pergunta</strong> (“este valor é um dado pessoal?”) com dois caminhos: manter protegido e reenviar (o raciocínio guardado que carregava o valor é descartado) ou liberar, neste processo ou em todos; tirar a peça da conversa; “não é dado pessoal” na auditoria; “Não enviar” por peça na conferência; vocabulário processual fora do reconhecedor de nomes. A espera pelo modelo aparece dentro da bolha e no campo. <strong>Gemini 3.8 Flash</strong> entra na lista (direto e via OpenRouter) e vira o indicado do cartão Gemini</td></tr>
             <tr><td><span class="v">0.56.1</span></td><td>02/09/2026</td><td><strong>Bloqueio da proteção com saída que preserva o nome.</strong> A conversa inteira é remascarada com o mapa atual a cada envio (um nome descoberto tarde não volta em claro num bloco antigo); a conferência roda antes de qualquer rede e diz onde o valor estava; a bolha oferece “Mascarar e reenviar” e “Nova conversa (mantém as peças)” antes de “Liberar”, também na minuta e no mapa. A espera pelo modelo conta os segundos no status e a bolha mantém o indicador até haver texto</td></tr>

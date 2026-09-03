@@ -1977,13 +1977,18 @@ var PjePanel = (function () {
     // um ATRIBUTO. Isso importa porque o `panel.css` é buscado UMA vez no
     // `mount()` e nunca reinjetado — se o tema dependesse do arquivo, mudá-lo
     // ao vivo exigiria um segundo fetch e uma janela de FOUC.
+    // As três cores de cada amostra são CHROME · ACENTO · SUPERFÍCIE, na ordem
+    // em que aparecem no painel. Quando a chrome é gradiente, a amostra leva a
+    // parada do MEIO — é a que domina os 60px do cabeçalho. Amostra que não
+    // corresponde à paleta é pior que amostra nenhuma: ela promete uma cara e
+    // entrega outra no clique.
     const TEMAS = [
       { id: "", nome: "Azul TecJustiça", amostra: ["#0e4459", "#2e7e9c", "#ffffff"] },
-      { id: "noite", nome: "Noite", amostra: ["#0b161d", "#4aa6c9", "#16232c"] },
-      { id: "papel", nome: "Papel", amostra: ["#eef3f6", "#2e7e9c", "#ffffff"] },
-      { id: "vidro", nome: "Vidro", amostra: ["#6f8f9e", "#2e7e9c", "#ffffff"] },
-      { id: "toga", nome: "Toga", amostra: ["#46202a", "#8c4351", "#ffffff"] },
-      { id: "rosa", nome: "Rosa", amostra: ["#b8336e", "#ef74a8", "#fdf5f9"] },
+      { id: "noite", nome: "Noite", amostra: ["#122734", "#56c2e8", "#14252f"] },
+      { id: "papel", nome: "Papel", amostra: ["#efe7d9", "#2c7189", "#fdfbf6"] },
+      { id: "vidro", nome: "Vidro", amostra: ["#3a5f75", "#2e7e9c", "#e8f2f7"] },
+      { id: "toga", nome: "Toga", amostra: ["#6b2537", "#93374b", "#fffbfc"] },
+      { id: "rosa", nome: "Rosa", amostra: ["#c41f6a", "#d5327f", "#fdeff6"] },
     ];
     let temaAtual = "";
 

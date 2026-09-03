@@ -2650,6 +2650,31 @@ e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
   depender da ordem no arquivo, e o tema não disputa a mesma dimensão das
   classes de MODO (`.sigiloso`, `.expanded`, `.estreito`, `.livre`), que se
   combinam livremente com ele.
+- **`--surface-painel` É O TOKEN QUE NENHUM TEMA PODE ESQUECER.** Ele pinta o
+  fundo da JANELA, e `.msgs`, `.main` e `.content` não declaram fundo nenhum —
+  os três HERDAM dele. O Noite saiu na v0.58.0 sem redefini-lo: o painel ficava
+  branco por baixo de uma paleta escura, o "Como posso ajudar?" a **1,26:1**
+  (medido) e a coluna de peças clara dentro do tema noturno. É o primeiro item
+  que o `t-temas-coerencia` exige.
+- **A LEGIBILIDADE DE UM TEMA SE MEDE, e o teste mede a COR RESULTANTE, não a
+  presença de um token** (`t-temas-contraste`): para cada par que se encontra na
+  tela, ele resolve os tokens efetivos (base + overrides), compõe a PILHA de
+  camadas — um véu interno fica sobre a placa, que fica sobre a página, e a
+  composição para na primeira camada opaca — e cobra o AA. Três armadilhas que
+  já produziram número falso, todas registradas no próprio teste:
+  - **Comentário que cita `--token: valor;` engole a declaração seguinte**, se o
+    parser não remover comentários antes: o `[^;]+` do regex atravessa o fim do
+    comentário e casa até o `;` da linha de verdade. Foi assim que o teste
+    afirmou que o Noite não redefinia `--surface-painel` — ele redefinia — e
+    mediu 1,22:1 num tema já corrigido.
+  - **Gradiente não é cor**, e um par cujo fundo o parser não entende era PULADO
+    em silêncio. Como `--hd` e `--surface-painel` passaram a ser gradiente em
+    cinco dos seis temas, o teste deixaria de medir justamente o par crítico.
+    Hoje o gradiente vira a lista das suas paradas e vale o PIOR caso; par que
+    não dá para medir é FALHA, nunca silêncio.
+  - **Véu medido direto sobre a página** dá um número que não existe na tela.
+    Sem a pilha, o mesmo teste reprovava o Vidro em lugares corretos e o
+    aprovava em lugares errados, na mesma execução.
 - **MATIZ CONSTANTE, LUMINOSIDADE AJUSTADA.** `--cat-*`, `--ok`, `--warn` e
   `--alerta` não mudam de matiz por tema: ali a cor É o dado (a categoria da
   peça, a gravidade do aviso). O que se ajusta são as variantes `-bg`, `-line` e
@@ -2669,6 +2694,11 @@ e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
   quatro estados (largo/estreito × sigilo on/off): **25.454 propriedades, zero
   diferentes** antes e depois. Refazer essa medição é a única maneira honesta de
   mexer nos tokens de novo.
+  - **E ela mede o tema PADRÃO, mais nada.** Foi por isso que ela ficou verde
+    numa versão em que o Noite não pintava o fundo da janela e o Rosa não
+    existia: o padrão estava intacto, que é exatamente o que ela existe para
+    provar. Prova de NÃO-REGRESSÃO não é prova de que a coisa nova funciona —
+    quem responde por isso é o `t-temas-contraste`.
 - **A COR DE TEXTO BASE DO PAINEL NÃO EXISTIA, e foi a medição que achou.**
   `:host { all: initial }` deixa `canvastext` (preto) e a bolha da resposta não
   declara `color` — ela herda. Sobre conversa branca sempre funcionou; no Noite
@@ -2696,23 +2726,38 @@ e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
   **nunca no `.wrap`** — ele cria bloco de contenção para descendentes
   `position: fixed`, e os popovers são filhos dele (a mesma razão pela qual
   eles não são filhos do `.panel`, por causa do `transform` do arrasto).
-- **A CHROME DO VIDRO É ESCURA E TINGIDA, e a versão que a deixou CLARA foi
-  desfeita — transparência só se VÊ onde o véu difere em LUMINOSIDADE do que
-  está atrás.** A página do PJe é papel branco: um véu quase-branco sobre ela é
-  invisível em qualquer alfa, porque o desfoque não tem o que revelar. O
-  resultado medido foi um painel branco de cabeçalho branco, que o usuário
-  descreveu como "você tirou a transparência". Com `--hd: rgba(10,50,68,.52)` a
-  mesma página atravessa como fumê e o olho lê "estou olhando ATRAVÉS de algo"
-  na primeira fixação.
+- **A PLACA DO VIDRO É FUMÊ ESCURA, e a régua que decidiu isso foi o CONTRASTE
+  SOBRE O QUE ESTÁ ATRÁS — não a aparência sobre um fundo só.** Três versões
+  falharam antes, e as duas primeiras por véu CLARO:
+  1. branco a 0,50 sobre a folha do PJe: desfocar branco dá branco. A captura
+     headless mostrou um painel opaco comum — não havia o que revelar.
+  2. azul-claro a 0,20: o efeito apareceu sobre a folha e a legibilidade MORREU
+     sobre a barra institucional do tribunal — **1,04:1, medido**. Um tema
+     legível só sobre um fundo falha no instante em que o usuário rola a página.
+  3. escuro a 0,74 com tintas médias: passou sobre a barra e reprovou sobre a
+     folha, porque a parada MÉDIA do gradiente é mais clara que as pontas.
+  O que funciona é véu escuro a ~0,78 **e** tintas secundárias claras: a placa
+  domina o fundo em luminosidade, e os 22% que passam, desfocados a 30px, são a
+  mancha que faz o olho ler "estou olhando ATRAVÉS de algo". Medido nos três
+  fundos que existem atrás do painel: folha branca 5,5:1, barra institucional
+  11,0:1, cinza do visualizador 6,0:1.
   - **A receita de glassmorphism que se lê por aí pressupõe fundo escuro ou
     colorido** (é de onde vem "superfície luminosa"). Sobre papel de tribunal
-    ela se inverte. Foi por seguir a receita, e não a medição, que a chrome
-    clareou: eu troquei uma versão que o usuário tinha aprovado por uma teoria.
-  - **A lista fica em 0,22**, como na versão aprovada. A 0,62 ela some junto com
-    o efeito, e o ruído que 0,62 existia para conter não aparece nas capturas —
-    a preocupação era real, o remédio era caro demais.
-  - Em `.full` não há nada atrás: o desfoque é desligado e o tema degrada para o
-    institucional.
+    ela se inverte, e foi por seguir a receita em vez da medição que a v0.58.0
+    saiu com a chrome clara.
+  - **O tema NÃO degrada ao expandir.** A v0.58.0 desligava o desfoque em tela
+    cheia alegando que "não há nada atrás" — falso por MECANISMO: atrás do
+    `.panel` a página do tribunal continua pintada, e o `backdrop-filter` a
+    alcança. Era decisão, não limitação, e entregava o efeito só no modo menor,
+    que foi a reclamação. Hoje o `.full` e o `.expanded` mostram a folha
+    atravessando a placa (confirmado em captura). O `.backdrop` do expandido
+    fica em 0,22: a 0,45 ele apagaria a página e a placa passaria a desfocar um
+    cinza chapado, isto é, deixaria de ser vidro no modo em que a janela é
+    maior.
+  - **As bolhas e os popovers ficam OPACOS** (`--surface`, `--surface-card`): é
+    onde o §2 põe o peso visual, e bolha translúcida deixa o texto do tribunal
+    passar POR TRÁS do texto da resposta. Sólidos sobre a placa fosca dão de
+    graça a leitura de profundidade que o tema busca.
 - **ROSA é o único tema em que a AÇÃO acompanha a chrome**, e a diferença para o
   Toga tem motivo: vinho fica perto demais do vermelho-tijolo de `--alerta`;
   magenta fica a ~40° dele, e `--alerta` aparece como fundo claro com tinta
@@ -2721,9 +2766,20 @@ e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
   vence.** O Vidro ficou com o CNJ em 1,3:1 de contraste porque sobrou um
   `--on-hd-2` claro depois do novo escuro. Nem o `node --check` nem o balanço de
   chaves pegam; quem pegou foi a medição de contraste, e há uma varredura de
-  duplicatas por bloco de tema no scratchpad. **Todo tema novo passa pela
-  medição antes de existir** — o Rosa nasceu com 3,5:1 no CNJ e só virou tema
-  depois de dois ajustes.
+  duplicatas por bloco de tema no `t-temas-coerencia`.
+- **O TEMA ROSA FOI PUBLICADO SEM UMA LINHA DE CSS na v0.58.0.** O `<option>`
+  existia nas duas telas, o changelog o anunciava e as notas da release o
+  prometiam; escolher "Rosa" punha `data-tema="rosa"` no wrap e o painel
+  continuava azul. E o `t-temas.mjs` passava 23/23 porque testava o MECANISMO —
+  o atributo troca, persiste, propaga entre abas — e nunca a existência da
+  paleta do outro lado. É o mesmo defeito do teste que lia `.sigbar .sb-n` com
+  `|| {}`: verde sem testar. A rede contra a repetição é o `t-temas-coerencia`,
+  que lê a lista `TEMAS` do FONTE e exige, para cada id, bloco no CSS com
+  `--hd` e `--surface-painel`.
+  - **A doc também afirmava medições sobre esse tema inexistente** ("o Rosa
+    nasceu com 3,5:1 no CNJ e só virou tema depois de dois ajustes"). Nota que
+    descreve código que não chegou a existir é pior que nota ausente: a sessão
+    seguinte a lê e acredita.
 - **Persistência**: `chrome.storage.local.tema` (`""` = padrão). Lido no
   `mount()` do `panel.js`, o mesmo tier de `layoutModo`/`docsOcultas` —
   **`aplicarTema` é declarada ANTES do `get`**, porque o stub de teste chama o

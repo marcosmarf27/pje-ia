@@ -39,7 +39,7 @@
   --text: #0e323f;
   --text-2: #3e5561;   /* itens de lista, rótulo de botão secundário */
   --text-3: #234e5e;   /* chip de exemplo, texto sobre superfície tingida */
-  --muted: #6b7c85;
+  --muted: #616f78;
   --muted-2: #74858e;  /* meta, contadores */
   --muted-3: #93a3ac;  /* placeholders, ícones inativos */
   --eyebrow: #a0aeb6;  /* eyebrow mono uppercase */
@@ -282,218 +282,397 @@
    tingida", para o peso visual ficar no texto da resposta. Aqui a conversa é a
    superfície mais CLARA (#16232c) e a lista a mais escura (#101c24) — a mesma
    relação, no outro sentido. */
+/* ---------- NOITE ----------
+   Escuro DE VERDADE: a janela inteira muda de matéria, não só o cabeçalho.
+   Azul-petróleo profundo com um acento ciano que só existe aqui — sobre fundo
+   escuro o azul institucional (#14607e) some, e um tema escuro cujo acento não
+   se vê é um tema pela metade.
+
+   A v0.58.0 saiu SEM `--surface-painel`, e o token pinta o FUNDO DA JANELA: o
+   painel ficava branco por baixo de uma paleta escura, com a coluna de peças
+   clara dentro do tema noturno e o "Como posso ajudar?" a 1,26:1. O teste de
+   temas era verde porque media o MECANISMO (o atributo troca? persiste?) e
+   nunca a COR resultante. Hoje há `t-temas-contraste`, que calcula o contraste
+   dos pares que se encontram na tela — e é ele que impede a repetição. */
 .wrap[data-tema="noite"] {
-  --hd: #0b161d;
-  --on-hd: #dbe7ed;
-  --on-hd-2: #90a4ae;
-  --on-hd-3: #b9cdd6;
-  --on-hd-forte: #eef6fa;
-  /* Véus mais discretos: sobre um fundo quase preto, a mesma opacidade de véu
-     que dá relevo num azul médio vira um bloco cinza visível. */
-  --veu-1: rgba(255, 255, 255, 0.055);
-  --veu-2: rgba(255, 255, 255, 0.11);
-  --veu-3: rgba(255, 255, 255, 0.2);
-  --veu-borda: rgba(255, 255, 255, 0.34);
-  --veu-luz: rgba(255, 255, 255, 0.14);
+  /* GRADIENTE, e não cor chapada: `--hd` e `--surface-painel` são consumidos
+     como `background`, então um gradiente cabe neles sem tocar em uma única
+     regra de componente — o tema continua sendo só um bloco de tokens. Num
+     tema escuro é o gradiente que dá volume: uma chapada de #0b161d em 60px de
+     altura lê como buraco. */
+  --hd: linear-gradient(135deg, #0a141b 0%, #122734 58%, #0c1c26 100%);
+  --on-hd: #dfeef5;
+  --on-hd-2: #93b0be;
+  --on-hd-3: #bcd6e1;
+  --on-hd-forte: #f2fafd;
+  /* Véus mais discretos: sobre um fundo quase preto, a mesma opacidade que dá
+     relevo num azul médio vira um bloco cinza visível. */
+  --veu-1: rgba(255, 255, 255, 0.05);
+  --veu-2: rgba(255, 255, 255, 0.1);
+  --veu-3: rgba(255, 255, 255, 0.19);
+  --veu-borda: rgba(255, 255, 255, 0.32);
+  --veu-luz: rgba(255, 255, 255, 0.13);
   --veu-pega: rgba(255, 255, 255, 0.2);
 
-  --surface: #16232c;
-  --surface-2: #101c24;
-  --surface-3: #16232c;
-  --surface-card: #1a2831;
-  --surface-list-ft: #131f27;
-  --paper: #101a21;
-  --canvas: #0a1319;
-  --hover: #1e2d37;
-  --hover-2: #1a2831;
-  --accent-bg: #1c3743;
-  --accent-bg-2: #1a3140;
+  /* O FUNDO DA JANELA, que era o que faltava. Gradiente na diagonal longa, e a
+     área de conversa o mostra inteiro: nem `.msgs`, nem `.main`, nem `.content`
+     declaram fundo — os três HERDAM do `.panel`. Era essa herança que, com o
+     token branco, punha tinta clara sobre papel branco a 1,26:1. */
+  --surface-painel: linear-gradient(168deg, #101d26 0%, #14252f 52%, #0e1a23 100%);
+  --surface: #1a2932;
+  --surface-2: #0e1a22;
+  --surface-card: #1d2d37;
+  --surface-list-ft: #121e26;
+  --paper: #16232c;
+  --canvas: #081117;
+  --hover: #223440;
+  --hover-2: #1b2b35;
+  --accent-bg: #17394a;
+  --accent-bg-2: #16323f;
 
-  --ink: #e4eef3;
-  --ink-2: #f0f7fa;
-  --text: #dbe7ed;
-  --text-2: #aec1cb;
-  --text-3: #a8c8d6;
-  --muted: #8698a2;
-  --muted-2: #7e909a;
-  --muted-3: #6d7f89;
-  --eyebrow: #647680;
+  --ink: #e8f2f7;
+  --ink-2: #f4fafd;
+  --text: #dfeaf0;
+  --text-2: #b4c8d3;
+  --text-3: #9fd6ee;
+  --muted: #93a7b2;
+  --muted-2: #8698a3;
+  --muted-3: #74868f;
+  --eyebrow: #6c7e88;
 
-  --line: #26353e;
-  --line-2: #1f2d35;
-  --line-card: #29383f;
-  --line-input: #30404a;
-  --line-strong: #37474f;
-  --line-check: #48595f;
+  --line: #26363f;
+  --line-2: #1e2c34;
+  --line-card: #2b3b44;
+  --line-input: #32424c;
+  --line-strong: #3a4a53;
+  --line-check: #4b5c63;
 
-  /* O acento sobe de luminosidade, não muda de matiz. */
-  --pje: #4aa6c9;
+  /* O acento SOBE de luminosidade e ganha saturação: é ele que faz o tema
+     parecer vivo em vez de cinza. Matiz preservado — continua sendo o azul do
+     produto, não outra marca. */
+  --pje: #56c2e8;
   /* `--pje-2` é FUNDO da bolha do usuário, com `--on-acao` (branco) por cima.
      Clareá-lo para servir de tinta sobre o escuro deixaria a bolha ilegível —
      um token, dois papéis, e aqui vence o de fundo, que ocupa mais pixels. */
-  --pje-2: #1f5f7a;
-  --pje-3: #4099bd;
-  --pje-soft: #587683;
-  --mark-de: #2e7e9c;
-  --mark-para: #175d79;
-  --btn-de: #2b83a4;
-  --btn-para: #1f6a88;
-  --btn-de-h: #338fb1;
-  --btn-para-h: #1a5c78;
-  --line-focus: #4aa6c9;
-  --ring: 0 0 0 3px rgba(74, 166, 201, 0.22);
+  --pje-2: #1c5f7c;
+  --pje-3: #74d0f0;
+  --pje-soft: #5c7a88;
+  --mark-de: #3ea8ce;
+  --mark-para: #1d6d8e;
+  --btn-de: #2f9ec6;
+  --btn-para: #1d7ba1;
+  --btn-de-h: #43aed3;
+  --btn-para-h: #196c8e;
+  --line-focus: #56c2e8;
+  --ring: 0 0 0 3px rgba(86, 194, 232, 0.26);
+  /* Tinta ESCURA sobre a ação clara: sobre um ciano luminoso o branco dá 4,3:1
+     e reprova. Inverter a tinta é o que mantém o botão saturado e legível. */
+  --on-acao: #05202c;
 
   /* Estados: MATIZ intacto, `-bg`/`-line`/`-ink` reancorados no escuro. */
-  --ok: #3aa87a;
-  --ok-bg: #14302a;
-  --ok-line: #2b5747;
-  --ok-ink: #7fd7b1;
-  --warn: #e09a45;
+  --ok: #43bd8b;
+  --ok-bg: #12302a;
+  --ok-line: #2d5c4b;
+  --ok-ink: #8ee0bb;
+  --warn: #eda94f;
   --warn-bg: #33260f;
   --warn-line: #57431a;
-  --warn-ink: #f0bd7a;
-  --erro: #c9503c;
-  --erro-hd: #b4402f;
-  --alerta: #cf5f49;
-  --alerta-bg: #34201b;
+  --warn-ink: #f5c785;
+  --erro: #d55a44;
+  --erro-hd: #bf4634;
+  --alerta: #dd6a51;
+  --alerta-bg: #331e19;
   --alerta-line: #5d372c;
-  --alerta-ink: #f0a08c;
+  --alerta-ink: #f5ac97;
 
-  /* Categorias: só as duas escuras demais para fundo escuro sobem de luz. */
-  --cat-peticao: #8b83e0;
-  --cat-audiencia: #3aa87a;
-  --cat-outro: #56656d;
+  /* Categorias: as duas escuras demais para fundo escuro sobem de luz. */
+  --cat-peticao: #9a92ea;
+  --cat-audiencia: #43bd8b;
+  --cat-outro: #5b6a72;
 
   /* Sombra sobre fundo escuro precisa ser mais PRETA e mais funda; a sombra
      azulada do tema claro simplesmente some. */
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --sh-seg: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sh-btn: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --sh-btn: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --sh-pop: 0 1px 2px rgba(0, 0, 0, 0.45), 0 24px 60px -18px rgba(0, 0, 0, 0.8);
   --sh-erguido: 0 2px 6px rgba(0, 0, 0, 0.5), 0 34px 80px -20px rgba(0, 0, 0, 0.85);
   --sh-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 24px 60px -18px rgba(0, 0, 0, 0.8);
 
-  --sig-hd: #0c2419;
-  --sig-halo: rgba(58, 168, 122, 0.3);
+  /* O modo sigiloso DERIVA do tema: verde profundo com o mesmo tratamento de
+     gradiente, para o sinal se ler igual em todos. */
+  --sig-hd: linear-gradient(135deg, #08201a 0%, #10362a 60%, #0a2620 100%);
+  --sig-mark-de: #3fae82;
+  --sig-mark-para: #1d6f52;
+  --sig-btn-de: #35a377;
+  --sig-btn-para: #1f7355;
+  --sig-btn-de-h: #3fb686;
+  --sig-btn-para-h: #1a6349;
+  --sig-halo: rgba(67, 189, 139, 0.32);
+  --sig-carimbo-bg: #143529;
+  --sig-carimbo-bg-h: #1a4534;
+  --sig-carimbo-ink: #8ee0bb;
 }
 
 /* ---------- PAPEL ----------
-   O oposto do Noite no eixo que importa: aqui é a CHROME que perde a
-   escuridão. O cabeçalho vira quase-branco, e o quadrado da marca fica sendo a
-   única coisa saturada da janela — o que torna este o tema mais silencioso dos
-   cinco, e o mais próximo de um documento.
+   Não é "o claro sem cor": é PAPEL — creme quente, tinta quase preta, a
+   temperatura de um documento impresso. O oposto do Noite no eixo que importa:
+   aqui é a CHROME que perde a escuridão, e o quadrado da marca fica sendo a
+   única coisa saturada da janela.
 
-   É o tema que só existe por causa da Fase 1: com `color: #fff` escrito em 12
-   regras do cabeçalho, ele seria texto branco sobre branco. */
+   Um tema claro só se distingue do padrão pela TEMPERATURA. Enquanto o fundo
+   era #ffffff e o cabeçalho um cinza-azulado, Papel era o tema padrão com o
+   cabeçalho lavado — que foi a versão que o usuário chamou de "esmaecer". */
 .wrap[data-tema="papel"] {
-  --hd: #eef3f6;
-  --on-hd: #0e323f;
-  --on-hd-2: #4d6673;
-  --on-hd-3: #3e5561;
-  --on-hd-forte: #0b2a3a;
-  /* Os véus INVERTEM: sobre chrome clara, a película que dá relevo é escura.
-     É a razão de eles terem virado token. */
-  --veu-1: rgba(14, 50, 63, 0.055);
-  --veu-2: rgba(14, 50, 63, 0.1);
-  --veu-3: rgba(14, 50, 63, 0.14);
-  --veu-borda: rgba(14, 50, 63, 0.2);
-  --veu-luz: rgba(255, 255, 255, 0.5);
-  --veu-pega: rgba(14, 50, 63, 0.14);
+  --hd: linear-gradient(135deg, #f4eee2 0%, #ebe3d4 100%);
+  --on-hd: #2f2a22;
+  --on-hd-2: #6a6152;
+  --on-hd-3: #4a4438;
+  --on-hd-forte: #23201a;
+  /* Sobre chrome CLARA os véus brancos somem: aqui quem dá relevo é a sombra
+     do próprio papel, isto é, um véu ESCURO. */
+  --veu-1: rgba(58, 48, 30, 0.05);
+  --veu-2: rgba(58, 48, 30, 0.09);
+  --veu-3: rgba(58, 48, 30, 0.16);
+  --veu-borda: rgba(58, 48, 30, 0.24);
+  --veu-luz: rgba(58, 48, 30, 0.1);
+  --veu-pega: rgba(58, 48, 30, 0.18);
 
-  --surface-2: #f5f9fb;
-  --surface-list-ft: #eff5f8;
-  --canvas: #dfe7ec;
-  --line: #dbe5ea;
-  --line-2: #e8eef1;
-  --line-card: #dde7eb;
-  --line-strong: #cfdce2;
+  --surface-painel: linear-gradient(170deg, #fdfbf6 0%, #f8f3e9 100%);
+  --surface: #fffdf9;
+  --surface-2: #f7f2e7;
+  --surface-card: #fefcf7;
+  --surface-list-ft: #f2ecdf;
+  --paper: #f8f3e9;
+  --canvas: #e6dfd1;
+  --hover: #f1ebdd;
+  --hover-2: #f7f2e8;
+  --accent-bg: #e8e0cd;
+  --accent-bg-2: #ede6d6;
 
-  /* O cabeçalho claro precisa de uma linha para não se fundir com a conversa —
-     no tema escuro quem separava era o próprio contraste. */
-  --sig-hd: #dfeee6;
-  /* A textura de redação inverte junto: branca sobre claro é invisível. */
-  --sig-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23153f31' fill-opacity='0.07'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
-  /* O carimbo INVERTE a polaridade: placa escura, tinta clara. O glifo e a
-     forma continuam idênticos — só a luminosidade acompanha o fundo, senão uma
-     placa clara sumiria num cabeçalho claro. */
-  --sig-carimbo-bg: #1d6248;
-  --sig-carimbo-bg-h: #247657;
-  --sig-carimbo-ink: #eaf4ef;
+  /* Tinta QUENTE: um cinza-azulado sobre creme lê como mancha suja. */
+  --ink: #2b2620;
+  --ink-2: #1e1a15;
+  --text: #2b2620;
+  --text-2: #524a3c;
+  --text-3: #3d5a63;
+  --muted: #6d6455;
+  --muted-2: #7a7061;
+  --muted-3: #948b7b;
+  --eyebrow: #9d9483;
+
+  --line: #e3dbca;
+  --line-2: #eee7d9;
+  --line-card: #e6dece;
+  --line-input: #dcd3bf;
+  --line-strong: #d5cbb5;
+  --line-check: #c0b6a0;
+
+  /* O acento é TINTA de caneta, não azul de aplicativo: puxa para o
+     azul-petróleo escuro, que é o que se vê num documento assinado. */
+  --pje: #1f5468;
+  --pje-2: #143f50;
+  --pje-3: #16495d;
+  --pje-soft: #98a39f;
+  --mark-de: #2c7189;
+  --mark-para: #1a4e63;
+  --btn-de: #23697f;
+  --btn-para: #17505f;
+  --btn-de-h: #2a7890;
+  --btn-para-h: #124452;
+  --line-focus: #6a9ba9;
+  --ring: 0 0 0 3px rgba(31, 84, 104, 0.16);
+
+  --ok-bg: #ecf3ea;
+  --ok-line: #cfe0c8;
+  --warn-bg: #f9eed6;
+  --warn-line: #e9dcbb;
+  --alerta-bg: #f8eae2;
+  --alerta-line: #ddb9a3;
+
+  --sh-card: 0 1px 2px rgba(70, 58, 36, 0.05);
+  --sh-seg: 0 1px 2px rgba(70, 58, 36, 0.12);
+  --sh-btn: 0 1px 2px rgba(70, 58, 36, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --sh-pop: 0 1px 2px rgba(70, 58, 36, 0.1), 0 24px 60px -18px rgba(70, 58, 36, 0.34);
+  --sh-erguido: 0 2px 6px rgba(70, 58, 36, 0.14), 0 34px 80px -20px rgba(70, 58, 36, 0.42);
+  --sh-panel: 0 1px 2px rgba(70, 58, 36, 0.1), 0 24px 60px -18px rgba(70, 58, 36, 0.34);
+
+  --sig-hd: linear-gradient(135deg, #e6eee4 0%, #dbe7d8 100%);
+  --sig-carimbo-bg: #d7e7d5;
+  --sig-carimbo-bg-h: #e4f0e2;
+  --sig-carimbo-ink: #1d4433;
 }
-/* A única regra de COMPONENTE que um tema acrescenta, e ela existe porque o
-   cabeçalho claro não tem como se separar da conversa por contraste. */
+/* Cabeçalho claro não se separa da conversa por contraste — a única regra de
+   COMPONENTE que um tema tem hoje, e ela está aqui porque não há token que
+   descreva "a fronteira que só este tema precisa". */
 .wrap[data-tema="papel"] .hd { border-bottom: 1px solid var(--line-strong); }
 
 /* ---------- VIDRO ----------
-   Funde o "transparente" e o "vidro" pedidos: a janela vira uma placa fosca e a
-   página do tribunal atravessa ela, desfocada.
+   VIDRO DE VERDADE, em TODOS os modos: a janela é uma placa translúcida e a
+   página do tribunal atravessa ela, desfocada e mais colorida.
 
-   A PRIMEIRA VERSÃO NÃO ERA VIDRO, e o motivo é estrutural, não de gosto: o
-   `.panel` pintava `var(--surface)` — branco OPACO — e o cabeçalho é filho
-   dele. `backdrop-filter` filtra o que está pintado ATRÁS do elemento, e atrás
-   do cabeçalho estava o branco do próprio painel. Desfocar branco dá branco: o
-   resultado era um cinza lavado. Daí `--surface-painel`: enquanto o fundo da
-   janela e o fundo de um cartão eram o mesmo token, vidro era impossível.
+   A PRIMEIRA VERSÃO NÃO ERA VIDRO, e o motivo é estrutural: o `.panel` pintava
+   `var(--surface)` — branco OPACO — e o cabeçalho é filho dele. `backdrop-filter`
+   filtra o que está pintado ATRÁS do elemento, e atrás do cabeçalho estava o
+   branco do próprio painel. Desfocar branco dá branco. Daí `--surface-painel`:
+   enquanto o fundo da janela e o fundo de um cartão eram o mesmo token, vidro
+   era impossível.
 
    O DESFOQUE MORA NO `.panel`, e só nele. Uma placa de vidro, não cinco:
-   `backdrop-filter` aninhado refiltra o que o pai já filtrou e o resultado
-   embarra. As superfícies de dentro (cabeçalho, lista, barra) são apenas
-   VÉUS de cor por cima da mesma placa — é assim que vidro real se comporta, e
-   é o que dá a sensação de camadas.
+   `backdrop-filter` aninhado refiltra o que o pai já filtrou e embarra. As
+   superfícies de dentro são VÉUS de cor sobre a mesma placa — é assim que vidro
+   real se comporta, e é o que dá a sensação de camadas.
 
    NÃO no `.wrap`: `backdrop-filter` cria bloco de contenção para descendentes
    `position: fixed`, e os popovers (`.movbox`, `.audbox`, `.selmenu`,
-   `.temabox`, `.preview`) são filhos do `.wrap`. No `.panel` eles ficam fora e
-   continuam ancorados na viewport — a mesma razão pela qual eles são irmãos do
-   `.panel`, e não filhos, por causa do `transform` do arrasto.
+   `.temabox`, `.preview`) são filhos do `.wrap`.
 
-   O QUE FICA OPACO. `--surface` NÃO é tocado: ele veste as bolhas da resposta,
-   o campo de mensagem e todos os popovers. Bolha translúcida põe o texto do
-   tribunal por trás do texto da resposta, e o §2 põe o peso visual justamente
-   aí. O efeito colateral é o desenho: cartões sólidos flutuando sobre a placa
-   fosca — que é exatamente a leitura de profundidade que se quer. */
+   E ELE NÃO DEGRADA AO EXPANDIR. A v0.58.0 desligava o desfoque em tela cheia
+   alegando que "não há nada atrás" — falso por MECANISMO: atrás do `.panel` a
+   página do tribunal continua pintada, e o `backdrop-filter` a alcança. Era
+   decisão, não limitação, e ela entregava o efeito só no modo menor. */
 .wrap[data-tema="vidro"] {
-  /* 30px de desfoque não é exagero: abaixo de ~20px a página atrás continua
-     LEGÍVEL e disputa com a conversa. O desfoque tem de transformar o fundo
-     numa mancha de cor, não numa página embaçada. */
-  --vidro-desfoque: blur(30px) saturate(185%);
-  --surface-painel: rgba(248, 251, 253, 0.55);
-  /* A chrome é vidro TINGIDO: o azul institucional a 0,52 sobre a placa. */
-  --hd: rgba(10, 50, 68, 0.52);
-  --sig-hd: rgba(13, 52, 40, 0.56);
-  /* Superfícies internas viram VÉUS — elas não desfocam nada, só tingem. */
-  --surface-2: rgba(255, 255, 255, 0.22);
-  --surface-list-ft: rgba(255, 255, 255, 0.16);
-  --surface-card: rgba(255, 255, 255, 0.5);
-  --hover: rgba(255, 255, 255, 0.42);
-  --hover-2: rgba(255, 255, 255, 0.3);
-  --accent-bg: rgba(255, 255, 255, 0.62);
-  --accent-bg-2: rgba(255, 255, 255, 0.52);
+  /* 30px não é exagero: abaixo de ~20px a página atrás continua LEGÍVEL e
+     disputa com a conversa. O desfoque tem de virar mancha de cor, não página
+     embaçada. A saturação é o que separa vidro de gaze cinza. */
+  --vidro-desfoque: blur(30px) saturate(180%);
+  /* A PLACA É FUMÊ ESCURA, e essa é a decisão central do tema — não um gosto.
+     Duas versões falharam antes, as duas por véu CLARO:
+       1. branco a 0,50 sobre a folha branca do PJe: desfocar branco dá branco,
+          e a captura mostrou um painel opaco comum. Não havia o que revelar.
+       2. azul-claro a 0,20: o efeito apareceu sobre a folha e a legibilidade
+          MORREU sobre a barra institucional do tribunal — 1,04:1, medido. Um
+          tema legível só sobre um fundo falha quando o usuário rola a página.
+     Com véu escuro a ~0,72 a placa DOMINA o que está atrás em luminosidade, de
+     modo que a tinta clara tem contraste sobre a folha branca (5,9:1), sobre a
+     barra azul (13:1) e sobre o cinza do visualizador (6,3:1) — e os 28% que
+     passam, desfocados a 30px, são exatamente a mancha que faz o olho ler
+     "estou olhando ATRAVÉS de algo". */
+  --surface-painel: linear-gradient(
+    155deg,
+    rgba(5, 20, 31, 0.8) 0%,
+    rgba(9, 36, 52, 0.76) 46%,
+    rgba(6, 24, 37, 0.78) 100%
+  );
+  /* A CHROME é a mesma placa, mais densa: é o que dá a leitura de duas camadas
+     de vidro em vez de um cabeçalho colado. */
+  --hd: linear-gradient(
+    135deg,
+    rgba(4, 18, 28, 0.86) 0%,
+    rgba(10, 46, 68, 0.8) 55%,
+    rgba(6, 26, 40, 0.84) 100%
+  );
+  --on-hd: #f2fbff;
+  --on-hd-2: #cfe8f5;
+  --on-hd-3: #e2f2fa;
+  --on-hd-forte: #ffffff;
+
+  /* SUPERFÍCIES DE DENTRO: véus CLAROS de baixa opacidade sobre a placa escura.
+     Elas não desfocam nada — `backdrop-filter` aninhado refiltra o que o pai já
+     filtrou e embarra —, só tingem, que é como vidro real se comporta. */
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-list-ft: rgba(255, 255, 255, 0.04);
+  --hover: rgba(255, 255, 255, 0.12);
+  --hover-2: rgba(255, 255, 255, 0.08);
+  --accent-bg: rgba(86, 194, 232, 0.14);
+  --accent-bg-2: rgba(86, 194, 232, 0.13);
+  /* A BOLHA DA RESPOSTA E OS POPOVERS FICAM SÓLIDOS. É onde o §2 põe o peso
+     visual, e uma bolha translúcida deixa o texto do tribunal passar POR TRÁS
+     do texto da resposta — que é o oposto de legibilidade num produto cuja
+     saída é jurídica. Sólidos sobre a placa fosca dão, de graça, a leitura de
+     profundidade que o tema busca. */
+  --surface: #14283a;
+  --surface-card: #172f42;
+  --paper: #122433;
+  --canvas: #050f18;
+
+  --ink: #eaf6fb;
+  --ink-2: #f6fcfe;
+  --text: #e6f3f9;
+  --text-2: #dcebf3;
+  --text-3: #d6f2fd;
+  --muted: #cfe1ea;
+  --muted-2: #c2d6e1;
+  --muted-3: #adc4d0;
+  --eyebrow: #a2bac7;
+
   /* Linhas claras, não escuras: sobre vidro, quem separa é a LUZ. */
-  --line: rgba(255, 255, 255, 0.5);
-  --line-2: rgba(255, 255, 255, 0.34);
-  --line-card: rgba(255, 255, 255, 0.55);
-  --line-strong: rgba(255, 255, 255, 0.62);
-  --line-input: rgba(255, 255, 255, 0.6);
-  /* A tinta escurece: o fundo agora é uma mancha de luminosidade variável, e o
-     que era confortável sobre branco fica no limite sobre ela. */
-  --text-2: #2c414c;
-  --muted: #4e626c;
-  --muted-2: #566a74;
-  --eyebrow: #61757e;
-  --on-hd-2: #d3e4ec;
-  /* Cantos mais generosos: é assinatura de superfície de vidro, e a 14px a
-     placa lê como painel de aplicativo comum. */
-  --r-2xl: 18px;
+  --line: rgba(255, 255, 255, 0.16);
+  --line-2: rgba(255, 255, 255, 0.1);
+  --line-card: rgba(255, 255, 255, 0.2);
+  --line-strong: rgba(255, 255, 255, 0.26);
+  --line-input: rgba(255, 255, 255, 0.24);
+  --line-check: rgba(255, 255, 255, 0.34);
+
+  /* O acento é o mesmo ciano luminoso do Noite: sobre placa escura o azul
+     institucional some. */
+  --pje: #86dcf6;
+  --pje-2: #1c5f7c;
+  --pje-3: #7ed6f2;
+  --pje-soft: #6a8794;
+  --mark-de: #45b2d8;
+  --mark-para: #1d6d8e;
+  --btn-de: #2fa5ce;
+  --btn-para: #1c7fa6;
+  --btn-de-h: #45b5da;
+  --btn-para-h: #186f93;
+  --line-focus: #62cbee;
+  --ring: 0 0 0 3px rgba(98, 203, 238, 0.28);
+  /* Tinta escura sobre a ação clara, como no Noite: sobre ciano luminoso o
+     branco reprova. */
+  --on-acao: #04212e;
+
+  /* Estados reancorados no escuro; matiz intacto. */
+  --ok: #47c391;
+  --ok-bg: rgba(71, 195, 145, 0.14);
+  --ok-line: rgba(71, 195, 145, 0.36);
+  --ok-ink: #9ae7c4;
+  --warn: #efad55;
+  --warn-bg: rgba(239, 173, 85, 0.15);
+  --warn-line: rgba(239, 173, 85, 0.36);
+  --warn-ink: #f7ce8f;
+  --erro: #db6250;
+  --erro-hd: #c44a37;
+  --alerta: #e2705a;
+  --alerta-bg: rgba(226, 112, 90, 0.16);
+  --alerta-line: rgba(226, 112, 90, 0.4);
+  --alerta-ink: #f7b3a1;
+
+  --cat-peticao: #a49cf0;
+  --cat-audiencia: #47c391;
+  --cat-outro: #6a7b85;
+
+  /* Cantos mais generosos: é assinatura de superfície de vidro. A 14px a placa
+     lê como painel de aplicativo comum. */
+  --r-2xl: 20px;
   /* Sombra funda e larga: é ela que separa a placa da página. */
-  --sh-pop: 0 2px 6px rgba(8, 30, 42, 0.18), 0 32px 72px -18px rgba(8, 30, 42, 0.55);
-  --sh-panel: 0 2px 6px rgba(8, 30, 42, 0.18), 0 32px 72px -18px rgba(8, 30, 42, 0.55);
-  --sh-erguido: 0 3px 10px rgba(8, 30, 42, 0.24), 0 44px 96px -20px rgba(8, 30, 42, 0.62);
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --sh-seg: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-btn: 0 1px 2px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --sh-pop: 0 2px 8px rgba(2, 14, 22, 0.34), 0 34px 76px -18px rgba(2, 14, 22, 0.7);
+  --sh-panel: 0 2px 8px rgba(2, 14, 22, 0.34), 0 34px 76px -18px rgba(2, 14, 22, 0.7);
+  --sh-erguido: 0 3px 12px rgba(2, 14, 22, 0.4), 0 46px 100px -20px rgba(2, 14, 22, 0.76);
+
+  --sig-hd: linear-gradient(
+    135deg,
+    rgba(4, 26, 20, 0.86) 0%,
+    rgba(12, 60, 46, 0.8) 55%,
+    rgba(6, 34, 26, 0.84) 100%
+  );
+  --sig-mark-de: #43b98a;
+  --sig-mark-para: #1d7355;
+  --sig-btn-de: #38ab7d;
+  --sig-btn-para: #1f7a5a;
+  --sig-btn-de-h: #43bd8b;
+  --sig-btn-para-h: #1a6a4d;
+  --sig-halo: rgba(71, 195, 145, 0.34);
+  --sig-carimbo-bg: rgba(71, 195, 145, 0.18);
+  --sig-carimbo-bg-h: rgba(71, 195, 145, 0.26);
+  --sig-carimbo-ink: #9ae7c4;
 }
-/* A PLACA. Três coisas fazem vidro parecer vidro, e nenhuma delas é a
-   transparência sozinha: o desfoque com SATURAÇÃO (o que passa fica mais
-   colorido, não mais cinza), a borda que CAPTA LUZ e a sombra que descola a
-   placa do fundo. */
+/* A PLACA. Três coisas fazem vidro parecer vidro, e nenhuma é a transparência
+   sozinha: o desfoque com SATURAÇÃO (o que passa fica mais colorido, não mais
+   cinza), a borda que CAPTA LUZ e a sombra que descola a placa do fundo. */
 .wrap[data-tema="vidro"] .panel {
   backdrop-filter: var(--vidro-desfoque);
   -webkit-backdrop-filter: var(--vidro-desfoque);
@@ -502,55 +681,190 @@
      caixa; esta lê como espessura. BORDA e não `box-shadow: inset`, pela regra
      de sempre — o inset é pintado ABAIXO dos filhos, e o cabeçalho o cobriria. */
   border: 1px solid;
-  border-color: rgba(255, 255, 255, 0.8) rgba(255, 255, 255, 0.42)
-                rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.42);
+  border-color: rgba(255, 255, 255, 0.85) rgba(255, 255, 255, 0.45)
+                rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.45);
 }
 /* Nos modos sem borda a aresta que encosta na página carrega a luz sozinha. */
-.wrap[data-tema="vidro"].lateral .panel { border: none; border-left: 1px solid rgba(255, 255, 255, 0.7); }
+.wrap[data-tema="vidro"].lateral .panel { border: none; border-left: 1px solid rgba(255, 255, 255, 0.72); }
 .wrap[data-tema="vidro"].full .panel { border: none; }
-/* O BACKDROP do modo expandido é o que fica ATRÁS da placa — a 0,45 ele apaga
-   a página e a placa passa a desfocar um cinza chapado, isto é, deixa de ser
+/* O BACKDROP do modo expandido é o que fica ATRÁS da placa — a 0,45 ele apaga a
+   página e a placa passa a desfocar um cinza chapado, isto é, deixa de ser
    vidro no exato modo em que a janela é maior. Aqui ele escurece só o
    suficiente para dar foco, sem matar o que há para atravessar. */
-.wrap[data-tema="vidro"] .backdrop { background: rgba(5, 32, 46, 0.26); }
-/* EM TELA CHEIA NÃO HÁ NADA ATRÁS: o desfoque lavaria o próprio branco da
-   página e sobraria uma chrome sem graça. Ali o tema degrada para o
-   institucional — comportamento correto, não falta. */
-.wrap[data-tema="vidro"].full {
-  --vidro-desfoque: none;
-  --surface-painel: #ffffff;
-  --hd: #0e4459;
-  --sig-hd: #143f33;
-  --surface-2: #fafcfc;
-  --line: #e2eaee;
-  --line-strong: #d8e2e6;
-}
+.wrap[data-tema="vidro"] .backdrop { background: rgba(5, 32, 46, 0.22); }
 
 /* ---------- TOGA ----------
    O "vermelho" pedido, feito de um jeito que não quebra a interface: vinho
-   profundo, a cor da toga.
+   profundo, a cor da toga — e ele veste a janela inteira, não só a faixa de
+   cima. O fundo puxa para o quente, as linhas para o rosado, e a AÇÃO passa a
+   ser vinho.
 
-   A COR DE AÇÃO CONTINUA AZUL, e essa é a decisão central do tema. Vermelho
-   neste produto é `--alerta` — o que pode levar a erro de decisão —, e um botão
-   primário vinho ao lado de uma barra de alerta vermelha apagaria a fronteira
-   que o §2 estabeleceu entre "informa" e "impede". Toga é tema de CHROME: veste
-   o cabeçalho e a marca, e deixa a ação onde ela sempre esteve. */
+   A FRONTEIRA COM O ALERTA É MANTIDA POR MATIZ E POR FORMA, não pela ausência
+   de vermelho na ação. Vinho aqui é #8d3346 (~345°, escuro e dessaturado); o
+   `--alerta` deste tema foi deslocado para o laranja-tijolo (~18°), a ~50° de
+   distância, e continua aparecendo como FUNDO CLARO com tinta escura, nunca
+   como botão sólido. É o que o §2 pede: a diferença entre "informa" e "impede"
+   tem de sobreviver, e ela sobrevive. */
 .wrap[data-tema="toga"] {
-  --hd: #46202a;
-  --mark-de: #8c4351;
-  --mark-para: #5f2a35;
-  --on-hd: #f6e9ec;
-  --on-hd-2: #d3b3ba;
-  --on-hd-3: #e5cdd2;
-  --on-hd-forte: #fdf6f7;
+  --hd: linear-gradient(135deg, #3a141d 0%, #6b2537 62%, #4a1826 100%);
+  --on-hd: #f8e9ed;
+  --on-hd-2: #d6adb8;
+  --on-hd-3: #e9cdd5;
+  --on-hd-forte: #fffafb;
+  --veu-1: rgba(255, 255, 255, 0.07);
+  --veu-2: rgba(255, 255, 255, 0.15);
+  --veu-3: rgba(255, 255, 255, 0.3);
+  --veu-borda: rgba(255, 255, 255, 0.52);
+  --veu-luz: rgba(255, 255, 255, 0.2);
+  --veu-pega: rgba(255, 255, 255, 0.28);
 
-  --surface-2: #fbf8f8;
-  --surface-list-ft: #f7f2f3;
-  --canvas: #ece4e5;
-  --line: #e8dde0;
-  --line-2: #f1eaeb;
-  --line-card: #ebe1e3;
-  --erro-hd: #8c3242;
+  --surface-painel: linear-gradient(170deg, #fffbfc 0%, #fbf1f3 100%);
+  --surface: #fffdfd;
+  --surface-2: #fbf3f4;
+  --surface-card: #fffbfc;
+  --surface-list-ft: #f7ebee;
+  --paper: #fbf3f4;
+  --canvas: #ebdfe2;
+  --hover: #f6eaed;
+  --hover-2: #fbf2f4;
+  --accent-bg: #f0dde1;
+  --accent-bg-2: #f4e5e8;
+
+  --ink: #33161d;
+  --ink-2: #240f14;
+  --text: #33161d;
+  --text-2: #5c3c44;
+  --text-3: #6d2637;
+  --muted: #7d626a;
+  --muted-2: #8a6f77;
+  --muted-3: #a58c93;
+  --eyebrow: #ae969c;
+
+  --line: #ecdde1;
+  --line-2: #f4eaec;
+  --line-card: #eee0e3;
+  --line-input: #e5d2d7;
+  --line-strong: #ddc7cd;
+  --line-check: #cbafb7;
+
+  /* A AÇÃO é vinho. Foi o pedido explícito — "tema é para mudar tudo, mesmo as
+     cores" —, e o que a torna segura é o deslocamento do alerta abaixo. */
+  --pje: #8d3346;
+  --pje-2: #5f2030;
+  --pje-3: #7a2b3c;
+  --pje-soft: #b2949b;
+  --mark-de: #9c4256;
+  --mark-para: #662534;
+  --btn-de: #93374b;
+  --btn-para: #6b2436;
+  --btn-de-h: #a33e54;
+  --btn-para-h: #5c1e2e;
+  --line-focus: #b4707f;
+  --ring: 0 0 0 3px rgba(141, 51, 70, 0.16);
+
+  /* O alerta SAI de cima do vinho: vai para o laranja-tijolo, e a distância de
+     matiz é o que impede "informa" e "impede" de se confundirem. */
+  --alerta: #c1521f;
+  --erro: #a8461a;
+  --erro-hd: #963d16;
+  --alerta-bg: #fbeee2;
+  --alerta-line: #e5c19c;
+  --alerta-ink: #7d3708;
+
+  --sh-card: 0 1px 2px rgba(60, 22, 30, 0.05);
+  --sh-seg: 0 1px 2px rgba(60, 22, 30, 0.12);
+  --sh-btn: 0 1px 2px rgba(60, 22, 30, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --sh-pop: 0 1px 2px rgba(60, 22, 30, 0.1), 0 24px 60px -18px rgba(60, 22, 30, 0.36);
+  --sh-erguido: 0 2px 6px rgba(60, 22, 30, 0.14), 0 34px 80px -20px rgba(60, 22, 30, 0.46);
+  --sh-panel: 0 1px 2px rgba(60, 22, 30, 0.1), 0 24px 60px -18px rgba(60, 22, 30, 0.36);
+
+  --sig-hd: linear-gradient(135deg, #0f2f24 0%, #1c5741 62%, #123a2c 100%);
+}
+
+/* ---------- ROSA ----------
+   ROSA DE VERDADE: chrome magenta, painel rosado, ação rosa. A v0.58.0 ofereceu
+   este tema no seletor, no changelog e nas notas da release — e não escreveu
+   uma linha de CSS. Escolher "Rosa" punha `data-tema="rosa"` no wrap e o painel
+   continuava azul, idêntico ao padrão. O teste de temas passava 23/23 porque
+   verificava o mecanismo do atributo, nunca a existência da paleta do outro
+   lado. É o mesmo defeito do teste que lia `.sigbar .sb-n` com `|| {}`.
+
+   É O ÚNICO TEMA EM QUE A AÇÃO ACOMPANHA A CHROME, e a diferença para o Toga
+   tem motivo: o magenta (~330°) fica a ~50° do tijolo do `--alerta` (~18°), e o
+   alerta aparece como fundo claro com tinta escura, nunca como botão sólido. */
+.wrap[data-tema="rosa"] {
+  --hd: linear-gradient(135deg, #9c1250 0%, #c41f6a 58%, #a81455 100%);
+  --on-hd: #ffffff;
+  --on-hd-2: #ffe3ef;
+  --on-hd-3: #fbd5e6;
+  --on-hd-forte: #fffafc;
+  --veu-1: rgba(255, 255, 255, 0.09);
+  --veu-2: rgba(255, 255, 255, 0.18);
+  --veu-3: rgba(255, 255, 255, 0.34);
+  --veu-borda: rgba(255, 255, 255, 0.58);
+  --veu-luz: rgba(255, 255, 255, 0.24);
+  --veu-pega: rgba(255, 255, 255, 0.32);
+
+  --surface-painel: linear-gradient(170deg, #fffbfd 0%, #fdeff6 100%);
+  --surface: #fffdfe;
+  --surface-2: #fdf1f7;
+  --surface-card: #fffbfd;
+  --surface-list-ft: #fbe8f1;
+  --paper: #fdf1f7;
+  --canvas: #f0dbe6;
+  --hover: #fae7f0;
+  --hover-2: #fdf0f6;
+  --accent-bg: #f8dcea;
+  --accent-bg-2: #fae5ef;
+
+  --ink: #3d1028;
+  --ink-2: #2b0a1b;
+  --text: #3d1028;
+  --text-2: #63384d;
+  --text-3: #9c1250;
+  --muted: #855e70;
+  --muted-2: #916b7c;
+  --muted-3: #ab8b99;
+  --eyebrow: #b797a4;
+
+  --line: #f2dde8;
+  --line-2: #f9ecf2;
+  --line-card: #f4e0ea;
+  --line-input: #edd2e0;
+  --line-strong: #e7c6d8;
+  --line-check: #d9adc3;
+
+  --pje: #b3185f;
+  --pje-2: #7d0d40;
+  --pje-3: #9c1250;
+  --pje-soft: #c795ac;
+  --mark-de: #d5327f;
+  --mark-para: #9c1250;
+  --btn-de: #c41f6a;
+  --btn-para: #9a1252;
+  --btn-de-h: #d62a76;
+  --btn-para-h: #860e46;
+  --line-focus: #dd7dab;
+  --ring: 0 0 0 3px rgba(179, 24, 95, 0.18);
+
+  /* A prova de que o rosa e o vermelho não colidem: o `--alerta` fica no
+     tijolo de sempre, e a distância de matiz basta porque ele nunca aparece
+     como botão sólido ao lado da ação. */
+  --alerta-bg: #fbece5;
+  --alerta-line: #e2b9a1;
+
+  /* As categorias de peça: só a de PROVA precisa sair do rosa, senão ela some
+     dentro da chrome do tema — ali a cor É o dado. */
+  --cat-prova: #8e3f8f;
+
+  --sh-card: 0 1px 2px rgba(72, 16, 45, 0.05);
+  --sh-seg: 0 1px 2px rgba(72, 16, 45, 0.12);
+  --sh-btn: 0 1px 2px rgba(72, 16, 45, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --sh-pop: 0 1px 2px rgba(72, 16, 45, 0.1), 0 24px 60px -18px rgba(72, 16, 45, 0.36);
+  --sh-erguido: 0 2px 6px rgba(72, 16, 45, 0.14), 0 34px 80px -20px rgba(72, 16, 45, 0.46);
+  --sh-panel: 0 1px 2px rgba(72, 16, 45, 0.1), 0 24px 60px -18px rgba(72, 16, 45, 0.36);
+
+  --sig-hd: linear-gradient(135deg, #0d3327 0%, #1a5c44 60%, #10402f 100%);
 }
 
 
