@@ -2644,13 +2644,36 @@ em `content.js`.
       `(arquivo anexado «nome», fl. N)`, e ela mora no texto do turno, **não na
       constante compartilhada** — assim a minuta sem anexo sai byte a byte como
       antes. Mesma razão da exceção da movimentação.
-    - `origem` grava os anexos (art. 19, §6º: um registro que omite o documento
-      de que o ato foi feito é um registro falso) e o editor os mostra.
+    - **`origem` grava os anexos, e o objeto é montado CAMPO A CAMPO** (não há
+      spread do `ctx` em `guardarMinuta`). Passar o dado no `ctx` não o
+      persiste: a primeira versão desta rodada tinha o `ctx.anexos` preenchido,
+      o comentário justificando o art. 19, §6º e o editor lendo `o.anexos` em
+      TRÊS pontos — com o campo nunca chegando ao disco. `node --check` passa, o
+      ESLint de `no-undef` passa, e o registro do ato sai incompleto exatamente
+      no caso em que alguém pergunta de onde ele veio. **Ao acrescentar um campo
+      a um registro persistido, conferir a lista de chaves do objeto, não o
+      chamador.** Mesmo eixo do `garantirBaixada`, que precisa de `Object.assign`
+      e não de um `set` cru.
+    - **`origem.soAnexos` existe porque o `processo` gravado continua sendo o da
+      TELA.** `guardarMinuta` lê `PJE.getNumeroProcesso()` sempre, e antes desta
+      rodada isso era sempre verdade — não havia minuta sem peça. Com o caso
+      novo, o cartão de "Minhas minutas" passou a exibir o CNJ como se fosse o
+      objeto do ato. Guardar o número continua certo (a minuta nasceu ali, e é
+      por ele que a busca a acha); o que não pode é a afirmação implícita. A
+      marca `de arquivo anexado` vem ANTES do número no `.mc-meta`, para
+      reordenar a leitura, e o `title` do processo diz que ele é contexto — a
+      MESMA distinção que o `soAnexosNoContexto()` já fazia no system prompt.
+      **Um caminho novo pode tornar falso um campo que sempre foi verdadeiro:
+      ao permitir um estado que não existia, varrer quem LÊ o registro.**
     - Coberto pelos cenários F, G e H do `t-content.mjs` — o G é a
       NÃO-REGRESSÃO: com peça marcada, o system volta a afirmar o processo e a
       lista de ids reaparece. **Correção de teste feita junto**: o stub de
       `PJE.lerAnexo` devolvia `null`, então NENHUM teste conseguia provar que o
       anexo chega ao request — o chip aparecia e o payload saía sem o documento.
+      Os dois defeitos acima têm asserção sobre o REGISTRO GRAVADO (a mutação
+      que remove as duas linhas do objeto `origem` derruba três asserções,
+      inclusive a de não-regressão): testar o request não os alcançava, porque
+      eles acontecem depois do `done`.
 - **LACUNA CONHECIDA** (documentada em `subirAnexos`): anexo PDF já no histórico não é
   revalidado por `revalidarPecasDoHistorico` (o `ativos` dela é `selecaoEfetiva()`), então
   trocar a CHAVE da API no meio da conversa deixa um `file_id` de outra conta e o turno
