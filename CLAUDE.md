@@ -3497,11 +3497,58 @@ importam, porque nenhum tinha sintoma):
   constantes do programa: passar o `SUFIXO_MINUTA` pela máscara adulteraria a
   própria instrução se o detector tivesse rotulado uma palavra dela numa peça.
 
-**LACUNAS CONHECIDAS, não resolvidas nesta versão:** duas abas no MESMO processo
-mantêm cópias independentes do mapa e a última gravação vence (podem criar
-`[PESSOA_1]` para pessoas diferentes); e desligar o modo numa aba desarma a
-guarda da outra, cujo botão continua aceso. O caso comum — uma aba por processo
-— não é afetado.
+**DUAS ABAS NO MESMO PROCESSO: o mapa é FUNDIDO, não sobrescrito** (v0.59.0).
+`mapaSigilo` é uma cópia por ABA, hidratada uma vez no boot, e `salvarCaso`
+mescla com spread raso — então o campo `sigilo` inteiro era substituído pela
+última gravação. As duas abas partiam do mesmo mapa, davam o **mesmo número a
+pessoas diferentes**, e a segunda gravação apagava a primeira: o texto já tinha
+saído com `[PESSOA_2]` e o disco passava a devolver outro nome. É a mesma
+família do defeito em que `hidratar` renumerava — e o mesmo preço: um nome
+trocado numa minuta que vai ao PJe assinada. Três peças, e nenhuma sozinha
+basta:
+
+- **`PSEUD.absorver` + `PSEUD.fundir`** (pseudonimos.js) são o algoritmo. O
+  gravado é a AUTORIDADE e entra inteiro (os rótulos dele já podem ter viajado
+  num request); os itens locais são absorvidos um a um. `absorver` é o irmão de
+  `restaurar`, e a diferença é a que importa: ali o número gravado é um FATO,
+  aqui é um PEDIDO — vale só se estiver livre, senão a parte ganha outro e a
+  troca é reportada em `renumerados`. **A guarda tem de estar em `absorver`, e
+  não em `anotar`**, que sobrescreve o `porRotulo` sem reclamar. A fusão respeita
+  a chave canônica, então "BANCO BRADESCO" e "Banco Bradesco S.A." vindos de
+  abas diferentes continuam sendo uma parte só.
+- **Compare-and-swap em `salvarCaso`** (casodb.js + o `baseSigilo` que atravessa
+  `caso.js` e `background.js`) é a ATOMICIDADE. Sem ela as duas abas leem o mesmo
+  estado, as duas fundem contra ele e a segunda gravação apaga a primeira do
+  mesmo jeito — a fusão sozinha só encurtaria a janela. O `sigilo` ganhou um
+  campo `rev`; gravação com base velha é RECUSADA e a resposta traz o que está no
+  disco. **O resto do patch passa mesmo assim**: perder o download de uma peça
+  por causa de um conflito de mapa seria trocar um problema por outro. Sem
+  `baseSigilo` o comportamento é byte a byte o de antes, que é o certo para os
+  campos aditivos (peças, ficha, grid).
+  - **A fusão fica no CONTENT e não no worker**, e isso é decisão: ela depende da
+    chave canônica, que vive em `pseudonimos.js` (content script). Duplicá-la no
+    worker criaria duas definições de identidade para divergirem — e divergir ali
+    custa uma pessoa com dois rótulos, ou dois rótulos com uma pessoa.
+- **`sincronizarMapaSigilo` dentro de `armarSigilo`** é o que fecha a janela de
+  verdade. `armarSigilo` roda no início de TODO turno e o mascaramento das peças
+  só acontece adiante (em `anonimizarLote`, dentro de `baixarSelecionadas`):
+  sincronizando ali, os rótulos novos nascem a partir do maior número GLOBAL, e a
+  colisão não chega a existir. Sai cedo quando a `rev` não mudou — numa sessão de
+  uma aba só, que é 100% do uso normal, não custa nada além de uma leitura.
+- **Renumeração conserta o `sigiloCache`, não o descarta** (`reescreverRotulos`):
+  descartar obrigaria a refazer o OCR de centenas de folhas por uma troca que
+  custa um replace. E a passada é **UMA só** — com duas, uma cadeia (2 vira 3 e 3
+  vira 4) faria a segunda pegar o que a primeira acabou de escrever, e é numa
+  fusão que a cadeia aparece.
+- Coberto por `t-sigilo-duas-abas.mjs`, que reproduz a corrida (as duas abas dão
+  o 2 a pessoas diferentes) e roda o CAS contra um IndexedDB de verdade
+  (`fake-indexeddb`). **Testado por MUTAÇÃO nas duas metades**: tirar a checagem
+  de ocupação em `absorver` derruba 4 asserções (uma delas dizendo que o 2
+  passou a ser de Pedro); tirar a comparação de `rev` no `casodb` derruba outras
+  4, entre elas "o mapa da aba B NÃO entrou por cima".
+
+**LACUNA QUE PERMANECE:** desligar o modo numa aba desarma a guarda da outra,
+cujo botão continua aceso.
 
 **Onde o mascaramento acontece, e por que ali.** O gancho vive DENTRO de
 `baixarSelecionadas`, no mesmo funil da bomba de upload e pela mesma razão que o

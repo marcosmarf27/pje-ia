@@ -285,23 +285,52 @@ const CAMPOS_DE_SESSAO = [
 
 // O caso guarda só o que é do PROCESSO: ficha, grid e qual conversa está
 // aberta. O que é de uma sessão de trabalho mora em `conversas`.
-export async function salvarCaso(chave, patch) {
+// `baseSigilo` é o `sigilo.rev` que esta aba leu. Quando vem definido e a
+// revisão gravada mudou desde então, o campo `sigilo` do patch é DESCARTADO e a
+// resposta traz `conflitoSigilo` mais o que está no disco — o chamador funde e
+// tenta de novo. É compare-and-swap, e não merge aqui dentro, por um motivo
+// que não é de gosto: a fusão depende da CHAVE CANÔNICA de um nome
+// ("BANCO BRADESCO" e "Banco Bradesco S.A." são a mesma parte), e essa regra
+// vive em `pseudonimos.js`, que é content script. Duplicá-la no worker criaria
+// duas definições de identidade para divergirem — e o preço de divergir ali é
+// uma pessoa com dois rótulos, ou dois rótulos com uma pessoa.
+//
+// A atomicidade vem da transação do IndexedDB, que é serializável, e o worker
+// MV3 é ÚNICO para toda a extensão: duas abas do mesmo processo passam pela
+// mesma fila. É isso que fecha a janela que o `hidratar`-só-no-boot deixava
+// aberta a sessão inteira.
+export async function salvarCaso(chave, patch, baseSigilo) {
   if (!chave) return null;
   const db = await abrir();
   const agora = Date.now();
   let carimbo = agora;
   let criado = false;
+  let conflitoSigilo = false;
+  let sigiloAtual = null;
   await transacao(db, [CASOS], "readwrite", (tx) => {
     const st = tx.objectStore(CASOS);
     const req = st.get(chave);
     req.onsuccess = () => {
       criado = !req.result;
       const antes = req.result || { chave, criadoEm: agora };
+      let aplicar = patch;
+      if (patch && patch.sigilo && baseSigilo !== undefined && baseSigilo !== null) {
+        const revAtual = (antes.sigilo && antes.sigilo.rev) || 0;
+        if (revAtual !== baseSigilo) {
+          // Outra aba gravou entre a leitura desta e agora. O resto do patch
+          // (peças, ficha) é ADITIVO e passa: perder o download de uma peça por
+          // causa de um conflito de mapa seria trocar um problema por outro.
+          conflitoSigilo = true;
+          sigiloAtual = antes.sigilo || null;
+          aplicar = { ...patch };
+          delete aplicar.sigilo;
+        }
+      }
       // Carimbo ESTRITAMENTE monotônico, e não `Date.now()` cru: duas gravações
       // dentro do mesmo milissegundo deixariam `atualizadoEm` igual à base que
       // a outra aba tem em mãos, e a detecção de conflito passaria batida.
       carimbo = Math.max(agora, (antes.atualizadoEm || 0) + 1);
-      st.put({ ...antes, ...patch, chave, atualizadoEm: carimbo });
+      st.put({ ...antes, ...aplicar, chave, atualizadoEm: carimbo });
     };
     return agora;
   });
@@ -318,7 +347,7 @@ export async function salvarCaso(chave, patch) {
       /* faxina é best-effort */
     }
   }
-  return { atualizadoEm: carimbo };
+  return { atualizadoEm: carimbo, conflitoSigilo, sigilo: sigiloAtual };
 }
 
 // Grava (ou cria) UMA conversa. `convId` novo nasce aqui — quem chama não

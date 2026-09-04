@@ -1320,8 +1320,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             ok: true, convId: c.convId, atualizadoEm: c.atualizadoEm, ramificou: c.ramificou,
           });
         }
-        const r = await salvarCaso(chave, msg.patch || {});
-        sendResponse({ ok: true, atualizadoEm: r.atualizadoEm });
+        // `baseSigilo` é opcional e só o mapa de sigilo o usa: sem ele o
+        // comportamento é byte a byte o de antes (last-write-wins), que é o
+        // certo para os campos ADITIVOS (peças, ficha, grid).
+        const r = await salvarCaso(chave, msg.patch || {}, msg.baseSigilo);
+        sendResponse({
+          ok: true,
+          atualizadoEm: r.atualizadoEm,
+          conflitoSigilo: !!r.conflitoSigilo,
+          sigilo: r.sigilo || null,
+        });
       } catch (e) {
         // Cota estourada é o único erro que vale uma segunda tentativa: poda
         // metade dos casos e repete UMA vez. Se falhar de novo, o content

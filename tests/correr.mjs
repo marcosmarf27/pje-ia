@@ -22,6 +22,7 @@ const CATALOGO = [
   { t: "t-nucleo" },
   { t: "t-nucleo-correr" },
   { t: "t-v56-unit" },
+  { t: "t-sigilo-duas-abas" },
   { t: "t-modelos-coerencia" },
   { t: "t-config" },
   { t: "t-worker" },

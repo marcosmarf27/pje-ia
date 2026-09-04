@@ -222,6 +222,47 @@
       return "[" + rot + "_" + n + "]";
     }
 
+    // ABSORVER: entra um item que veio de OUTRA cópia deste mesmo mapa (a aba
+    // vizinha, pelo disco). É o irmão de `restaurar`, e a diferença é a única
+    // que importa aqui: `restaurar` reconstrói um mapa que ESTAVA vazio e pode
+    // confiar no número gravado; `absorver` mistura duas numerações que
+    // nasceram independentes, então o número que chega é um PEDIDO, não um
+    // fato.
+    //
+    // Duas abas no mesmo processo hidratam o mesmo mapa no boot e, a partir
+    // dali, numeram sozinhas: as duas veem {1: João} e as duas dão o 2 à
+    // próxima pessoa que acharem. Sem esta função, a gravação de uma
+    // sobrescrevia a da outra e `[PESSOA_2]` passava a devolver o nome errado
+    // — num texto que já saiu e não pode ser reescrito. É a mesma família do
+    // defeito em que `hidratar` renumerava, e o preço é o mesmo: um nome
+    // trocado numa minuta que vai ao PJe assinada.
+    function absorver(tipo, n, valor, liberado, formas) {
+      const rot = rotuloDe(tipo);
+      const chave = chaveDe(rot, valor);
+      if (!chave) return null;
+      const tabela = porTipo.get(rot);
+      // Mesma parte que este mapa já conhece: funde as FORMAS e mantém o
+      // número de quem chegou primeiro. Trocar o número aqui seria justamente
+      // o que não se pode fazer — o rótulo antigo pode já ter saído em texto.
+      const reg = tabela && tabela.get(chave);
+      if (reg) {
+        for (const f of Array.isArray(formas) ? formas : []) if (f) reg.formas.add(String(f));
+        if (valor) reg.formas.add(String(valor));
+        if (liberado) reg.liberado = true;
+        return "[" + rot + "_" + reg.n + "]";
+      }
+      // Parte NOVA para este mapa. O número que ela trouxe só vale se estiver
+      // LIVRE: se a outra aba já o deu a outra pessoa, reusá-lo faria um rótulo
+      // designar duas — exatamente o que este arquivo existe para impedir. Note
+      // que `anotar` sobrescreveria o `porRotulo` sem reclamar, então a guarda
+      // tem de estar AQUI, e não lá dentro.
+      const livre = Number.isInteger(n) && n >= 1 && !porRotulo.has(rot + "_" + n);
+      const novo = anotar(rot, chave, livre ? n : proximo.get(rot) || 1, valor);
+      if (liberado) novo.liberado = true;
+      for (const f of Array.isArray(formas) ? formas : []) if (f) novo.formas.add(String(f));
+      return "[" + rot + "_" + novo.n + "]";
+    }
+
     function paraValor(rotulo) {
       const r = porRotulo.get(String(rotulo).replace(/^\[|\]$/g, ""));
       return r ? r.valor : null;
@@ -310,6 +351,7 @@
       processo: processo || null,
       rotular: rotular,
       restaurar: restaurar,
+      absorver: absorver,
       paraValor: paraValor,
       proibidos: proibidos,
       liberar: liberar,
@@ -333,6 +375,31 @@
     const ordenados = bruto.itens.slice().sort((a, b) => a.n - b.n);
     for (const it of ordenados) m.restaurar(it.tipo, it.n, it.valor, !!it.liberado, it.formas);
     return m;
+  }
+
+  // FUNDE o mapa GRAVADO com o desta aba, e devolve o que teve de mudar de
+  // número. O gravado é a AUTORIDADE: ele entra primeiro e inteiro, porque os
+  // rótulos dele já podem ter viajado num request ou numa minuta, e rótulo que
+  // saiu não se reescreve.
+  //
+  // A ordem é o algoritmo: hidratar o gravado (que preserva a numeração) e
+  // depois ABSORVER, um a um, os itens locais. Cada absorção decide sozinha
+  // entre "já conheço esta parte" (funde formas), "o número dela está livre"
+  // (fica com ele) e "o número está ocupado" (ganha outro) — e é só neste
+  // último caso que há renumeração a reportar.
+  //
+  // `renumerados` não é diagnóstico: é o que diz ao chamador que o texto que
+  // ELE já mascarou nesta sessão usa rótulos que deixaram de valer.
+  function fundir(bruto, local) {
+    const m = hidratar(bruto);
+    const renumerados = [];
+    const itens = (local && Array.isArray(local.itens) && local.itens) || [];
+    for (const it of itens.slice().sort((a, b) => a.n - b.n)) {
+      const antes = "[" + it.tipo + "_" + it.n + "]";
+      const depois = m.absorver(it.tipo, it.n, it.valor, !!it.liberado, it.formas);
+      if (depois && depois !== antes) renumerados.push({ de: antes, para: depois, valor: it.valor });
+    }
+    return { mapa: m, renumerados: renumerados };
   }
 
   // ------------------------------------------------------------------ mascarar
@@ -488,6 +555,7 @@
     rotuloDe: rotuloDe,
     criarMapa: criarMapa,
     hidratar: hidratar,
+    fundir: fundir,
     mascarar: mascarar,
     reidentificar: reidentificar,
     conferir: conferir,

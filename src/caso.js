@@ -59,8 +59,13 @@ var CASO = (function () {
     // `salvarConversa`. `{ok:false, cheio:true}` avisa que o disco encheu mesmo
     // depois da poda de emergência: é o único erro que o chamador precisa
     // distinguir, porque a resposta certa a ele é parar de tentar.
-    salvar(chave, patch) {
-      return rpc({ type: "casoSalvar", chave, patch });
+    // `baseSigilo` é o `sigilo.rev` que esta aba leu, e só o mapa de sigilo o
+    // usa. Passando-o, a gravação daquele campo vira compare-and-swap: se outra
+    // aba gravou nesse meio-tempo, a resposta traz `conflitoSigilo` e o que
+    // está no disco, em vez de sobrescrever. Omitindo-o, o comportamento é o de
+    // sempre — que é o certo para os campos aditivos.
+    salvar(chave, patch, baseSigilo) {
+      return rpc({ type: "casoSalvar", chave, patch, baseSigilo });
     },
 
     // Uma conversa inteira, para quando o usuário troca de conversa na lista.

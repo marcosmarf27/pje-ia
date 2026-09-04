@@ -661,6 +661,11 @@
   // `chrome.storage.sync` (que sai da máquina pela conta Google): mora no
   // casodb, por processo.
   let mapaSigilo = null;
+  // Revisão do mapa que ESTA aba leu do disco. É o `base` de um
+  // compare-and-swap: `mapaSigilo` é uma cópia por ABA, hidratada uma vez no
+  // boot, e sem isto duas abas no mesmo processo davam o mesmo número a pessoas
+  // diferentes e a última gravação apagava a outra. Ver `sincronizarMapaSigilo`.
+  let revSigilo = 0;
   // Predicado da deny list, carregado de src/config/deny-list.json. `null` até a
   // primeira carga; `() => false` se o arquivo falhar (mascara mais, que é o
   // lado seguro).
@@ -4112,12 +4117,73 @@
   // deixaria a guarda conferindo uma lista velha, que é o mesmo que não conferir.
   async function armarSigilo() {
     if (!modoSigiloso || !mapaSigilo || !casoChave) return;
+    // ANTES de armar, e não depois: a guarda é montada a partir do mapa, e um
+    // mapa desatualizado arma uma guarda incompleta. É também aqui que a janela
+    // das duas abas se fecha, porque o mascaramento das peças deste turno só
+    // acontece adiante (em `anonimizarLote`, dentro de `baixarSelecionadas`):
+    // sincronizando agora, os rótulos novos nascem a partir do maior número
+    // GLOBAL, e não do maior que esta aba conhecia.
+    await sincronizarMapaSigilo();
     await rpc({
       type: "sigiloArmar",
       chave: casoChave,
       proibidos: mapaSigilo.proibidos(),
       isentas: isentasDoSistema(),
     });
+  }
+
+  // Relê o mapa gravado e funde com o desta aba. Best-effort por decisão: falha
+  // aqui não pode derrubar um turno — degrada para o comportamento anterior, em
+  // que cada aba trabalhava com a própria cópia.
+  async function sincronizarMapaSigilo() {
+    if (!memoriaDisponivel || memoriaMorta || !casoChave || !mapaSigilo) return;
+    try {
+      const { caso } = await CASO.ler(casoChave);
+      const g = caso && caso.sigilo;
+      if (!g || !g.mapa) return;
+      // A revisão é o que evita fundir a cada turno numa sessão de uma aba só,
+      // que é o caso de 100% do uso normal.
+      if (((g.rev || 0)) === revSigilo) return;
+      aplicarFusaoSigilo(g);
+    } catch (e) {
+      console.warn("[PJe IA] não deu para sincronizar o mapa de sigilo:", (e && e.message) || e);
+    }
+  }
+
+  // Funde o mapa GRAVADO (autoridade — os rótulos dele podem já ter saído em
+  // texto) com o desta aba, adota o resultado e conserta o que esta aba já
+  // mascarou. Devolve as renumerações, para quem chamou decidir se avisa.
+  function aplicarFusaoSigilo(gravado) {
+    const f = PSEUD.fundir(gravado && gravado.mapa, mapaSigilo.serializar());
+    mapaSigilo = f.mapa;
+    revSigilo = (gravado && gravado.rev) || 0;
+    for (const v of (gravado && Array.isArray(gravado.liberados) ? gravado.liberados : [])) {
+      if (typeof v === "string" && v) liberadosSigilo.add(v);
+    }
+    if (f.renumerados.length) {
+      // O texto que esta aba já mascarou carrega os rótulos ANTIGOS. Ele não
+      // saiu ainda (o mascaramento acontece dentro do turno, depois daqui), mas
+      // está no `sigiloCache` e é o que iria no request — então é reescrito, e
+      // não descartado: descartar obrigaria a refazer o OCR de centenas de
+      // folhas por uma renumeração que custa um replace.
+      const de = new Map(f.renumerados.map((r) => [r.de, r.para]));
+      for (const [id, ent] of sigiloCache) {
+        if (!ent || typeof ent.text !== "string") continue;
+        sigiloCache.set(id, { ...ent, text: reescreverRotulos(ent.text, de) });
+      }
+      console.warn(
+        "[PJe IA] o mapa de sigilo foi fundido com o de outra aba; " +
+          f.renumerados.length + " rótulo(s) mudaram de número."
+      );
+    }
+    return f.renumerados;
+  }
+
+  // Troca os rótulos numa passada SÓ. Duas passadas quebrariam numa cadeia
+  // (2 vira 3 e 3 vira 4: a segunda passada pegaria o que a primeira acabou de
+  // escrever), e é justamente numa fusão que a cadeia aparece.
+  function reescreverRotulos(texto, de) {
+    return String(texto).replace(/\[[A-Z_]+_\d+\]/g, (m) => de.get(m) || m);
   }
 
   // O MAPA VAI PARA O CASODB, e a escolha de onde ele mora e' deliberada.
@@ -4132,19 +4198,54 @@
   // O campo NAO entra em CAMPOS_DE_SESSAO: ele e' do PROCESSO, como as pecas.
   // Duas abas no mesmo processo compartilham o mapa, e isso e' o correto --
   // `[PESSOA_1]` tem de ser a mesma pessoa nas duas.
+  //
+  // Mas compartilhar o CAMPO nunca bastou, e a distincao ja custou um bug:
+  // `mapaSigilo` e' uma copia por ABA, hidratada uma vez no boot, e o
+  // `salvarCaso` mescla com spread raso -- o campo `sigilo` inteiro era
+  // substituido pela ultima gravacao, e um rotulo que ja tinha saido em texto
+  // passava a devolver outro nome. Por isso a gravacao virou compare-and-swap
+  // (`gravarMapaSigilo`) e o turno comeca sincronizando
+  // (`sincronizarMapaSigilo`, dentro de `armarSigilo`).
+  // Fire-and-forget para os chamadores (são três, todos em caminhos síncronos),
+  // com o compare-and-swap por dentro.
   function salvarMapaSigilo() {
     if (!memoriaDisponivel || !casoChave || !mapaSigilo || memoriaMorta) return;
-    try {
-      CASO.salvar(casoChave, {
-        sigilo: {
-          ligado: modoSigiloso,
-          mapa: mapaSigilo.serializar(),
-          liberados: [...liberadosSigilo],
+    gravarMapaSigilo().catch((e) =>
+      console.warn("[PJe IA] não deu para gravar o mapa de sigilo:", (e && e.message) || e)
+    );
+  }
+
+  // COMPARE-AND-SWAP, e não um put cru. `salvarCaso` mescla com spread raso, o
+  // que substitui o campo `sigilo` inteiro: enquanto era um put, a segunda aba
+  // apagava o mapa da primeira e um rótulo que já tinha saído em texto passava
+  // a devolver outro nome. Aqui a gravação só vale se a revisão no disco ainda
+  // for a que esta aba leu; se não for, funde e repete.
+  //
+  // Três tentativas porque cada rodada só perde para uma gravação de OUTRA aba,
+  // e três seguidas exigiriam duas abas gravando em rajada no mesmo processo.
+  // Esgotadas, o mapa em memória JÁ está fundido (a fusão acontece a cada
+  // rodada) e o que se perde é a gravação desta rodada — a próxima a refaz.
+  async function gravarMapaSigilo() {
+    for (let tent = 0; tent < 3; tent++) {
+      const r = await CASO.salvar(
+        casoChave,
+        {
+          sigilo: {
+            ligado: modoSigiloso,
+            mapa: mapaSigilo.serializar(),
+            liberados: [...liberadosSigilo],
+            rev: revSigilo + 1,
+          },
         },
-      });
-    } catch (e) {
-      console.warn("[PJe IA] não deu para gravar o mapa de sigilo:", (e && e.message) || e);
+        revSigilo
+      );
+      if (!r || !r.conflitoSigilo) {
+        revSigilo = revSigilo + 1;
+        return;
+      }
+      aplicarFusaoSigilo(r.sigilo);
     }
+    console.warn("[PJe IA] mapa de sigilo: três conflitos seguidos; a próxima gravação refaz.");
   }
 
   // Retoma o mapa gravado. `hidratar` PRESERVA a numeracao, e isso e' o ponto:
@@ -4155,6 +4256,10 @@
     if (!g) return;
     try {
       mapaSigilo = PSEUD.hidratar(g.mapa || { processo: casoChave, itens: [] });
+      // A revisão lida vira o `base` do compare-and-swap das gravações desta
+      // aba. Mapa gravado antes desta versão não tem o campo: `0` é o certo,
+      // e a primeira gravação o leva a 1.
+      revSigilo = (g.rev) || 0;
       liberadosSigilo.clear();
       for (const v of Array.isArray(g.liberados) ? g.liberados : []) {
         if (typeof v === "string" && v) liberadosSigilo.add(v);
