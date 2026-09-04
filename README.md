@@ -564,6 +564,18 @@ Se algo der errado, aperte **F12** no PJe, copie o erro do Console e cole no Cla
 ele corrige. Peça também: *"valide a sintaxe com `node --check src/*.js`"* (o projeto não
 tem build; é assim que se confere).
 
+**E rode a suíte de testes** — ela vive em `tests/` e não precisa de PJe nenhum:
+
+```bash
+cd tests && npm install && node correr.mjs
+```
+
+São 35 testes que rodam fora do navegador (o painel inteiro em `jsdom`, o modo sigiloso de
+ponta a ponta, o escritor de ZIP conferido por um leitor independente, o tokenizador do NER
+contra o oráculo em Rust do HuggingFace). Levam cerca de um minuto e meio. Um PR que deixa
+a suíte verde já passou pela parte difícil da revisão; se algum ficar vermelho, cole a
+saída no Claude Code. O `tests/README.md` explica o que cada um cobre.
+
 > ⚠️ **Nunca coloque no PR a sua chave de API, número de processo, nome de parte ou
 > qualquer trecho de autos.** Prints são bem-vindos — desde que borrados.
 
