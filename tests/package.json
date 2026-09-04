@@ -1,0 +1,13 @@
+{
+  "name": "tecjustica-pje-testes",
+  "private": true,
+  "type": "module",
+  "description": "Testes da extensão. Vive aqui, e NÃO na raiz: a extensão não tem build step nem package.json, e empacotar.ps1 copia apenas manifest.json, src/, icons/ e vendor/ — tests/ fica fora do pacote por construção, como cli/ e Planos/.",
+  "scripts": {
+    "test": "node correr.mjs",
+    "test:rapido": "node correr.mjs --rapido"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

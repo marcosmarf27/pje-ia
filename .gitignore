@@ -66,3 +66,15 @@ _saida-teste/
 # são o contrato que `Tokenizador.conferirConfig` valida em runtime.
 vendor/ner-modelo/model.onnx
 vendor/ner-modelo/*.onnx_data
+
+# ---------------------------------------------------------------------------
+# Testes (tests/). Os .mjs, o runner e as fixtures SÃO versionados; o que não é:
+#
+#  - node_modules/ (só jsdom) — já coberto pela regra acima.
+#  - tests/espelho/ — GERADO a cada execução por t-worker.mjs, que copia
+#    src/*.js e injeta um package.json com type:module porque background.js é
+#    ES module e a RAIZ do repo não tem package.json (decisão do projeto: sem
+#    build step). Versioná-lo criaria uma segunda cópia de todo o src/ para
+#    envelhecer em silêncio — exatamente o que a nota do `.gitignore` sobre o
+#    model.onnx chama de insumo, e não de fonte.
+tests/espelho/
