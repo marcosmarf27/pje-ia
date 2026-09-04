@@ -482,6 +482,22 @@ async function cenarioEnvio(nome, cfg) {
     t(!/use exatamente estes ids/.test(corpo),
       "[minuta+anexo]: e a lista de ids de peca NAO aparece quando nao ha peca");
   }
+
+  // O REGISTRO no disco (arts. 19, 6o e 21, 2o da Res. CNJ 615). O objeto
+  // `origem` e montado campo a campo, entao um dado passado no ctx e sem linha
+  // la NAO vai ao disco -- foi o que aconteceu com `anexos` na primeira versao
+  // desta rodada, com o editor ja o exibindo e o campo nunca existindo.
+  const chaveM = Object.keys(amb.store.local).find((k) => k.indexOf("minuta:") === 0);
+  t(!!chaveM, "[minuta+anexo]: a minuta foi gravada no disco");
+  const regM = (chaveM && amb.store.local[chaveM]) || {};
+  const origemM = regM.origem || {};
+  t(/contrato/i.test(String(origemM.anexos || "")),
+    "[minuta+anexo]: a origem NOMEIA o arquivo de que o ato foi feito -- registro que omite isso e registro falso");
+  t(origemM.soAnexos === true,
+    "[minuta+anexo]: a origem marca que NAO houve peca dos autos");
+  // O processo da tela continua gravado (e verdade que a minuta nasceu ali, e e
+  // por ele que a busca acha), mas quem o LE precisa saber que e contexto.
+  t(!!regM.processo, "[minuta+anexo]: o processo em que ela nasceu continua gravado");
 }
 
 // ------- cenário G: NÃO-REGRESSÃO da minuta com peça marcada
@@ -515,6 +531,14 @@ async function cenarioEnvio(nome, cfg) {
     t(/use exatamente estes ids/.test(corpo), "[minuta normal]: a lista de ids esta la");
     t(!/arquivo anexado/.test(corpo), "[minuta normal]: e nada sobre anexo");
   }
+
+  // O registro do disco tambem tem de voltar ao que sempre foi: sem a marca de
+  // so-anexos, o cartao de "Minhas minutas" mostra o processo como o objeto do
+  // ato -- e aqui isso e VERDADE.
+  const chaveM = Object.keys(amb.store.local).find((k) => k.indexOf("minuta:") === 0);
+  const origemM = ((chaveM && amb.store.local[chaveM]) || {}).origem || {};
+  t(origemM.soAnexos === false, "[minuta normal]: a origem NAO marca so-anexos");
+  t(!origemM.anexos, "[minuta normal]: e nao nomeia arquivo nenhum");
 }
 
 

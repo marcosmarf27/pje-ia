@@ -540,6 +540,10 @@
     // "editada" separa o que foi trabalhado do que só foi gerado. 2 s de folga
     // porque o editor grava o HTML convertido logo na primeira abertura.
     const editada = (r.atualizadoEm || 0) > (r.criadoEm || 0) + 2000;
+    // Minuta feita SO de arquivo anexado: o `processo` gravado e o que estava
+    // aberto na tela, e sem esta marca o cartao o exibe como se fosse o objeto
+    // do ato. O chip vem ANTES do numero justamente para reordenar a leitura.
+    const soAnexos = !!(r.origem && r.origem.soAnexos);
     return (
       '<div class="mcard" data-id="' + escaparTexto(r.id) + '">' +
       '<a class="mc-open" href="editor.html?id=' + encodeURIComponent(r.id) + '">' +
@@ -549,7 +553,12 @@
       "</div>" +
       '<div class="mc-tit">' + escaparTexto(tituloUtil(r)) + "</div>" +
       '<div class="mc-meta">' +
-      (r.processo ? '<span class="mc-proc">' + escaparTexto(r.processo) + "</span>" : "") +
+      (soAnexos ? '<span class="mc-anx">de arquivo anexado</span>' : "") +
+      (r.processo
+        ? '<span class="mc-proc"' +
+          (soAnexos ? ' title="Processo aberto quando a minuta foi criada. O ato foi redigido a partir de arquivo de fora dos autos."' : "") +
+          ">" + escaparTexto(r.processo) + "</span>"
+        : "") +
       "<span>" + tempoRelativo(ts) + "</span>" +
       (editada ? '<span class="mc-ed">editada</span>' : "") +
       "</div>" +

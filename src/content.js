@@ -8558,6 +8558,8 @@
         anexos: idsAnexosEnvio.length
           ? mascararCurto(idsAnexosEnvio.map((id) => metaDe(id).titulo).join("; "))
           : "",
+        // Sem NENHUMA peca dos autos: o ato foi feito so do arquivo do usuario.
+        soAnexos: !dl.ok.length,
       });
       const idProc = PJE.getIdProcesso();
       const nomeMd = ("minuta" + (idProc ? "-processo-" + idProc : "") + ".md").replace(
@@ -8635,6 +8637,20 @@
             modelo: (ctx && ctx.modelo) || "",
             modelosCategoria: (ctx && ctx.modelosCategoria) || "",
             modelosQtd: (ctx && ctx.modelosQtd) || 0,
+            // Os arquivos de fora dos autos que embasaram o ato. O objeto e
+            // montado campo a campo (nao ha spread do ctx), entao um dado que
+            // chega no ctx e nao tem linha aqui simplesmente NAO vai ao disco:
+            // foi o que aconteceu na primeira versao desta rodada, com o editor
+            // ja lendo `o.anexos` em tres pontos e o campo nunca existindo.
+            anexos: (ctx && ctx.anexos) || "",
+            // A minuta feita SO de anexo nasceu no processo da tela, mas nao e
+            // SOBRE ele. Sem esta marca o cartao de "Minhas minutas" mostra o
+            // CNJ como se fosse o objeto do ato -- a mesma confusao que o
+            // `soAnexosNoContexto()` do chat resolve chamando o numero de
+            // CONTEXTO. Guardar o processo continua certo (e verdade que ela
+            // nasceu ali, e e por ele que se busca); o que nao pode e a
+            // afirmacao implicita de que o ato trata daquele processo.
+            soAnexos: !!(ctx && ctx.soAnexos),
             em: Date.now(),
           }
         : null;

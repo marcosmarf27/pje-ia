@@ -911,6 +911,10 @@ body {
   letter-spacing: 0.02em;
 }
 .mc-ed { color: var(--ok, #2f9268); font-weight: 600; }
+/* procedencia, nao estado: o ato veio de arquivo de FORA dos autos. Cor da
+   marca (institucional), nunca --warn: nao ha nada de errado com a minuta --
+   o que muda e do que ela foi feita, e por isso o chip precede o numero. */
+.mc-anx { color: var(--pje, #12729f); font-weight: 600; }
 .mc-previa {
   margin-top: 5px;
   font-size: var(--fs-meta);
