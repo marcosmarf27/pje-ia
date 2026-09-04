@@ -4227,6 +4227,7 @@
   // rodada) e o que se perde é a gravação desta rodada — a próxima a refaz.
   async function gravarMapaSigilo() {
     for (let tent = 0; tent < 3; tent++) {
+      const revEnviada = revSigilo + 1;
       const r = await CASO.salvar(
         casoChave,
         {
@@ -4234,13 +4235,19 @@
             ligado: modoSigiloso,
             mapa: mapaSigilo.serializar(),
             liberados: [...liberadosSigilo],
-            rev: revSigilo + 1,
+            rev: revEnviada,
           },
         },
         revSigilo
       );
       if (!r || !r.conflitoSigilo) {
-        revSigilo = revSigilo + 1;
+        // A revisão ENVIADA, e não `revSigilo + 1` lido agora: entre o começo
+        // desta chamada e a resposta, `sincronizarMapaSigilo` pode ter rodado e
+        // reescrito `revSigilo` com o que leu do disco. Somando 1 sobre o valor
+        // de agora, o contador ficaria um acima do que está gravado — e a
+        // próxima gravação levaria um conflito espúrio, com uma fusão inútil,
+        // justamente na corrida que isto existe para tratar.
+        revSigilo = revEnviada;
         return;
       }
       aplicarFusaoSigilo(r.sigilo);

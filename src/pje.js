@@ -1184,7 +1184,11 @@ var PJE = (function () {
     // resposta sobre a busca, e um `undefined` neste ramo se leria como "não
     // perguntei" em vez de "não achei" — a diferença que decide se o chamador
     // avisa o usuário ou fica calado.
-    if (!tl) return { total: 0, completo: true, achou: pararQuando ? false : undefined };
+    // `completo: false`, e não true: sem `#divTimeLine` não há timeline
+    // carregada — afirmar o contrário faz o chamador concluir que a varredura
+    // ESGOTOU a lista. Ver a flag `sumiu` abaixo: é o mesmo erro, e ele
+    // envenenava a sessão inteira.
+    if (!tl) return { total: 0, completo: false, achou: pararQuando ? false : undefined };
     // Já está lá: não rola nada. Vale para o caso em que o chamador testou antes
     // e a timeline mudou no meio (o A4J re-renderiza sozinho).
     if (pararQuando && pararQuando()) {
@@ -1199,12 +1203,23 @@ var PJE = (function () {
     const TETO_MS = 90000;
     let total = contar();
     let estaveis = 0; // rodadas seguidas sem crescimento — 2 encerram
+    let sumiu = false; // a timeline desapareceu no meio (re-render A4J)
     while (estaveis < 2 && Date.now() - inicio < TETO_MS) {
       // Re-localiza timeline e scroller a CADA rodada: o re-render A4J que
       // anexa as peças novas pode substituir os nós no DOM — uma referência
       // guardada apontaria para um elemento morto e a rolagem viraria no-op.
       tl = document.querySelector("#divTimeLine");
-      if (!tl) break; // página re-renderizou/navegou no meio
+      if (!tl) {
+        // O MESMO A4J que traz as peças RE-RENDERIZA a timeline, e durante a
+        // troca o nó não existe: um retrato tirado aqui é indistinguível de
+        // navegação. Sair com `completo: true` faria o chamador concluir que a
+        // lista foi esgotada — e em `garantirNaTimeline` isso marca
+        // `timelineVarridaAteOFim`, que NUNCA volta: um soluço de re-render
+        // tornaria toda peça fora da timeline inalcançável pelo resto da
+        // sessão. É a mesma família do falso positivo do `telaMorta`.
+        sumiu = true;
+        break;
+      }
       const sc = acharScroller(tl);
       if (sc === window) {
         window.scrollTo(0, document.documentElement.scrollHeight);
@@ -1247,7 +1262,7 @@ var PJE = (function () {
     devolverRolagem(scrollAntes);
     return {
       total: listarDocumentos().length,
-      completo: Date.now() - inicio < TETO_MS,
+      completo: !sumiu && Date.now() - inicio < TETO_MS,
       achou: pararQuando ? !!pararQuando() : undefined,
     };
   }

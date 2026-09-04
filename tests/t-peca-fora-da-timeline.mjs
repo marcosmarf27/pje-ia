@@ -159,5 +159,37 @@ function montar(opcoes) {
     "e so gasta os requests de download, nao uma timeline inteira", a.pedidos.length - antes);
 }
 
+
+// ------------------- o RE-RENDER transitorio nao pode envenenar a memoria
+// O mesmo A4J que traz as pecas RE-RENDERIZA a timeline, e durante a troca o
+// #divTimeLine nao existe. Se a varredura sair dali dizendo "completa", a
+// memoria `timelineVarridaAteOFim` liga -- e ela NUNCA volta: um soluco de
+// re-render tornaria toda peca fora da timeline inalcancavel pelo resto da
+// sessao, sem sintoma. E a mesma familia do falso positivo do `telaMorta`.
+{
+  const a = montar();
+  const doc = a.w.document;
+  const tl = doc.querySelector("#divTimeLine");
+  const pai = tl.parentNode;
+  // Some com a timeline no meio da primeira rolagem e devolve logo depois.
+  let jaSumiu = false;
+  const original = doc.querySelector.bind(doc);
+  doc.querySelector = (sel) => {
+    if (sel === "#divTimeLine" && !jaSumiu) {
+      jaSumiu = true;
+      return null; // o retrato tirado durante o re-render
+    }
+    return original(sel);
+  };
+  await a.PJE.baixar("184100996").catch(() => {});
+  doc.querySelector = original;
+  if (!tl.parentNode) pai.appendChild(tl);
+
+  // A peca seguinte TEM de disparar uma varredura de verdade -- e achar.
+  const corpo = await a.PJE.baixar("184100106").catch((e) => ({ erro: e.message }));
+  ok(corpo && !corpo.erro,
+    "depois de um re-render transitorio, a busca ainda funciona", corpo && corpo.erro);
+}
+
 console.log("  " + n + "/" + n + " asserções" + (mau ? " (" + mau + " FALHARAM)" : ""));
 process.exit(mau ? 1 : 0);

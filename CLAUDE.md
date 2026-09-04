@@ -3529,12 +3529,19 @@ basta:
     chave canônica, que vive em `pseudonimos.js` (content script). Duplicá-la no
     worker criaria duas definições de identidade para divergirem — e divergir ali
     custa uma pessoa com dois rótulos, ou dois rótulos com uma pessoa.
-- **`sincronizarMapaSigilo` dentro de `armarSigilo`** é o que fecha a janela de
-  verdade. `armarSigilo` roda no início de TODO turno e o mascaramento das peças
-  só acontece adiante (em `anonimizarLote`, dentro de `baixarSelecionadas`):
-  sincronizando ali, os rótulos novos nascem a partir do maior número GLOBAL, e a
-  colisão não chega a existir. Sai cedo quando a `rev` não mudou — numa sessão de
-  uma aba só, que é 100% do uso normal, não custa nada além de uma leitura.
+- **`sincronizarMapaSigilo` dentro de `armarSigilo`** ENCOLHE a janela, e é
+  importante não dizer mais do que isso. `armarSigilo` roda no início de TODO
+  turno e o mascaramento das peças só acontece adiante (em `anonimizarLote`,
+  dentro de `baixarSelecionadas`): sincronizando ali, os rótulos novos nascem a
+  partir do maior número GLOBAL que se conhecia naquele instante. **A janela que
+  resta é [a sincronização → o envio]** — caixa de conferência, upload e pré-voo,
+  isto é, dezenas de segundos, não milissegundos. O DISCO fica consistente de
+  todo jeito (o CAS garante que quem grava por último funde), mas o texto que a
+  segunda aba ENVIOU naquele intervalo ainda pode carregar um rótulo colidido.
+  Fechar isso de vez exigiria alocar o rótulo no worker, e `rotular` é síncrona —
+  torná-la assíncrona espalharia `await` por `mascararCurto` e por todo o
+  caminho de medição. Sai cedo quando a `rev` não mudou: numa sessão de uma aba
+  só, que é 100% do uso normal, não custa nada além de uma leitura.
 - **Renumeração conserta o `sigiloCache`, não o descarta** (`reescreverRotulos`):
   descartar obrigaria a refazer o OCR de centenas de folhas por uma troca que
   custa um replace. E a passada é **UMA só** — com duas, uma cadeia (2 vira 3 e 3
@@ -3546,6 +3553,12 @@ basta:
   de ocupação em `absorver` derruba 4 asserções (uma delas dizendo que o 2
   passou a ser de Pedro); tirar a comparação de `rev` no `casodb` derruba outras
   4, entre elas "o mapa da aba B NÃO entrou por cima".
+  - **LACUNA DE TESTE, dita porque não dizer é pior**: `fundir` e o CAS são
+    testados em ISOLAMENTO; a FIAÇÃO entre eles — `sincronizarMapaSigilo` →
+    `aplicarFusaoSigilo` → a reescrita do `sigiloCache` — não tem teste de ponta
+    a ponta. O `t-turno-sigiloso` stuba `CASO` para falhar, então exercita só o
+    ramo do catch. Para fechar: um modo em que `CASO.ler` devolva um mapa com
+    `rev` diferente.
 
 **LACUNA QUE PERMANECE:** desligar o modo numa aba desarma a guarda da outra,
 cujo botão continua aceso.
