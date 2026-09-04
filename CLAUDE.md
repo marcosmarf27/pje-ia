@@ -2615,16 +2615,42 @@ em `content.js`.
     mesmo anexo) que verifica os dois desbloqueios, o system do modo, a ausência
     do inventário — e a REGRESSÃO: marcar uma peça devolve "Processo em análise"
     e tira o trecho.
-  - **LACUNA CONHECIDA: só o CHAT aceita anexo sem peça.** `onMinuta` e
-    `onMapa` continuam com a guarda DURA `selectedIds.length === 0` ("Marque as
-    peças que devem embasar a minuta"), então minutar a partir de um anexo é
-    recusado. Estendê-los não é trocar a guarda: os dois montam blocos do zero a
-    partir de `dl.ok` e seriam ~8 pontos CADA (`baixarSelecionadas` com lista
-    vazia, o `if (!dl.ok.length) throw`, `guardaPaginas`, `subirAnexos`,
-    `montarBlocos`, `pecasTruncadas`, os `atts` da bolha) no fluxo mais delicado
-    do produto — o que sai daqui vai ao PJe. Some-se que o `SUFIXO_MINUTA` exige
-    `(Peça, id 123456, fl. 7)` e um anexo não tem id: o formato da citação teria
-    de ganhar um ramo. Se for fazer, fazer inteiro e com teste próprio.
+  - **MINUTA E MAPA TAMBÉM ACEITAM ANEXO SEM PEÇA** (v0.59.0). Até aqui os dois
+    tinham a guarda dura `selectedIds.length === 0` e recusavam com "Marque as
+    peças que devem embasar a minuta" — com o chip do arquivo na tela. Quatro
+    frentes, e a ordem em que elas mordem importa:
+    - **O PAINEL guarda ANTES do content, em QUATRO pontos** (o botão e o envio,
+      de cada modo), e corrigir só o content não destrava nada: o `.btn-minuta`
+      nem ENTRAVA no modo, então o Enviar seguinte virava uma mensagem de chat
+      comum. `temMaterialParaAto()` é a fonte única — "há material para embasar?"
+      não é "há peça marcada?".
+    - **O gancho de ANONIMIZAÇÃO dos anexos** (e o do texto local) precisa
+      existir nos dois fluxos: os anexos não passam por `baixarSelecionadas`, e
+      desde que `entradaDoc` falha FECHADO sob sigilo, um anexo não mascarado
+      SUMIRIA do request — a minuta sairia sem o documento que a embasa,
+      justamente no modo em que isso mais importa.
+    - **O SYSTEM DA MINUTA precisou de premissa própria** (`PROMPT_MINUTA_SO_ANEXOS`,
+      e `systemMinuta` passou a receber `soAnexos`). É o ponto mais grave da
+      rodada: `systemMinuta` chamava `contextoDoProcesso(false)` HARDCODED, então
+      um ato redigido a partir de um contrato anexado saía com o system afirmando
+      "Processo em análise: X" e mandando a ficha com os titulares de cada polo —
+      e o modelo preenchia cabeçalho e dispositivo com **as partes do processo
+      aberto na tela**. Um ato com as partes erradas é o pior defeito possível
+      num documento assinado, e sai plausível e bem escrito. O MAPA não precisou:
+      ele usa `systemPromptAtual()`, e `soAnexosNoContexto()` já dá true ali.
+    - **A CITAÇÃO ganhou ramo** — anexo não tem id, e o `SUFIXO_MINUTA` exige
+      `(Título da peça, id 123456, fl. 7)` em toda afirmação: sem forma própria o
+      modelo fica entre omitir a origem e inventar um id. A forma é
+      `(arquivo anexado «nome», fl. N)`, e ela mora no texto do turno, **não na
+      constante compartilhada** — assim a minuta sem anexo sai byte a byte como
+      antes. Mesma razão da exceção da movimentação.
+    - `origem` grava os anexos (art. 19, §6º: um registro que omite o documento
+      de que o ato foi feito é um registro falso) e o editor os mostra.
+    - Coberto pelos cenários F, G e H do `t-content.mjs` — o G é a
+      NÃO-REGRESSÃO: com peça marcada, o system volta a afirmar o processo e a
+      lista de ids reaparece. **Correção de teste feita junto**: o stub de
+      `PJE.lerAnexo` devolvia `null`, então NENHUM teste conseguia provar que o
+      anexo chega ao request — o chip aparecia e o payload saía sem o documento.
 - **LACUNA CONHECIDA** (documentada em `subirAnexos`): anexo PDF já no histórico não é
   revalidado por `revalidarPecasDoHistorico` (o `ativos` dela é `selecaoEfetiva()`), então
   trocar a CHAVE da API no meio da conversa deixa um `file_id` de outra conta e o turno

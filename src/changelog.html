@@ -103,7 +103,45 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.58.3</span> O <strong>Vidro</strong> virou vidro de verdade — e o modo sigiloso voltou a ter cor</h2>
+        <h2><span class="v novo">v0.59.0</span> Três correções que ninguém via — e a minuta a partir de um arquivo anexado</h2>
+        <p>
+          <strong>Se você abre o mesmo processo em duas abas com o modo sigiloso ligado</strong>,
+          esta versão conserta algo sério e silencioso. Cada aba mantinha sua própria tabela de
+          apelidos, e as duas davam o mesmo número a pessoas diferentes: a segunda gravação
+          apagava a primeira, e uma minuta gerada antes passava a devolver o nome errado ao
+          restaurar os nomes. Agora as tabelas são <strong>fundidas</strong>, e quem chegou
+          primeiro mantém o número — o rótulo que já saiu num texto nunca muda de dono.
+        </p>
+        <p>
+          <strong>Peça que aparece na lista mas não na linha do tempo agora baixa.</strong>
+          Desde que a lista passou a vir da rota oficial do PJe, ela traz mais peças do que a
+          linha do tempo mostra — e o PJe só libera o download depois que a peça é aberta ali.
+          O resultado era uma peça que simplesmente faltava na análise, e a IA respondendo
+          "não consta" sobre um documento que existe nos autos. A extensão agora vai buscá-la
+          sozinha, parando assim que a encontra, e devolve a rolagem para onde estava. Quando
+          a peça realmente não está na linha do tempo, a mensagem diz isso — antes ela mandava
+          "abra-a na linha do tempo", que era pedir o impossível.
+        </p>
+        <p>
+          <strong>Minuta e mapa mental agora aceitam um arquivo anexado, sem marcar peça
+          nenhuma.</strong> O contrato que a parte trouxe, o documento que chegou por e-mail, a
+          peça de outro processo: solte no 📎 e clique em Gerar. Os dois recusavam com "marque
+          as peças" mesmo com o arquivo na tela. E o cuidado que essa mudança exigiu vale ser
+          dito: quando a minuta vem só de um anexo, a extensão avisa o modelo de que o processo
+          aberto na tela é <em>contexto</em>, não o objeto — sem isso, o ato sairia com o número
+          e as partes do processo errado, bem escrito e difícil de notar na revisão. O que
+          faltar continua virando <code>[COMPLETAR: …]</code>, e o registro de origem da minuta
+          passa a nomear o arquivo de que ela foi feita.
+        </p>
+        <p>
+          Nos bastidores, os testes da extensão saíram da pasta temporária e passaram a viver
+          no repositório, com um comando só para rodar todos. Ao mudarem de lugar, três deles
+          estavam vermelhos havia semanas — nenhum por defeito do produto, todos por terem
+          ficado para trás. Teste que falha sozinho é teste que ninguém roda.
+        </p>
+      </div>
+      <div class="card">
+        <h2><span class="v">v0.58.3</span> O <strong>Vidro</strong> virou vidro de verdade — e o modo sigiloso voltou a ter cor</h2>
         <p>
           O tema <strong>Vidro</strong> era uma placa escura e fumê. Ele media bem, mas não
           era o material que o nome promete: agora é uma <strong>placa branca translúcida</strong>,
@@ -2080,7 +2118,7 @@
 
       <h1 class="serif" id="historico">Histórico completo</h1>
       <p class="lead">
-        As 72 versões, da mais recente à primeira. As marcadas com
+        As 73 versões, da mais recente à primeira. As marcadas com
         <span class="dot-marco"></span> mudaram o produto de forma visível.
       </p>
 
@@ -2090,6 +2128,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.59.0</span></td><td>04/09/2026</td><td><span class="dot-marco"></span><strong>Três correções silenciosas e a minuta a partir de um anexo.</strong> Com o modo sigiloso ligado, <strong>duas abas no mesmo processo</strong> mantinham tabelas de apelidos independentes e davam o mesmo número a pessoas diferentes — a segunda gravação apagava a primeira, e uma minuta gerada antes passava a devolver o nome errado ao restaurar os nomes; agora as tabelas são fundidas e quem chegou primeiro mantém o número. <strong>Peça que aparece na lista mas não na linha do tempo</strong> voltou a baixar: desde que a lista passou a vir da rota oficial ela traz mais peças do que a tela mostra, e o PJe só libera o download depois de a peça ser aberta ali — o resultado era uma peça faltando na análise e a IA dizendo “não consta” sobre documento que existe. E <strong>minuta e mapa mental passaram a aceitar arquivo anexado sem peça marcada</strong>, avisando o modelo de que o processo aberto na tela é contexto e não o objeto: sem isso o ato sairia com as partes do processo errado. Os testes da extensão saíram da pasta temporária e passaram a viver no repositório</td></tr>
             <tr><td><span class="v">0.58.3</span></td><td>03/09/2026</td><td><strong>O Vidro virou vidro.</strong> A placa fumê escura foi trocada por uma placa BRANCA translúcida, tingida de azul e com um risco de luz na diagonal — e ficou mais transparente que a anterior, não menos. O que destravou foi a cor do texto: com tinta escura o fundo difícil deixa de ser a folha branca e passa a ser a barra azul do tribunal, onde uma placa clara vence com folga. A medição de contraste passou a cobrir também o CABEÇALHO sobre os três fundos — nos modos lateral e tela cheia é ele que encosta na barra. E um defeito publicado: em cinco das seis aparências, ligar o modo sigiloso NÃO pintava o cabeçalho de verde (o token virou gradiente na v0.58.0 e o consumidor só aceitava cor), de modo que o sinal de que os autos não estão saindo em claro não aparecia fora do tema padrão</td></tr>
             <tr><td><span class="v">0.58.2</span></td><td>03/09/2026</td><td><strong>Contraste do modo sigiloso em todos os temas.</strong> O botão Enviar com o modo ligado estava em 3,87:1 — abaixo do mínimo de leitura, e desde antes da rodada de temas — e o carimbo do sigilo ficava fraco sobre a placa do tema Vidro. Os dois passaram a ser medidos junto com o resto do painel</td></tr>
             <tr><td><span class="v">0.58.1</span></td><td>03/09/2026</td><td><strong>Os seis temas funcionando.</strong> O Rosa era oferecido sem existir (nenhuma paleta no CSS); o Noite não pintava o fundo da janela, deixando texto claro sobre branco; o Vidro desligava o efeito ao expandir. Agora cada tema muda cabeçalho, painel, superfícies e ação: chrome em gradiente, Rosa magenta de ponta a ponta, Toga vinho na ação com o alerta deslocado para o tijolo, Noite com acento ciano, Papel em creme quente, Vidro como placa fumê translúcida em todos os modos. Todo par de texto e fundo passa por medição de contraste — incluindo as paradas dos gradientes e o que a placa translúcida mostra por trás</td></tr>

@@ -161,7 +161,16 @@ async function montar(cenario) {
         return { kind: "text", fmt: "html", text: "CONTEUDO DA PECA " + id, size: 30 };
       },
       baixarPdfOficial: async () => null,
-      lerAnexo: async () => null,
+      // LÊ o arquivo de verdade. Enquanto devolvia `null`, o anexo era
+      // registrado sem conteúdo e nenhum teste conseguia provar que ele CHEGA
+      // ao request — o chip aparecia na tela e o payload saía sem o documento.
+      // Um stub que sempre falha faz o teste passar por vacuidade.
+      lerAnexo: async (file) => ({
+        kind: "text",
+        fmt: "texto",
+        text: await file.text(),
+        size: file.size || 0,
+      }),
     },
     PLIB: { TETO: 8000, listar: async () => [], aoMudar: () => {}, novoId: () => "p1", salvar: async () => {}, excluir: async () => {}, bytesDe: () => 0 },
     MLIB: {
@@ -413,6 +422,134 @@ async function cenarioEnvio(nome, cfg) {
         "[" + rotulo + "]: o bloco de texto diz ao modelo o que aconteceu com a peca");
       t(!/envio anterior expirou/.test(txt), "[" + rotulo + "]: NAO usa a dica errada (reenviar nao resolve)");
     }
+  }
+}
+
+
+// ------- cenário F: MINUTA a partir de ARQUIVO ANEXADO, sem peça marcada
+// Ate a v0.58 a minuta recusava com "Marque as pecas que devem embasar a
+// minuta" -- com o chip do arquivo na tela. E o defeito nao era so a guarda: o
+// system afirmava "Processo em analise: X" e mandava a ficha com os titulares
+// de cada polo, entao um ato redigido a partir de um contrato anexado sairia
+// com as partes do processo ABERTO NA TELA. Um ato com as partes erradas e o
+// pior defeito possivel num documento assinado -- e sai plausivel.
+{
+  const amb = await montar({ model: "gpt-5.6-luna", storage: { openaiApiKey: "sk-o" }, caps: CAPS_OPENAI });
+  const sr = shadow(amb.w);
+
+  const inp = sr.querySelector(".attach-input");
+  t(!!inp, "[minuta+anexo]: o input de anexo existe");
+  const arq = new amb.w.File(["CONTRATO DE LOCACAO. Clausula 1: o valor e mil reais."],
+    "contrato.txt", { type: "text/plain" });
+  Object.defineProperty(inp, "files", { value: [arq], configurable: true });
+  inp.dispatchEvent(new amb.w.Event("change", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 300));
+
+  const btnMinuta = sr.querySelector(".btn-minuta");
+  t(!!btnMinuta, "[minuta+anexo]: o botao de minutar existe");
+  btnMinuta.click();
+  await new Promise((r) => setTimeout(r, 60));
+  // Especie de REGIME LIVRE (oficio): nao exige tese. A exigencia da Res. CNJ
+  // 615 e outro eixo e ja tem teste proprio.
+  const selAto = sr.querySelector(".minutabar select");
+  if (selAto) {
+    const livre = [...selAto.options].find((o) => /of[ií]cio/i.test(o.textContent || ""));
+    if (livre) {
+      selAto.value = livre.value;
+      selAto.dispatchEvent(new amb.w.Event("change", { bubbles: true }));
+    }
+  }
+  await new Promise((r) => setTimeout(r, 40));
+
+  const send = sr.querySelector(".send");
+  t(!send.disabled, "[minuta+anexo]: o botao Gerar NAO fica desabilitado sem peca marcada");
+  send.click();
+  await new Promise((r) => setTimeout(r, 600));
+
+  const chat = amb.enviadosPorta.find((m) => m.type === "chat");
+  t(!!chat, "[minuta+anexo]: o turno SAI -- era isto que a guarda barrava");
+  if (chat) {
+    const corpo = JSON.stringify(chat.payload.messages || []);
+    const sys = String(chat.payload.system || "");
+    t(/CONTRATO DE LOCACAO/.test(corpo), "[minuta+anexo]: o conteudo do arquivo esta no request");
+    t(/NENHUMA peça dos autos/.test(sys),
+      "[minuta+anexo]: o system diz que nao ha peca dos autos -- a premissa que evita o ato com as partes erradas");
+    t(!/Processo em análise/.test(sys),
+      "[minuta+anexo]: e NAO afirma o processo da tela como objeto");
+    t(/contexto de trabalho/.test(sys), "[minuta+anexo]: o processo da tela entra como CONTEXTO");
+    t(/arquivo anexado/.test(corpo),
+      "[minuta+anexo]: a forma de citar um anexo (sem id de peca) vai no pedido");
+    t(!/use exatamente estes ids/.test(corpo),
+      "[minuta+anexo]: e a lista de ids de peca NAO aparece quando nao ha peca");
+  }
+}
+
+// ------- cenário G: NÃO-REGRESSÃO da minuta com peça marcada
+{
+  const amb = await montar({ model: "gpt-5.6-luna", storage: { openaiApiKey: "sk-o" }, caps: CAPS_OPENAI });
+  const sr = shadow(amb.w);
+  for (const cb of sr.querySelectorAll('.docrow input[type="checkbox"]')) {
+    cb.checked = true;
+    cb.dispatchEvent(new amb.w.Event("change", { bubbles: true }));
+  }
+  sr.querySelector(".btn-minuta").click();
+  await new Promise((r) => setTimeout(r, 60));
+  const selAto = sr.querySelector(".minutabar select");
+  if (selAto) {
+    const livre = [...selAto.options].find((o) => /of[ií]cio/i.test(o.textContent || ""));
+    if (livre) {
+      selAto.value = livre.value;
+      selAto.dispatchEvent(new amb.w.Event("change", { bubbles: true }));
+    }
+  }
+  await new Promise((r) => setTimeout(r, 40));
+  sr.querySelector(".send").click();
+  await new Promise((r) => setTimeout(r, 600));
+  const chat = amb.enviadosPorta.find((m) => m.type === "chat");
+  t(!!chat, "[minuta normal]: o turno sai");
+  if (chat) {
+    const corpo = JSON.stringify(chat.payload.messages || []);
+    const sys = String(chat.payload.system || "");
+    t(/Processo em análise/.test(sys), "[minuta normal]: o system volta a afirmar o processo");
+    t(!/NENHUMA peça dos autos/.test(sys), "[minuta normal]: sem a premissa de so-anexos");
+    t(/use exatamente estes ids/.test(corpo), "[minuta normal]: a lista de ids esta la");
+    t(!/arquivo anexado/.test(corpo), "[minuta normal]: e nada sobre anexo");
+  }
+}
+
+
+// ------- cenário H: MAPA MENTAL a partir de ARQUIVO ANEXADO, sem peça marcada
+// Espelha o cenário F. O mapa usa `systemPromptAtual()`, e `soAnexosNoContexto()`
+// ja da TRUE quando nao ha peca marcada nem no historico -- entao a premissa
+// vem de graca; o que precisava mudar era a guarda e o fluxo de dados.
+{
+  const amb = await montar({ model: "gpt-5.6-luna", storage: { openaiApiKey: "sk-o" }, caps: CAPS_OPENAI });
+  const sr = shadow(amb.w);
+  const inp = sr.querySelector(".attach-input");
+  const arq = new amb.w.File(["PROCESSO DE OUTRA VARA. Autor: Fulano."], "outro.txt", { type: "text/plain" });
+  Object.defineProperty(inp, "files", { value: [arq], configurable: true });
+  inp.dispatchEvent(new amb.w.Event("change", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 300));
+
+  const btnMapa = sr.querySelector(".btn-mapa");
+  t(!!btnMapa, "[mapa+anexo]: o botao de mapa existe");
+  btnMapa.click();
+  await new Promise((r) => setTimeout(r, 60));
+  const mapabar = sr.querySelector(".mapabar");
+  t(mapabar && !mapabar.hidden, "[mapa+anexo]: o modo mapa LIGA sem peca marcada");
+  sr.querySelector(".send").click();
+  await new Promise((r) => setTimeout(r, 600));
+
+  const chat = amb.enviadosPorta.find((m) => m.type === "chat");
+  t(!!chat, "[mapa+anexo]: o turno sai");
+  if (chat) {
+    const corpo = JSON.stringify(chat.payload.messages || []);
+    const sys = String(chat.payload.system || "");
+    t(/PROCESSO DE OUTRA VARA/.test(corpo), "[mapa+anexo]: o conteudo do arquivo esta no request");
+    t(/arquivo anexado/.test(corpo), "[mapa+anexo]: a forma de citar um anexo vai no pedido");
+    t(!/use exatamente estes ids/.test(corpo), "[mapa+anexo]: sem lista de ids de peca");
+    t(/contexto de trabalho|NÃO é o objeto/.test(sys),
+      "[mapa+anexo]: o system trata o processo da tela como contexto");
   }
 }
 

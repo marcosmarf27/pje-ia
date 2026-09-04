@@ -219,6 +219,26 @@
   // [!ALERTA] do PROMPT_DESTAQUES e ele permanece. O que sai daqui é a
   // INSISTÊNCIA depois do aviso: a lista de peças para marcar, que respondia
   // uma pergunta que ninguém fez e deixava a verdadeira sem resposta.
+  // O irmão do `PROMPT_SO_ANEXOS` para a MINUTA. Não é o mesmo texto porque
+  // aquele é escrito para a conversa ("responda", "NESTA conversa", "não peça
+  // que marque peças") e aqui não há conversa — há um ato que vai ao PJe.
+  //
+  // A frase que importa é a do meio: sem ela o system afirma "Processo em
+  // análise: X" e manda a ficha com os titulares de cada polo, e o modelo, ao
+  // redigir a partir de um contrato anexado, preenche o cabeçalho e o
+  // dispositivo com as partes do processo ABERTO NA TELA. Um ato com as partes
+  // erradas é o pior defeito possível num documento assinado — e sai plausível,
+  // bem escrito e difícil de notar na revisão.
+  const PROMPT_MINUTA_SO_ANEXOS = [
+    "NENHUMA peça dos autos abertos foi anexada a esta minuta, e isso é intencional:",
+    "o material são os ARQUIVOS que o usuário anexou na caixa de mensagem. É legítimo",
+    "que tratem de OUTRO processo, ou que nem sejam peça judicial.",
+    "NÃO use o número do processo da tela nem os nomes das partes dele no ato que você",
+    "vai redigir — eles são o contexto de trabalho do usuário, não o objeto desta minuta.",
+    "O que faltar para identificar o processo, as partes, os valores ou as datas vira",
+    "[COMPLETAR: ...], como manda a regra acima; nunca é preenchido com o que está na tela.",
+  ];
+
   const PROMPT_SO_ANEXOS = [
     "NESTA conversa o material de análise são os ARQUIVOS ANEXADOS pelo usuário na",
     "caixa de mensagem. Nenhuma peça dos autos abertos foi anexada, e isso é",
@@ -429,7 +449,12 @@
   //
   // `soAnexos` não entra: minutar exige peça marcada (guarda dura no painel e
   // em minutarAgora), então o modo só-anexos nunca se aplica aqui.
-  function systemMinuta(comBusca) {
+  // `soAnexos` é PARÂMETRO e não uma leitura de `soAnexosNoContexto()`: aquele
+  // predicado olha `pecasNaConversa` e a seleção do painel, e a minuta é um
+  // request ISOLADO — o que decide aqui é se ALGUMA peça dos autos entrou NESTE
+  // request. Também é chamada DUAS vezes por turno (pré-voo e stream), e as
+  // duas precisam da mesma string.
+  function systemMinuta(comBusca, soAnexos) {
     const base =
       PROMPT_PAPEL.concat(
         PROMPT_FONTE_MINUTA,
@@ -450,7 +475,9 @@
         PROMPT_CIT_TEXTUAL,
         comBusca ? PROMPT_BUSCA : [],
         PROMPT_FIM_COMUM
-      ).join(" ") + contextoDoProcesso(false);
+      ).join(" ") +
+      contextoDoProcesso(!!soAnexos) +
+      (soAnexos ? " " + PROMPT_MINUTA_SO_ANEXOS.join(" ") : "");
     if (!customPrompt) return base;
     // Mesmo rótulo de subordinação do chat: a persona do usuário orienta o
     // estilo, mas não desliga a não-invenção nem a origem obrigatória.
@@ -8191,8 +8218,15 @@
     // da timeline lazy podem não existir ainda, e a minuta recusaria peças que
     // o usuário vê marcadas na conversa.
     const selectedIds = selecaoEfetiva().length ? selecaoEfetiva() : selecaoDoPainel;
-    if (selectedIds.length === 0) {
-      panel.setStatus("Marque as peças que devem embasar a minuta.");
+    // ANEXO DO INPUT conta como base da minuta: o contrato que a parte trouxe,
+    // o documento que chegou por e-mail, a peça de OUTRO processo que serve de
+    // referência. Até aqui a minuta recusava com "Marque as peças" e o chip do
+    // arquivo na tela — a mesma metade de bloqueio que o chat tinha antes de
+    // `soAnexosNoContexto`. Minuta e mapa são requests ISOLADOS (montam blocos
+    // do zero e não reenviam `conversation`), então aqui não há `pecasNaConversa`
+    // a considerar: bastam a seleção e os anexos.
+    if (selectedIds.length === 0 && !anexos.size) {
+      panel.setStatus("Marque as peças que devem embasar a minuta — ou anexe um arquivo com 📎.");
       return false;
     }
     busy = true;
@@ -8238,7 +8272,13 @@
           ? "\n\n📚 Seguindo " + modelos.length + " modelo(s) de referência" +
             (catModelos ? " — " + catModelos : "")
           : ""),
-      selectedIds.map((id) => metaDe(id).titulo)
+      // Os anexos entram na bolha com o 📎, como no chat: o transcript é o
+      // registro do que embasou a minuta, e um arquivo que não aparece ali some
+      // para quem reabrir o caso.
+      [
+        ...selectedIds.map((id) => metaDe(id).titulo),
+        ...[...anexos.keys()].map((id) => "📎 " + metaDe(id).titulo),
+      ]
     );
     let assistantEl = null;
     let acc = "";
@@ -8264,14 +8304,44 @@
 
       // Peça que falha no download não derruba a minuta: seguimos com o que
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
-      const dl = await baixarSelecionadas(selectedIds);
-      if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
-      // Conferência humana do modo sigiloso, antes de qualquer rede (a minuta
-      // não tem anexos do input: o delta é o que acabou de ser mascarado).
+      // Sem peça marcada (minuta só de anexo) não há o que baixar, e chamar
+      // `baixarSelecionadas([])` pintaria um card de progresso vazio na tela.
+      const dl = selectedIds.length
+        ? await baixarSelecionadas(selectedIds)
+        : { ok: [], falhas: [] };
+      const idsAnexos = [...anexos.keys()];
+      if (!dl.ok.length && !idsAnexos.length) {
+        throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      }
+      // ANEXOS TAMBÉM SÃO ANONIMIZADOS (e viram texto para o modelo que não lê
+      // o arquivo). Eles não vêm do PJe, então o gancho dentro de
+      // `baixarSelecionadas` não os alcança — é a mesma razão pela qual o chat
+      // tem este bloco no `onSend`. Sem ele, `entradaDoc` falha FECHADO sob
+      // sigilo e o anexo sumiria do request: a minuta sairia sem o documento
+      // que a embasa, justamente no modo em que isso mais importa.
+      if (modoSigiloso && idsAnexos.length) {
+        const anonAnexos = await anonimizarLote(idsAnexos);
+        if (anonAnexos.falhas.length) panel.mostrarFalhasPecas(anonAnexos.falhas);
+      } else if (
+        idsAnexos.length &&
+        capsMinuta &&
+        (capsMinuta.aceitaPdf === false || capsMinuta.aceitaImagem === false)
+      ) {
+        // As caps são as do REDATOR, não as do chat: é ele que vai receber o
+        // arquivo, e os dois podem ser modelos diferentes (ver `modeloDaMinuta`).
+        const txAnexos = await extrairTextoLote(idsAnexos);
+        if (txAnexos.falhas.length) panel.mostrarFalhasPecas(txAnexos.falhas);
+      }
+      // Conferência humana do modo sigiloso, antes de qualquer rede — depois de
+      // peças E anexos mascarados.
+      let idsEnvio = [...dl.ok, ...idsAnexos];
       {
-        const rem = (await confirmarEnvioSigiloso(dl.ok)) || new Set();
-        if (rem.size) dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
-        if (!dl.ok.length) {
+        const rem = (await confirmarEnvioSigiloso(idsEnvio)) || new Set();
+        if (rem.size) {
+          dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
+          idsEnvio = idsEnvio.filter((id) => !rem.has(String(id)));
+        }
+        if (!idsEnvio.length) {
           const e = new Error("Nenhuma peça ficou no envio. Marque outras peças e gere de novo.");
           e.cancelado = true;
           throw e;
@@ -8279,12 +8349,13 @@
       }
       // Teto de páginas do modelo que vai REDIGIR: o do chat barraria em 100
       // páginas (Haiku) uma minuta que vai rodar no Sonnet 5, que aceita 600.
-      guardaPaginas(dl.ok, capsMinuta);
+      guardaPaginas(idsEnvio, capsMinuta);
       await subirPecas(dl.ok);
-      const blocos = montarBlocos(dl.ok);
+      await subirAnexos(idsEnvio.filter(ehIdAnexo));
+      const blocos = montarBlocos(idsEnvio);
       panel.endPrep();
       if (dl.falhas.length) panel.mostrarFalhasPecas(dl.falhas);
-      const cortadasMinuta = pecasTruncadas(dl.ok);
+      const cortadasMinuta = pecasTruncadas(idsEnvio);
       if (cortadasMinuta.length) {
         panel.mostrarFalhasPecas(cortadasMinuta, avisoTrunc(cortadasMinuta));
       }
@@ -8308,6 +8379,31 @@
           " no início desta mensagem — escolhendo o mais adequado e aproveitando o" +
           " linguajar dos demais —, mas com os FATOS exclusivamente das peças deste" +
           " processo."
+        : "";
+      const idsAnexosEnvio = idsEnvio.filter(ehIdAnexo);
+      // `tituloParaEnvio`, não `metaDe(...).titulo`: o título dos autos carrega
+      // nome ("Depoimento de JOÃO DA SILVA"), e esta lista é o único canal pelo
+      // qual o id chega ao modelo.
+      const listaPecas = dl.ok.length
+        ? " Peças anexadas, use exatamente estes ids: " +
+          dl.ok.map((id) => tituloParaEnvio(id)).join("; ") + "."
+        : "";
+      // O nome do ARQUIVO é escolha do usuário e carrega nome de gente com
+      // frequência ("contrato-joao-da-silva.pdf"), então passa pela máscara.
+      const listaAnexos = idsAnexosEnvio.length
+        ? " Arquivos anexados pelo usuário (NÃO são peças destes autos): " +
+          mascararCurto(idsAnexosEnvio.map((id) => metaDe(id).titulo).join("; ")) + "."
+        : "";
+      // A FORMA DE CITAR UM ANEXO. Ele não tem id nem folha na timeline, e o
+      // `SUFIXO_MINUTA` exige "(Título da peça, id 123456, fl. 7)" em toda
+      // afirmação: sem uma forma própria o modelo fica entre omitir a origem e
+      // inventar um id — citação falsa num documento que vai ao PJe assinado. É
+      // a mesma razão da exceção da movimentação, e mora AQUI, e não na
+      // constante compartilhada, para a minuta sem anexo não mudar um byte.
+      const regraCitarAnexo = idsAnexosEnvio.length
+        ? " Ao usar um arquivo anexado pelo usuário, cite-o como (arquivo anexado «nome do arquivo», fl. N)" +
+          " — NUNCA com id de peça, que ele não tem. E deixe claro no texto quando um fato vier de" +
+          " arquivo anexado e não dos autos."
         : "";
       const messages = prepararEnvio(
         [
@@ -8338,12 +8434,13 @@
                   SUFIXO_MINUTA.trimStart() +
                   regraDaOrientacao(ato) +
                   reforcoModelo +
-                  " Peças anexadas, use exatamente estes ids: " +
-                  // `tituloParaEnvio`, não `metaDe(...).titulo`: o título dos
-                  // autos carrega nome ("Depoimento de JOÃO DA SILVA"), e esta
-                  // lista é o único canal pelo qual o id chega ao modelo.
-                  dl.ok.map((id) => tituloParaEnvio(id)).join("; ") +
-                  "." +
+                  // As duas listas são CONDICIONAIS: numa minuta só de anexo a
+                  // frase "use exatamente estes ids:" ficaria seguida de nada, e
+                  // numa minuta sem anexo (o caso de sempre) o texto sai byte a
+                  // byte como antes desta versão.
+                  listaPecas +
+                  listaAnexos +
+                  regraCitarAnexo +
                   // O ato a redigir depende do que JÁ ACONTECEU: prazo
                   // decorrido, parte intimada, data da publicação. Nada disso
                   // está no texto das peças, e um relatório de sentença escrito
@@ -8378,7 +8475,9 @@
       // Vão TAMBÉM ao `estimarContexto` logo abaixo: o pré-voo tem de medir o
       // request que sai, e são ~5,4 mil chars de system e uma janela diferentes.
       if (minutaInfo && minutaInfo.model) optsMinuta.model = minutaInfo.model;
-      optsMinuta.system = systemMinuta(!!optsMinuta.tools);
+      // Nenhuma peça dos autos no request = minuta feita só de anexo, e o system
+      // precisa dizer isso. Ver PROMPT_MINUTA_SO_ANEXOS.
+      optsMinuta.system = systemMinuta(!!optsMinuta.tools, !dl.ok.length);
 
       // Pré-voo: a minuta não tinha nenhum — autos grandes somados a até 12
       // peças-modelo voltavam como erro cru da API em vez da mensagem que diz
@@ -8389,7 +8488,11 @@
       // A bolha do assistente nasce DEPOIS daqui de propósito: um turno barrado
       // pelo pré-voo não deve deixar bolha vazia na conversa. (O catch ainda
       // remove `assistantEl` se ele existir — a falha pode vir do stream.)
-      optsMinuta.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
+      // O MESMO conjunto do `guardaPaginas` acima, anexos inclusive: é por
+      // `opts.ids` que o portão duro do sigilo (`exigirAprovacaoSigilo`) e a
+      // guarda por estimativa sabem o que vai no request. Com `dl.ok` puro, um
+      // anexo ainda não aprovado passaria pelo portão sem ser visto.
+      optsMinuta.ids = idsEnvio;
       conferirSaidaSigilo(messages);
       await estimarContexto(messages, optsMinuta);
       assistantEl = panel.addMessage("assistant", "");
@@ -8446,6 +8549,15 @@
         modelo: (minutaInfo && minutaInfo.model) || (modelInfo && modelInfo.model) || "",
         modelosCategoria: catModelos || "",
         modelosQtd: modelos && modelos.length ? modelos.length : 0,
+        // Os ARQUIVOS que embasaram a minuta. O `origem` é o registro dos
+        // arts. 19, §6º e 21, §2º, e um registro que omite o documento de que o
+        // ato foi feito é um registro falso — ainda mais quando ele veio de
+        // fora dos autos, que é justamente o caso em que alguém vai perguntar
+        // de onde saiu. Nomes mascarados: o arquivo do usuário costuma se
+        // chamar "contrato-fulano.pdf", e isto vai ao disco.
+        anexos: idsAnexosEnvio.length
+          ? mascararCurto(idsAnexosEnvio.map((id) => metaDe(id).titulo).join("; "))
+          : "",
       });
       const idProc = PJE.getIdProcesso();
       const nomeMd = ("minuta" + (idProc ? "-processo-" + idProc : "") + ".md").replace(
@@ -8657,8 +8769,11 @@
     }
     if (ocupadoJsf()) return false;
     const selectedIds = selecaoEfetiva().length ? selecaoEfetiva() : selecaoDoPainel;
-    if (selectedIds.length === 0) {
-      panel.setStatus("Marque as peças que devem embasar o mapa mental.");
+    // Anexo do input conta como material, como na minuta: mapear um contrato ou
+    // uma peça de outro processo é uso legítimo, e a recusa vinha com o chip do
+    // arquivo na tela.
+    if (selectedIds.length === 0 && !anexos.size) {
+      panel.setStatus("Marque as peças que devem embasar o mapa mental — ou anexe um arquivo com 📎.");
       return false;
     }
     busy = true;
@@ -8679,7 +8794,10 @@
     panel.addMessage(
       "user",
       "🧠 Gerar mapa mental: " + instrucao,
-      selectedIds.map((id) => metaDe(id).titulo)
+      [
+        ...selectedIds.map((id) => metaDe(id).titulo),
+        ...[...anexos.keys()].map((id) => "📎 " + metaDe(id).titulo),
+      ]
     );
     let assistantEl = null;
     let acc = "";
@@ -8692,24 +8810,50 @@
       await garantirMovimentacoes();
       // Peça que falha no download não derruba o mapa: seguimos com o que
       // baixou e o relatório diz o que ficou de fora (mesma regra do chat).
-      const dl = await baixarSelecionadas(selectedIds);
-      if (!dl.ok.length) throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      // Sem peça marcada (mapa só de anexo) não há o que baixar.
+      const dl = selectedIds.length
+        ? await baixarSelecionadas(selectedIds)
+        : { ok: [], falhas: [] };
+      const idsAnexos = [...anexos.keys()];
+      if (!dl.ok.length && !idsAnexos.length) {
+        throw new Error("nenhuma das peças marcadas pôde ser baixada");
+      }
+      // Os anexos não passam por `baixarSelecionadas`, então o gancho do sigilo
+      // (e o do texto local) precisa alcançá-los aqui — mesma razão da minuta e
+      // do chat. Sem isto, `entradaDoc` falha fechado e o anexo sumiria do
+      // request no modo em que ele mais importa.
+      if (modoSigiloso && idsAnexos.length) {
+        const anonAnexos = await anonimizarLote(idsAnexos);
+        if (anonAnexos.falhas.length) panel.mostrarFalhasPecas(anonAnexos.falhas);
+      } else if (
+        idsAnexos.length &&
+        modelCaps &&
+        (modelCaps.aceitaPdf === false || modelCaps.aceitaImagem === false)
+      ) {
+        const txAnexos = await extrairTextoLote(idsAnexos);
+        if (txAnexos.falhas.length) panel.mostrarFalhasPecas(txAnexos.falhas);
+      }
       // Conferência humana do modo sigiloso, antes de qualquer rede.
+      let idsEnvio = [...dl.ok, ...idsAnexos];
       {
-        const rem = (await confirmarEnvioSigiloso(dl.ok)) || new Set();
-        if (rem.size) dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
-        if (!dl.ok.length) {
+        const rem = (await confirmarEnvioSigiloso(idsEnvio)) || new Set();
+        if (rem.size) {
+          dl.ok = dl.ok.filter((id) => !rem.has(String(id)));
+          idsEnvio = idsEnvio.filter((id) => !rem.has(String(id)));
+        }
+        if (!idsEnvio.length) {
           const e = new Error("Nenhuma peça ficou no envio. Marque outras peças e gere de novo.");
           e.cancelado = true;
           throw e;
         }
       }
-      guardaPaginas(dl.ok);
+      guardaPaginas(idsEnvio);
       await subirPecas(dl.ok);
-      const blocos = montarBlocos(dl.ok);
+      await subirAnexos(idsEnvio.filter(ehIdAnexo));
+      const blocos = montarBlocos(idsEnvio);
       panel.endPrep();
       if (dl.falhas.length) panel.mostrarFalhasPecas(dl.falhas);
-      const cortadasMapa = pecasTruncadas(dl.ok);
+      const cortadasMapa = pecasTruncadas(idsEnvio);
       if (cortadasMapa.length) {
         panel.mostrarFalhasPecas(cortadasMapa, avisoTrunc(cortadasMapa));
       }
@@ -8738,12 +8882,29 @@
                 text:
                   instrucao +
                   SUFIXO_MAPA +
-                  " Peças anexadas, use exatamente estes ids: " +
+                  // CONDICIONAIS, como na minuta: num mapa só de anexo a frase
+                  // "use exatamente estes ids:" ficaria seguida de nada, e num
+                  // mapa sem anexo (o caso de sempre) o texto sai como antes.
                   // `tituloParaEnvio`, não `metaDe(...).titulo`: o título dos
                   // autos carrega nome ("Depoimento de JOÃO DA SILVA"), e esta
                   // lista é o único canal pelo qual o id chega ao modelo.
-                  dl.ok.map((id) => tituloParaEnvio(id)).join("; ") +
-                  "." +
+                  (dl.ok.length
+                    ? " Peças anexadas, use exatamente estes ids: " +
+                      dl.ok.map((id) => tituloParaEnvio(id)).join("; ") + "."
+                    : "") +
+                  (idsEnvio.some(ehIdAnexo)
+                    ? " Arquivos anexados pelo usuário (NÃO são peças destes autos): " +
+                      mascararCurto(
+                        idsEnvio.filter(ehIdAnexo).map((id) => metaDe(id).titulo).join("; ")
+                      ) + "." +
+                      // O nó que vier de anexo não tem id de peça, e o
+                      // SUFIXO_MAPA exige a referência em TODO item que afirme
+                      // algo: sem forma própria, o modelo pendura o item numa
+                      // peça qualquer — origem inventada, com a mesma cara de
+                      // uma legítima. Mesma razão da exceção da movimentação.
+                      " Item que vier de arquivo anexado termina com (arquivo anexado «nome», fl. N)," +
+                      " nunca com id de peça."
+                    : "") +
                   // O mapa tem eixos de PRAZOS e de situação atual, que sem as
                   // datas dos atos saem vazios ou adivinhados.
                   mascararCurto(datasDasPecas(dl.ok)) +
@@ -8760,7 +8921,9 @@
       // assistente nasce só depois do pré-voo, para um turno barrado não
       // deixar bolha vazia na conversa.
       const optsMapa = optsDoTurno();
-      optsMapa.ids = dl.ok; // mesmo conjunto do guardaPaginas acima
+      // O MESMO conjunto do `guardaPaginas`, anexos inclusive: é por `opts.ids`
+      // que o portão duro do sigilo enxerga o que vai no request.
+      optsMapa.ids = idsEnvio;
       conferirSaidaSigilo(messages);
       await estimarContexto(messages, optsMapa);
       assistantEl = panel.addMessage("assistant", "");

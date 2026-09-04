@@ -758,7 +758,12 @@
     const o = d && d.origem;
     const box = document.getElementById("origem");
     if (!box) return;
-    if (!o || !(o.tese || o.rotulo)) {
+    // `o.anexos` entra na condição: uma minuta feita a partir de um arquivo
+    // anexado pode não ter tese (espécie de regime livre), e sem isto a faixa
+    // sumiria justamente no caso em que a proveniência é menos óbvia — o
+    // documento não está nos autos, e quem revisa não tem como saber de onde
+    // o ato saiu.
+    if (!o || !(o.tese || o.rotulo || o.anexos)) {
       box.hidden = true;
       return;
     }
@@ -781,6 +786,16 @@
       p.className = "og-tese";
       p.textContent = o.tese; // conteúdo do usuário: textContent, nunca innerHTML
       box.appendChild(p);
+    }
+    // De onde veio o material. Um ato redigido a partir de arquivo que NÃO está
+    // nos autos precisa dizer isso a quem revisa e assina — é o que o art. 19,
+    // §6º cobra, e é a informação que ninguém consegue inferir do texto pronto.
+    if (o.anexos) {
+      const pa = document.createElement("p");
+      pa.className = "og-meta";
+      pa.textContent =
+        "Baseada em arquivo(s) anexado(s) pelo usuário, fora dos autos: " + o.anexos;
+      box.appendChild(pa);
     }
     const pe = document.createElement("p");
     pe.className = "og-meta";

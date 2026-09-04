@@ -3142,9 +3142,9 @@ var PjePanel = (function () {
       // processo retomado da memória a timeline do PJe ainda não montou as
       // rows, e recusar por `getSelected()` dizia "marque as peças" com os
       // chips do contexto na tela mostrando as peças marcadas.
-      if (!selecaoEfetivaPainel().length) {
+      if (!temMaterialParaAto()) {
         statusEl.textContent =
-          "Para gerar a minuta, primeiro marque as peças que devem embasá-la.";
+          "Para gerar a minuta, marque as peças que devem embasá-la — ou anexe um arquivo com 📎.";
         return;
       }
       if (mapaMode) setMapaMode(false); // os dois modos são mutuamente exclusivos
@@ -3189,10 +3189,11 @@ var PjePanel = (function () {
     }
     btnMapa.addEventListener("click", () => {
       if (mapaMode) return setMapaMode(false); // segundo clique = cancelar
-      if (!selecaoEfetivaPainel().length) {
-        // idem minuta: a row lazy do processo retomado conta como marcada
+      if (!temMaterialParaAto()) {
+        // idem minuta: a row lazy do processo retomado conta como marcada, e o
+        // anexo do input conta como material
         statusEl.textContent =
-          "Para gerar o mapa mental, primeiro marque as peças que devem embasá-lo.";
+          "Para gerar o mapa mental, marque as peças que devem embasá-lo — ou anexe um arquivo com 📎.";
         return;
       }
       if (minutaMode) setMinutaMode(false); // os dois modos são mutuamente exclusivos
@@ -3303,6 +3304,17 @@ var PjePanel = (function () {
     // content.js já tinha a defesa (`selecaoEfetiva`), mas nunca era alcançada:
     // a recusa acontecia antes, aqui. É a mesma conta do `selecaoParaMemoria`,
     // extraída para os três consumidores não divergirem.
+    // "Há material para embasar?" não é "há peça marcada?". O arquivo que o
+    // usuário soltou na caixa embasa uma minuta tão bem quanto uma peça dos
+    // autos — é o contrato que a parte trouxe, o documento que chegou por
+    // e-mail. Enquanto as quatro guardas abaixo perguntavam só pela seleção, o
+    // botão de minutar nem ENTRAVA no modo com o chip do arquivo na tela, e o
+    // Enviar seguinte virava uma mensagem de chat comum. Fonte ÚNICA para não
+    // divergirem: são quatro (botão e envio, minuta e mapa).
+    function temMaterialParaAto() {
+      return selecaoEfetivaPainel().length > 0 || anexosAtuais.length > 0;
+    }
+
     function selecaoEfetivaPainel() {
       const ids = getSelected();
       if (selPendente && selPendente.size) ids.push(...selPendente);
@@ -6652,8 +6664,9 @@ var PjePanel = (function () {
       if (minutaMode) {
         if (!minutaCb) return;
         const sel = selecaoEfetivaPainel();
-        if (!sel.length) {
-          statusEl.textContent = "Marque as peças que devem embasar a minuta.";
+        if (!temMaterialParaAto()) {
+          statusEl.textContent =
+            "Marque as peças que devem embasar a minuta — ou anexe um arquivo com 📎.";
           return;
         }
         // Orientação obrigatória (Resolução CNJ 615): sem espécie, ou sem tese
@@ -6690,8 +6703,9 @@ var PjePanel = (function () {
       if (mapaMode) {
         if (!mapaCb) return;
         const sel = selecaoEfetivaPainel(); // idem minuta: cobre a row lazy
-        if (!sel.length) {
-          statusEl.textContent = "Marque as peças que devem embasar o mapa mental.";
+        if (!temMaterialParaAto()) {
+          statusEl.textContent =
+            "Marque as peças que devem embasar o mapa mental — ou anexe um arquivo com 📎.";
           return;
         }
         // idem minuta: só limpa depois do aceite (o handler recusa por turno em
