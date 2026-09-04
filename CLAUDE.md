@@ -4014,10 +4014,37 @@ tem tudo, no PJe não"*.
 - **Quando a peça não está mesmo na timeline, a mensagem diz a VERDADE** (a lista
   oficial é superconjunto da timeline) e oferece o preview, que não depende
   daquele DOM. Mandar "tentar de novo" seria repetir o laço.
-- **O MESMO defeito atinge `ativarPeca`** (ela também depende de `acharLink`), e
-  ali o efeito é falha de DOWNLOAD em peça que só a lista oficial conhece — hoje
-  tratada como falha tolerada. Se for corrigir, é a mesma técnica; é caminho
-  crítico, então com teste próprio.
+- **O MESMO defeito atingia `ativarPeca`, e foi corrigido na v0.59.0** — ali o
+  efeito era pior que um aviso: falha de DOWNLOAD em peça que só a lista oficial
+  conhece, tolerada como falha comum, e o modelo respondendo "não consta" sobre
+  documento que existe nos autos. `garantirNaTimeline(id)` (pje.js) roda ANTES
+  de `ativarPeca` dentro de `baixar`. Quatro decisões que não podem cair:
+  - **Cadeia PRÓPRIA (`buscaTimelineChain`), não a `activationChain`**: rolar não
+    fala com o JSF, então não pode ficar atrás dos ~5,6 s de uma ativação nem
+    contar como ativação em voo. Mas precisa ser serializada, porque o download
+    roda com concorrência 3 e duas rolagens disputariam o mesmo scroller.
+  - **`devolverRolagem: true`**, opção nova de `carregarTimelineCompleta`. No
+    "ver na timeline" a rolagem É o resultado pedido e restaurá-la produziria
+    dois saltos; aqui ela é COLATERAL — o usuário pediu uma análise —, e o
+    download roda também em caminhos de fundo (medição de contexto, prefetch).
+    Mover a tela por baixo de quem está lendo os autos é o defeito da faixa que
+    muda de altura sob o dedo.
+  - **`timelineVarridaAteOFim`**: uma varredura que terminou por estabilidade
+    responde por TODAS as peças. Sem essa memória, cada peça inalcançável de um
+    lote custaria até 90 s. Só marca quando `completo` é true — marcar no
+    estouro do teto daria uma timeline gigante como esgotada, e as peças do fim
+    dela ficariam inalcançáveis pelo resto da sessão.
+  - **A ORDEM das condições da mensagem final**, que a primeira versão errou:
+    peça fora da timeline devolve **404** (o endpoint só libera o que foi aberto
+    na sessão), então testar `ultimoStatus` antes fazia a mensagem nova nunca
+    aparecer. A causa provável manda; "não está na linha do tempo" é mais
+    acionável que um número de status. E ela deixou de mandar "abra-a na linha
+    do tempo" uma peça que não está lá — era o laço sem saída, e orientação
+    impossível é pior que nenhuma.
+  - Coberto por `t-peca-fora-da-timeline.mjs` (jsdom com lazy load e servidor
+    stateful de verdade: 404 até o clique na timeline). **Testado por mutação**:
+    trocar a chamada por `acharLink(id)` derruba as duas asserções centrais — a
+    peça não baixa e não é ativada.
 - Coberto por dois testes: `carregarTimelineCompleta` com lazy load simulado em
   jsdom (parada antecipada, retrocompatibilidade, peça inexistente) e o handler
   real do content.js por monkeypatch no `mount`.

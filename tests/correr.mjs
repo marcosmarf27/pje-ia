@@ -23,6 +23,7 @@ const CATALOGO = [
   { t: "t-nucleo-correr" },
   { t: "t-v56-unit" },
   { t: "t-sigilo-duas-abas" },
+  { t: "t-peca-fora-da-timeline", lento: true },
   { t: "t-modelos-coerencia" },
   { t: "t-config" },
   { t: "t-worker" },

@@ -356,6 +356,51 @@ var PJE = (function () {
   // na timeline (A4J) para registrá-la e tentamos de novo. As ativações são
   // serializadas — o JSF não tolera dois submits simultâneos na mesma view.
   let activationChain = Promise.resolve();
+
+  // ------------------------------------------------------------------------
+  // A PEÇA PODE NÃO ESTAR NA LINHA DO TEMPO, e desde a v0.38 esse é o caso
+  // COMUM, não a exceção. A lista do painel vem da rota REST (ou da grid), que
+  // é um SUPERCONJUNTO da timeline e não injeta nó nenhum nela; só a rolagem
+  // popula o `#divTimeLine`. Como `ativarPeca` procura o link por lá, a peça
+  // que só a lista oficial conhece nunca chegava a ser ativada — e a mensagem
+  // final de `baixar` mandava "abra-a na linha do tempo do processo", que é
+  // justamente o que não dá para fazer. O mesmo laço sem saída que o "ver na
+  // timeline" fechou na v0.45, um degrau mais fundo: aqui ele não devolve um
+  // aviso, devolve uma PEÇA FALTANDO na análise, e o modelo responde "não
+  // consta" sobre um documento que existe nos autos.
+  let buscaTimelineChain = Promise.resolve();
+  // Uma varredura que chegou ao fim (sem estourar o teto de 90 s) responde por
+  // TODAS as peças, não só pela que a pediu: se o link não está no DOM depois
+  // dela, ele não está. Sem esta memória, cada peça inalcançável de um lote
+  // custaria uma varredura inteira.
+  let timelineVarridaAteOFim = false;
+
+  async function garantirNaTimeline(id) {
+    if (acharLink(id)) return true;
+    if (timelineVarridaAteOFim) return false;
+    // SERIALIZADA, como a ativação: duas rolagens concorrentes disputariam o
+    // mesmo scroller (o download roda com concorrência 3). A cadeia é PRÓPRIA e
+    // não a `activationChain` — rolar não fala com o JSF, então não pode ficar
+    // atrás dos ~5,6 s de uma ativação nem contar como ativação em voo.
+    const meu = buscaTimelineChain.then(async () => {
+      if (acharLink(id)) return true; // outra rolagem da fila já trouxe
+      if (timelineVarridaAteOFim) return false;
+      const r = await carregarTimelineCompleta(null, () => !!acharLink(id), {
+        devolverRolagem: true,
+      });
+      // `completo` só é true quando a varredura terminou por estabilidade, e não
+      // por estouro do teto. Marcar no estouro faria uma timeline gigante, que
+      // não coube em 90 s, ser dada como esgotada — e as peças do fim dela
+      // ficariam inalcançáveis pelo resto da sessão.
+      if (r && r.completo && !r.achou) timelineVarridaAteOFim = true;
+      return !!(r && r.achou);
+    });
+    // A cadeia segue viva mesmo se esta busca falhar: uma rejeição não tratada
+    // aqui travaria todas as buscas seguintes da sessão.
+    buscaTimelineChain = meu.catch(() => {});
+    return meu;
+  }
+
   function ativarPeca(id) {
     const run = async () => {
       const link = acharLink(id);
@@ -590,7 +635,17 @@ var PJE = (function () {
     if (corpo) return corpo;
 
     // Ativação é o caminho lento (~5,6 s e serializado na sessão JSF) e depende
-    // de a peça estar NA TIMELINE — peças que só a grid conhece podem não estar.
+    // de a peça estar NA TIMELINE — o que, desde que a lista passou a vir da
+    // rota REST (v0.38), deixou de ser o caso comum. Por isso a peça é trazida
+    // para lá ANTES: sem isso `ativarPeca` lança na primeira linha, o download
+    // falha numa peça que existe nos autos, e o modelo responde "não consta".
+    //
+    // Custo: a rolagem para assim que a peça aparece (`pararQuando`), então no
+    // caso típico são segundos; o teto de 90 s só é pago quando ela não está
+    // mesmo lá — e UMA vez por sessão, porque a varredura completa responde por
+    // todas as peças (`timelineVarridaAteOFim`). Ela não fala com o JSF, então
+    // não gasta view nem disputa a `activationChain`.
+    const naTimeline = await garantirNaTimeline(id).catch(() => false);
     try {
       await ativarPeca(id);
     } catch {
@@ -599,10 +654,22 @@ var PJE = (function () {
     corpo = await tentarRotas();
     if (corpo) return corpo;
 
+    // A ORDEM importa, e a primeira versão desta guarda errava nela: quando a
+    // peça não está na timeline o servidor responde 404 (o endpoint só libera o
+    // que foi aberto na sessão), então testar o status ANTES fazia a mensagem
+    // nova nunca aparecer — o "HTTP 404" cru voltava a ser tudo o que o usuário
+    // via. A causa provável manda na mensagem, e "não está na linha do tempo" é
+    // mais acionável que um número de status.
     throw new Error(
-      ultimoStatus && ultimoStatus !== 200
-        ? "falha ao baixar a peça " + id + " (HTTP " + ultimoStatus + ")"
-        : "a peça " + id + " retornou vazia — abra-a na linha do tempo do processo e tente novamente"
+      !naTimeline
+        ? // NUNCA mandar "abra na linha do tempo" uma peça que não está lá: era
+          // o laço sem saída, e orientação impossível é pior que nenhuma.
+          "a peça " + id + " está na lista oficial do processo, mas o PJe não a " +
+          "mostra na linha do tempo desta tela — e é de lá que ele libera o " +
+          "download. Passe o mouse sobre ela na lista para ver o conteúdo."
+        : ultimoStatus && ultimoStatus !== 200
+          ? "falha ao baixar a peça " + id + " (HTTP " + ultimoStatus + ")"
+          : "a peça " + id + " retornou vazia — abra-a na linha do tempo do processo e tente novamente"
     );
   }
 
@@ -1100,7 +1167,18 @@ var PJE = (function () {
   // usado por "ver na timeline", que não precisa da lista inteira: precisa de
   // UMA peça. Numa peça do meio dos autos isso é a diferença entre 3 segundos e
   // os 90 do teto. Sem o parâmetro, o comportamento é byte a byte o de antes.
-  async function carregarTimelineCompleta(onProgress, pararQuando) {
+  // Devolve a rolagem para onde estava. Re-localiza a timeline porque o
+  // re-render A4J troca os nós durante a carga — uma referência guardada
+  // apontaria para um elemento morto e a restauração viraria no-op.
+  function devolverRolagem(scrollAntes) {
+    const tlFim = document.querySelector("#divTimeLine");
+    if (!tlFim) return;
+    const sc = acharScroller(tlFim);
+    if (sc === window) window.scrollTo(0, scrollAntes);
+    else sc.scrollTop = scrollAntes;
+  }
+
+  async function carregarTimelineCompleta(onProgress, pararQuando, opts) {
     let tl = document.querySelector("#divTimeLine");
     // `achou: false` também aqui: quem passou `pararQuando` espera SEMPRE uma
     // resposta sobre a busca, e um `undefined` neste ramo se leria como "não
@@ -1151,18 +1229,22 @@ var PJE = (function () {
       }
       if (onProgress) onProgress(listarDocumentos().length);
       if (achou) {
-        // Não devolve a rolagem: quem pediu a parada vai rolar até o alvo em
-        // seguida, e restaurar aqui produziria dois saltos na tela do usuário.
+        // Por padrão NÃO devolve a rolagem: quem pediu a parada ("ver na
+        // timeline") vai rolar até o alvo em seguida, e restaurar aqui
+        // produziria dois saltos na tela.
+        //
+        // `devolverRolagem` existe para o caso OPOSTO, que é o do download: ali
+        // a rolagem é COLATERAL — o usuário pediu uma análise, não um passeio
+        // pela timeline —, e o download roda também em caminhos de fundo
+        // (medição de contexto, prefetch). Mover a tela por baixo de quem está
+        // lendo os autos seria o mesmo defeito da faixa que muda de altura sob
+        // o dedo.
+        if (opts && opts.devolverRolagem) devolverRolagem(scrollAntes);
         return { total: listarDocumentos().length, completo: true, achou: true };
       }
       estaveis = cresceu ? 0 : estaveis + 1;
     }
-    const tlFim = document.querySelector("#divTimeLine");
-    if (tlFim) {
-      const sc = acharScroller(tlFim);
-      if (sc === window) window.scrollTo(0, scrollAntes);
-      else sc.scrollTop = scrollAntes;
-    }
+    devolverRolagem(scrollAntes);
     return {
       total: listarDocumentos().length,
       completo: Date.now() - inicio < TETO_MS,
