@@ -6,147 +6,384 @@
     <link rel="stylesheet" href="fontes.css" />
     <link rel="stylesheet" href="ui.css" />
     <style>
-      /* A página de opções é o MESMO console do popup, com respiro: mesma
-         ordem, mesmos componentes, mesmos IDs (popup.js é compartilhado). O que
-         muda é só a densidade e o texto longo — duas telas com estruturas
-         diferentes para a mesma tarefa era a origem da sensação de bagunça. */
-      body { display: flex; justify-content: center; padding: 40px 16px; }
-      .card {
-        width: 100%; max-width: 560px; background: #fff;
-        border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
-        box-shadow: var(--sh-pop);
+      /* A página de opções e o popup continuam sendo A MESMA TELA: os mesmos
+         componentes, os mesmos IDs, o mesmo `popup.js`. O que a v0.60.2 separa
+         é a NAVEGAÇÃO, não o componente — e essa é a revisão da decisão antiga
+         ("a mesma tela em duas densidades"), registrada no DESIGN.md §5.
+
+         O motivo: o popup tem 460×600px e é o console rápido; esta página tem a
+         viewport inteira e reúne SETE assuntos (chave, modelo, instruções,
+         aparência, privacidade, bibliotecas, apoio) que antes viviam num scroll
+         único de ~3.400px, sem nenhum mapa. Uma coluna de 560px no meio de uma
+         tela de 1400 não é "respiro", é desperdício com desorientação junto.
+
+         O que NÃO muda: nenhum id, nenhuma classe de componente, nenhuma linha
+         de `popup.js` — que busca tudo por id e não tem seletor de container.
+         Os blocos foram MOVIDOS para dentro de `<section>`, e nada mais. */
+      body {
+        background: var(--canvas);
+        min-height: 100vh;
       }
-      .brand { padding: 22px 26px; }
-      .body { padding: 24px 26px 28px; }
+      /* Rolagem suave no salto por âncora — sem ela o conteúdo TROCA, e quem
+         saltou não sabe se desceu ou se a página mudou. Desligada para quem
+         pediu menos movimento (DESIGN.md, "Movimento"). */
+      html { scroll-behavior: smooth; }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+      }
+
+      /* ── BARRA SUPERIOR ────────────────────────────────────────────────
+         Ela existe por causa da navegação: com as seções espalhadas por uma
+         página longa, uma `.save-row` no meio do fluxo deixaria o usuário
+         editando a Aparência sem enxergar onde se salva. Marca, estado da
+         chave e as duas ações ficam SEMPRE na tela. */
+      .cfg-top {
+        position: sticky; top: 0; z-index: 20;
+        background: var(--hd);
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      }
+      .cfg-top-in {
+        max-width: var(--w-cfg); margin: 0 auto;
+        padding: 0 24px;
+        display: flex; align-items: center; gap: 16px;
+        min-height: 64px;
+      }
+      /* A `.brand` do ui.css tem fundo, borda e padding próprios — aqui ela é
+         um item de uma barra que já os tem. Desfazer o que a regra genérica
+         impôs é a mesma disciplina do `.hd button` do painel. */
+      .cfg-top .brand {
+        padding: 0; background: none; border: 0; flex: none;
+      }
+      .cfg-top .brand img { width: 32px; height: 32px; padding: 6px; }
+      .cfg-top .brand .s { display: none; }
+      .cfg-top-acts {
+        margin-left: auto;
+        display: flex; align-items: center; gap: 14px;
+      }
+      .cfg-top .status-chip { margin: 0; flex: none; }
+      .cfg-top .save-row { margin: 0; display: flex; align-items: center; gap: 12px; }
+      /* O `.save-hint` do ui.css anima a ALTURA (`grid-template-rows: 0fr→1fr`),
+         que é o certo numa coluna. Numa barra fixa isso a faria crescer e
+         encolher sob o cursor — o defeito do `.hint-key` do painel, que a v0.60
+         aposentou. Mesma técnica, no eixo HORIZONTAL: a largura anima, a altura
+         nunca muda. */
+      .cfg-top .save-hint {
+        grid-template-rows: 1fr; grid-template-columns: 0fr;
+        margin-bottom: 0;
+        transition: grid-template-columns 0.18s ease;
+      }
+      .cfg-top .save-hint > span { white-space: nowrap; }
+      .cfg-top .save-row.pendente .save-hint { grid-template-columns: 1fr; margin-bottom: 0; }
+      .cfg-top .save-acts { position: relative; }
+      /* O "Salvo!" cobre os botões em vez de empurrá-los — a mesma solução do
+         popup.html, e pela mesma razão: numa barra de altura fixa, texto novo
+         no fluxo desloca tudo. */
+      .cfg-top .save-status {
+        position: absolute; inset: 0; margin: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--paper); border-radius: 10px;
+        pointer-events: none;
+      }
+      .cfg-top .save-status:empty { display: none; }
+
+      /* ── CORPO: navegação + conteúdo ───────────────────────────────── */
+      .cfg-wrap {
+        max-width: var(--w-cfg); margin: 0 auto;
+        padding: 28px 24px 64px;
+        display: grid; grid-template-columns: var(--w-cfg-nav) minmax(0, 1fr);
+        gap: 40px;
+        align-items: start;
+      }
+      .cfg-nav {
+        position: sticky; top: 88px;
+        display: flex; flex-direction: column; gap: 2px;
+        /* `min-width: 0` porque item de grid tem `min-width: auto` e se recusa
+           a encolher abaixo do conteúdo — foi o que esticou a coluna de filtros
+           da página de minutas para 1060px numa viewport de 742. */
+        min-width: 0;
+      }
+      .cfg-l {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; border-radius: var(--r-md);
+        color: var(--muted); text-decoration: none;
+        font-size: var(--fs-ui); font-weight: 500;
+        border: 1px solid transparent;
+        transition: background 0.14s ease, color 0.14s ease;
+      }
+      .cfg-l svg { flex: none; color: var(--muted-3); transition: color 0.14s ease; }
+      .cfg-l:hover { background: var(--hover); color: var(--text); }
+      .cfg-l:hover svg { color: var(--muted); }
+      /* O item corrente é marcado por `aria-current`, que o `options-nav.js`
+         escreve — o atributo é o estado, e a classe seria uma segunda verdade
+         para divergir dele. */
+      .cfg-l[aria-current="true"] {
+        background: var(--accent-bg); color: var(--pje-3); font-weight: 600;
+      }
+      .cfg-l[aria-current="true"] svg { color: var(--pje); }
+      .cfg-l:focus-visible { outline: none; box-shadow: var(--ring); }
+
+      .cfg-main { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
+      .cfg-sec {
+        background: var(--surface);
+        border: 1px solid var(--line); border-radius: var(--r-box, 14px);
+        padding: 22px 24px 26px;
+        /* O deslocamento do salto por âncora: sem ele o título da seção nasce
+           embaixo da barra fixa. */
+        scroll-margin-top: 84px;
+      }
+      .cfg-hd {
+        display: flex; align-items: baseline; gap: 10px;
+        margin: 0 0 16px; padding-bottom: 12px;
+        border-bottom: 1px solid var(--line-2);
+      }
+      .cfg-hd h2 {
+        margin: 0; font-family: var(--ff-display);
+        font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em;
+        color: var(--text);
+      }
+      .cfg-hd .eyebrow-n { margin-left: auto; }
+      .cfg-sub { margin: -8px 0 16px; font-size: var(--fs-meta); color: var(--muted); }
+
+      /* MEDIDA DE LEITURA. O cartão tem ~790px de largura útil, e a tela é
+         feita de parágrafos de 13px: a linha inteira dá ~110 caracteres, muito
+         além do confortável, e o olho perde o começo da linha seguinte. O texto
+         e os controles ficam num eixo de ~660px; quem usa a largura toda é só
+         o cabeçalho e a grade de provedores, que são varridos, não lidos.
+         Ganhar espaço não é obrigação de usá-lo. */
+      .cfg-sec > *, .cfg-sec .provcard > * { max-width: 660px; }
+      .cfg-sec > .cfg-hd, .cfg-sec > .prov-grid { max-width: none; }
+      /* ARMADILHA MEDIDA: `max-width` NÃO SE APLICA a elemento inline não
+         substituído. O `.hint` só ganha `display: block` do ui.css quando está
+         DENTRO de `label.field`; solto na seção ele é um `<span>` inline, e a
+         regra acima ficava viva no computed style sem efeito nenhum — a linha
+         seguia com 781px. É a mesma família do `background-color` que recusa
+         gradiente: o valor está certo e o CONSUMIDOR não o aceita. */
+      .cfg-sec > .hint, .cfg-sec > .perfil-hint, .cfg-sec > .side-hint { display: block; }
+
+      /* Sub-bloco DENTRO de uma seção ("Antes de enviar dados sigilosos"). O
+         `.sec-tit` do ui.css nasceu para ser o título de um bloco de página, e
+         nesta tela ele passou a viver sob um `.cfg-hd` — no mesmo tamanho, os
+         dois se leem como o mesmo nível e a seção parece ter dois títulos. */
+      .cfg-sec .sec-tit {
+        font-size: var(--fs-body); margin: var(--sp-5) 0 var(--sp-2b);
+        padding-top: var(--sp-4); border-top: 1px solid var(--line-2);
+      }
+
+      /* O primeiro campo de uma seção não precisa da margem que o separa do
+         bloco anterior — dentro do cartão ele já está no topo. */
+      .cfg-sec > .field:first-of-type,
+      .cfg-sec > .eyebrow-row:first-child { margin-top: 0; }
+      .cfg-sec .save-row { margin-top: var(--sp-4); }
+
+      /* ── Telas estreitas: a navegação vira fileira ────────────────────
+         Some a coluna, não a navegação: um mapa que desaparece devolve a
+         desorientação que ele existe para resolver. */
+      @media (max-width: 900px) {
+        .cfg-wrap { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 18px 16px 48px; }
+        .cfg-nav {
+          position: sticky; top: 64px; z-index: 10;
+          flex-direction: row; gap: 6px;
+          overflow-x: auto; padding: 10px 0;
+          background: var(--canvas);
+          border-bottom: 1px solid var(--line);
+        }
+        /* O RÓTULO FICA. A fileira já rola no eixo x, então escondê-lo não
+           economiza espaço nenhum — só devolve os sete glifos mudos que o
+           menu existe para eliminar (é o relato da engrenagem no painel, na
+           mesma semana). */
+        .cfg-l { flex: none; white-space: nowrap; }
+        .cfg-l svg { color: var(--muted); }
+        .cfg-sec { scroll-margin-top: 124px; }
+      }
+      @media (max-width: 620px) {
+        .cfg-top-in { min-height: 56px; padding: 0 14px; }
+        .cfg-top .brand .t { display: none; }
+        .cfg-top .status-chip { display: none; }
+      }
     </style>
   </head>
   <body>
-    <div class="card">
-      <div class="brand">
-        <img src="../icons/icon48.png" alt="" />
-        <div>
-          <div class="t">TecJustiça PJe</div>
-          <div class="s">Análise de autos com IA — Claude, Gemini, GPT ou OpenRouter</div>
+    <header class="cfg-top">
+      <div class="cfg-top-in">
+        <div class="brand">
+          <img src="../icons/icon48.png" alt="" />
+          <div>
+            <div class="t">TecJustiça PJe</div>
+            <div class="s">Análise de autos com IA — Claude, Gemini, GPT ou OpenRouter</div>
+          </div>
+        </div>
+        <div class="cfg-top-acts">
+          <div id="chip" class="status-chip warn">
+            <span class="dot"></span><span id="chipText">Chave não configurada</span>
+          </div>
+          <div class="save-row">
+            <div class="save-hint" id="saveHint"><span>Alterações não salvas</span></div>
+            <div class="save-acts">
+              <button class="btn btn-sec" id="testKey" type="button">Testar chave</button>
+              <button class="btn" id="save">Salvar configuração</button>
+              <div class="save-status" id="saveStatus"></div>
+            </div>
+          </div>
         </div>
       </div>
+    </header>
 
-      <div class="body">
-        <div id="chip" class="status-chip warn">
-          <span class="dot"></span><span id="chipText">Chave não configurada</span>
-        </div>
+    <div class="cfg-wrap">
+      <!-- NAVEGAÇÃO POR ÂNCORA, e não abas: tudo continua numa página só, e é
+           isso que mantém verdadeiro o "Alterações não salvas" da barra —
+           nenhum campo editado fica escondido atrás de outra aba na hora de
+           salvar. De quebra, `<a href="#…">` dá deep link de graça. -->
+      <nav class="cfg-nav" aria-label="Seções da configuração">
+        <a class="cfg-l" href="#sec-provedor">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.9 12.1 8.6-8.6"/><path d="m17 6 2 2"/><path d="m14 9 2 2"/></svg>
+          <span class="cl-t">Provedor e chave</span>
+        </a>
+        <a class="cfg-l" href="#sec-modelo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+          <span class="cl-t">Modelo</span>
+        </a>
+        <a class="cfg-l" href="#sec-instrucoes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/></svg>
+          <span class="cl-t">Instruções</span>
+        </a>
+        <a class="cfg-l" href="#sec-aparencia">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
+          <span class="cl-t">Aparência</span>
+        </a>
+        <a class="cfg-l" href="#sec-privacidade">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.6c0 4.5-3.2 8-7.5 8.9-4.3-.9-7.5-4.4-7.5-8.9V6z"/><path d="M9 12.2l2.1 2.1 4-4.2"/></svg>
+          <span class="cl-t">Privacidade</span>
+        </a>
+        <a class="cfg-l" href="#sec-bibliotecas">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h7v14H4z"/><path d="M13 6h7v14h-7z"/></svg>
+          <span class="cl-t">Bibliotecas</span>
+        </a>
+        <a class="cfg-l" href="#sec-apoio">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-3.9 5.6-.8z"/></svg>
+          <span class="cl-t">Sobre e apoio</span>
+        </a>
+      </nav>
 
+      <main class="cfg-main">
         <!-- PROVEDOR EM PRIMEIRO PLANO — estrutura idêntica à do popup. O
              provedor não é estado novo: continua derivado do `model` salvo
              (provedorDoModelo), então nada muda no storage nem no worker. -->
-        <div class="eyebrow-row">
-          <span class="eyebrow">Provedor</span>
-          <span class="eyebrow-n" id="provCount"></span>
-        </div>
-        <div class="prov-grid" role="tablist" aria-label="Provedor de IA">
-          <!-- Ordem = hierarquia: o GPT é o provedor do modelo PADRÃO
-               (gpt-5.6-luna), então vem primeiro. Quem acende o cartão é
-               `pintarProvedores`, pelo modelo salvo — nunca a posição. -->
-          <button class="prov" type="button" id="provO" data-prov="openai" role="tab" aria-selected="false">
-            <span class="prov-i po">O</span>
-            <span class="prov-n">GPT</span>
-            <span class="kstate" id="kstateO">não configurada</span>
-          </button>
-          <button class="prov" type="button" id="provA" data-prov="anthropic" role="tab" aria-selected="false">
-            <span class="prov-i pa">A</span>
-            <span class="prov-n">Claude</span>
-            <span class="kstate" id="kstateA">não configurada</span>
-          </button>
-          <button class="prov" type="button" id="provG" data-prov="gemini" role="tab" aria-selected="false">
-            <span class="prov-i pg">G</span>
-            <span class="prov-n">Gemini</span>
-            <span class="kstate" id="kstateG">não configurada</span>
-          </button>
-          <!-- OpenRouter por ÚLTIMO: é um agregador (uma chave, centenas de
-               modelos de vários fornecedores), não um provedor de modelo
-               próprio. Quem chega para configurar deve ver antes os três
-               caminhos diretos. -->
-          <button class="prov" type="button" id="provR" data-prov="openrouter" role="tab" aria-selected="false">
-            <span class="prov-i pr">R</span>
-            <span class="prov-n">OpenRouter</span>
-            <span class="kstate" id="kstateR">não configurada</span>
-          </button>
-        </div>
-        <p class="prov-nota">
-          Você só precisa da chave do provedor que for usar. Dá para cadastrar as
-          três e alternar quando quiser — a conversa em andamento, porém, não
-          atravessa provedores: trocar de família de modelo pede uma
-          <b>nova conversa</b>.
-        </p>
-
-        <!-- Os QUATRO inputs de chave seguem no DOM (só o do provedor ativo
-             fica visível), então "Salvar" continua lendo os quatro. -->
-        <div class="provcard">
-          <div class="pc-sec" id="keyA" data-prov="anthropic">
-            <div class="pc-head">
-              <label for="apiKey">Chave da API — Anthropic (Claude)</label>
-              <!-- Link DIRETO para a página de chaves do provedor, sempre visível
-                   (a dica abaixo some quando a chave está salva). Sem ele o
-                   endereço era texto para copiar à mão. -->
-              <span class="pc-acts">
-                <a class="pc-obter" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Obter chave ↗</a>
-                <button type="button" class="pc-trocar" data-alvo="apiKey" hidden>Trocar</button>
-              </span>
-            </div>
-            <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
-            <div class="pw-row">
-              <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off" aria-label="Chave da API da Anthropic" />
-              <button class="toggle-pw" id="togglePw" type="button">mostrar</button>
-            </div>
-            <span class="hint">Em console.anthropic.com — precisa de crédito na conta. <a href="help.html" target="_blank">Passo a passo →</a></span>
+        <section class="cfg-sec" id="sec-provedor">
+          <div class="cfg-hd">
+            <h2>Provedor e chave</h2>
+            <span class="eyebrow-n" id="provCount"></span>
           </div>
-
-          <div class="pc-sec" id="keyG" data-prov="gemini" hidden>
-            <div class="pc-head">
-              <label for="geminiApiKey">Chave da API — Google (Gemini)</label>
-              <span class="pc-acts">
-                <a class="pc-obter" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Obter chave ↗</a>
-                <button type="button" class="pc-trocar" data-alvo="geminiApiKey" hidden>Trocar</button>
-              </span>
-            </div>
-            <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
-            <div class="pw-row">
-              <input id="geminiApiKey" type="password" placeholder="AIza..." autocomplete="off" aria-label="Chave da API do Google" />
-              <button class="toggle-pw" id="togglePwG" type="button">mostrar</button>
-            </div>
-            <span class="hint">Em aistudio.google.com — grátis para começar. <a href="help.html#gemini" target="_blank">Passo a passo →</a></span>
+          <div class="prov-grid" role="tablist" aria-label="Provedor de IA">
+            <!-- Ordem = hierarquia: o GPT é o provedor do modelo PADRÃO
+                 (gpt-5.6-luna), então vem primeiro. Quem acende o cartão é
+                 `pintarProvedores`, pelo modelo salvo — nunca a posição. -->
+            <button class="prov" type="button" id="provO" data-prov="openai" role="tab" aria-selected="false">
+              <span class="prov-i po">O</span>
+              <span class="prov-n">GPT</span>
+              <span class="kstate" id="kstateO">não configurada</span>
+            </button>
+            <button class="prov" type="button" id="provA" data-prov="anthropic" role="tab" aria-selected="false">
+              <span class="prov-i pa">A</span>
+              <span class="prov-n">Claude</span>
+              <span class="kstate" id="kstateA">não configurada</span>
+            </button>
+            <button class="prov" type="button" id="provG" data-prov="gemini" role="tab" aria-selected="false">
+              <span class="prov-i pg">G</span>
+              <span class="prov-n">Gemini</span>
+              <span class="kstate" id="kstateG">não configurada</span>
+            </button>
+            <!-- OpenRouter por ÚLTIMO: é um agregador (uma chave, centenas de
+                 modelos de vários fornecedores), não um provedor de modelo
+                 próprio. Quem chega para configurar deve ver antes os três
+                 caminhos diretos. -->
+            <button class="prov" type="button" id="provR" data-prov="openrouter" role="tab" aria-selected="false">
+              <span class="prov-i pr">R</span>
+              <span class="prov-n">OpenRouter</span>
+              <span class="kstate" id="kstateR">não configurada</span>
+            </button>
           </div>
+          <p class="prov-nota">
+            Você só precisa da chave do provedor que for usar. Dá para cadastrar as
+            três e alternar quando quiser — a conversa em andamento, porém, não
+            atravessa provedores: trocar de família de modelo pede uma
+            <b>nova conversa</b>.
+          </p>
 
-          <div class="pc-sec" id="keyO" data-prov="openai" hidden>
-            <div class="pc-head">
-              <label for="openaiApiKey">Chave da API — OpenAI (GPT)</label>
-              <span class="pc-acts">
-                <a class="pc-obter" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Obter chave ↗</a>
-                <button type="button" class="pc-trocar" data-alvo="openaiApiKey" hidden>Trocar</button>
-              </span>
+          <!-- Os QUATRO inputs de chave seguem no DOM (só o do provedor ativo
+               fica visível), então "Salvar" continua lendo os quatro. -->
+          <div class="provcard">
+            <div class="pc-sec" id="keyA" data-prov="anthropic">
+              <div class="pc-head">
+                <label for="apiKey">Chave da API — Anthropic (Claude)</label>
+                <!-- Link DIRETO para a página de chaves do provedor, sempre visível
+                     (a dica abaixo some quando a chave está salva). Sem ele o
+                     endereço era texto para copiar à mão. -->
+                <span class="pc-acts">
+                  <a class="pc-obter" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Obter chave ↗</a>
+                  <button type="button" class="pc-trocar" data-alvo="apiKey" hidden>Trocar</button>
+                </span>
+              </div>
+              <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
+              <div class="pw-row">
+                <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off" aria-label="Chave da API da Anthropic" />
+                <button class="toggle-pw" id="togglePw" type="button">mostrar</button>
+              </div>
+              <span class="hint">Em console.anthropic.com — precisa de crédito na conta. <a href="help.html" target="_blank">Passo a passo →</a></span>
             </div>
-            <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
-            <div class="pw-row">
-              <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" aria-label="Chave da API da OpenAI" />
-              <button class="toggle-pw" id="togglePwO" type="button">mostrar</button>
-            </div>
-            <span class="hint">Em platform.openai.com — o provedor do modelo padrão; precisa de crédito na conta. <a href="help.html#openai" target="_blank">Passo a passo →</a></span>
-          </div>
 
-          <div class="pc-sec" id="keyR" data-prov="openrouter" hidden>
-            <div class="pc-head">
-              <label for="openrouterApiKey">Chave da API — OpenRouter</label>
-              <span class="pc-acts">
-                <a class="pc-obter" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">Obter chave ↗</a>
-                <button type="button" class="pc-trocar" data-alvo="openrouterApiKey" hidden>Trocar</button>
-              </span>
+            <div class="pc-sec" id="keyG" data-prov="gemini" hidden>
+              <div class="pc-head">
+                <label for="geminiApiKey">Chave da API — Google (Gemini)</label>
+                <span class="pc-acts">
+                  <a class="pc-obter" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Obter chave ↗</a>
+                  <button type="button" class="pc-trocar" data-alvo="geminiApiKey" hidden>Trocar</button>
+                </span>
+              </div>
+              <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
+              <div class="pw-row">
+                <input id="geminiApiKey" type="password" placeholder="AIza..." autocomplete="off" aria-label="Chave da API do Google" />
+                <button class="toggle-pw" id="togglePwG" type="button">mostrar</button>
+              </div>
+              <span class="hint">Em aistudio.google.com — grátis para começar. <a href="help.html#gemini" target="_blank">Passo a passo →</a></span>
             </div>
-            <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
-            <div class="pw-row">
-              <input id="openrouterApiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off" aria-label="Chave da API do OpenRouter" />
-              <button class="toggle-pw" id="togglePwR" type="button">mostrar</button>
+
+            <div class="pc-sec" id="keyO" data-prov="openai" hidden>
+              <div class="pc-head">
+                <label for="openaiApiKey">Chave da API — OpenAI (GPT)</label>
+                <span class="pc-acts">
+                  <a class="pc-obter" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Obter chave ↗</a>
+                  <button type="button" class="pc-trocar" data-alvo="openaiApiKey" hidden>Trocar</button>
+                </span>
+              </div>
+              <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
+              <div class="pw-row">
+                <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" aria-label="Chave da API da OpenAI" />
+                <button class="toggle-pw" id="togglePwO" type="button">mostrar</button>
+              </div>
+              <span class="hint">Em platform.openai.com — o provedor do modelo padrão; precisa de crédito na conta. <a href="help.html#openai" target="_blank">Passo a passo →</a></span>
             </div>
-            <span class="hint">Uma chave para modelos de vários fornecedores — inclusive os que não estão nas outras três listas. Nele a extensão exige provedores que <b>não guardem</b> o que é enviado. <a href="help.html#openrouter" target="_blank">Passo a passo →</a></span>
-          </div>
+
+            <div class="pc-sec" id="keyR" data-prov="openrouter" hidden>
+              <div class="pc-head">
+                <label for="openrouterApiKey">Chave da API — OpenRouter</label>
+                <span class="pc-acts">
+                  <a class="pc-obter" href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">Obter chave ↗</a>
+                  <button type="button" class="pc-trocar" data-alvo="openrouterApiKey" hidden>Trocar</button>
+                </span>
+              </div>
+              <div class="keymask" hidden><span class="km-v"></span><span class="km-t">local</span></div>
+              <div class="pw-row">
+                <input id="openrouterApiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off" aria-label="Chave da API do OpenRouter" />
+                <button class="toggle-pw" id="togglePwR" type="button">mostrar</button>
+              </div>
+              <span class="hint">Uma chave para modelos de vários fornecedores — inclusive os que não estão nas outras três listas. Nele a extensão exige provedores que <b>não guardem</b> o que é enviado. <a href="help.html#openrouter" target="_blank">Passo a passo →</a></span>
+            </div>
+          </div><!-- /.provcard -->
+        </section>
+
+        <section class="cfg-sec" id="sec-modelo">
+          <div class="cfg-hd"><h2>Modelo e raciocínio</h2></div>
 
           <label class="field" for="model">Modelo</label>
           <!-- O PRIMEIRO <option> é o modelo PADRÃO (gpt-5.6-luna) de
@@ -273,249 +510,264 @@
             menos. Nos modelos Gemini isto vira o nível de <i>thinking</i>; nos
             GPT, o <i>reasoning effort</i>.
           </span>
-        </div><!-- /.provcard -->
+        </section>
 
-        <label class="field" for="customPrompt">Instruções personalizadas (opcional)
-          <span class="hint">
-            Diga quem você é e como quer as respostas — vale para Claude, Gemini
-            e GPT, no chat, na minuta e no mapa mental. Editar isto no meio de
-            uma conversa invalida o cache: o turno seguinte custa um pouco mais.
-          </span>
-        </label>
-        <textarea id="customPrompt" rows="4" maxlength="4000" placeholder="Ex.: Sou advogado(a) da parte autora; aponte riscos e teses favoráveis…"></textarea>
-        <div class="personas" id="personas">
-          <button type="button" class="persona" data-txt="Sou advogado(a). Aponte riscos processuais, teses favoráveis à minha parte e prazos em aberto.">Advogado(a)</button>
-          <button type="button" class="persona" data-txt="Sou servidor(a) do juízo. Priorize a triagem: o que está pendente de decisão, o que já preclui e o que falta juntar.">Servidor(a)</button>
-          <button type="button" class="persona" data-txt="Sou magistrado(a). Resuma controvérsia, provas produzidas e teses de cada parte, indicando o que ainda precisa ser decidido.">Magistrado(a)</button>
-        </div>
+        <section class="cfg-sec" id="sec-instrucoes">
+          <div class="cfg-hd"><h2>Instruções personalizadas</h2></div>
+          <label class="field" for="customPrompt">O que a IA precisa saber sobre você (opcional)
+            <span class="hint">
+              Diga quem você é e como quer as respostas — vale para Claude, Gemini
+              e GPT, no chat, na minuta e no mapa mental. Editar isto no meio de
+              uma conversa invalida o cache: o turno seguinte custa um pouco mais.
+            </span>
+          </label>
+          <textarea id="customPrompt" rows="4" maxlength="4000" placeholder="Ex.: Sou advogado(a) da parte autora; aponte riscos e teses favoráveis…"></textarea>
+          <div class="personas" id="personas">
+            <button type="button" class="persona" data-txt="Sou advogado(a). Aponte riscos processuais, teses favoráveis à minha parte e prazos em aberto.">Advogado(a)</button>
+            <button type="button" class="persona" data-txt="Sou servidor(a) do juízo. Priorize a triagem: o que está pendente de decisão, o que já preclui e o que falta juntar.">Servidor(a)</button>
+            <button type="button" class="persona" data-txt="Sou magistrado(a). Resuma controvérsia, provas produzidas e teses de cada parte, indicando o que ainda precisa ser decidido.">Magistrado(a)</button>
+          </div>
+        </section>
 
-        <!-- APARÊNCIA. Entra aqui, no bloco de preferências, e não junto dos
-             cartões de provedor: não é credencial nem modelo. É `<select>` e
-             não `.seg` porque são CINCO opções — um segmented de cinco itens
-             em 460px de popup quebraria em duas fileiras. O campo é exclusivo
-             desta página (o popup segue sendo o console rápido), então o
-             popup.js o acessa sob `if (el)` como todos os outros daqui.
+        <!-- APARÊNCIA. Seção própria, e não junto dos cartões de provedor: não
+             é credencial nem modelo. É `<select>` e não `.seg` porque são SETE
+             opções — um segmented de sete itens quebraria em duas fileiras. O
+             campo é exclusivo desta página (o popup segue sendo o console
+             rápido), então o popup.js o acessa sob `if (el)` como todos os
+             outros daqui.
 
              O painel tem o MESMO controle no cabeçalho: quem já está lendo um
              processo troca sem sair dele; quem nunca abriu um descobre que a
              opção existe. Os dois escrevem a mesma chave e o
              `storage.onChanged` sincroniza as abas. -->
-        <label class="field" for="tema">Aparência do painel</label>
-        <select id="tema">
-          <option value="">Padrão (padrão)</option>
-          <option value="noite">Noite — escuro</option>
-          <option value="papel">Papel — claro</option>
-          <option value="vidro">Vidro — placa branca translúcida</option>
-          <option value="toga">Toga — vinho</option>
-          <option value="rosa">Rosa</option>
+        <section class="cfg-sec" id="sec-aparencia">
+          <div class="cfg-hd"><h2>Aparência</h2></div>
+          <label class="field" for="tema">Tema do painel</label>
+          <select id="tema">
+            <option value="">Padrão (padrão)</option>
+            <option value="noite">Noite — escuro</option>
+            <option value="papel">Papel — claro</option>
+            <option value="vidro">Vidro — placa branca translúcida</option>
+            <option value="toga">Toga — vinho</option>
+            <option value="rosa">Rosa</option>
             <option value="institucional">Institucional (o visual clássico)</option>
-        </select>
-        <span class="hint">
-          Veste só o painel dentro do PJe; esta página e as demais telas da
-          extensão não mudam. O modo sigiloso deriva do tema — em cada um ele
-          tem a própria paleta, para o sinal se ler igual em todos.
-        </span>
-
-        <!-- Memória de processos. O interruptor existe porque este é o único
-             recurso que guarda TRECHO DOS AUTOS no disco por conta própria (as
-             minutas e os modelos são coisas que o usuário mandou salvar). Ligado
-             por padrão: o ganho é grande e concreto, e a alternativa — pedir
-             permissão numa caixa antes de qualquer uso — seria fricção para
-             quase todo mundo. O que torna isso defensável é o resto: a faixa de
-             retomada anuncia a memória na tela, o botão de apagar fica junto
-             dela, e nada sobrevive a 14 dias. -->
-        <label class="field field-check">
-          <span class="chk">
-            <input type="checkbox" id="memoriaCaso" checked>
-            <b>Lembrar dos processos entre sessões</b>
+          </select>
+          <span class="hint">
+            Veste só o painel dentro do PJe; esta página e as demais telas da
+            extensão não mudam. O modo sigiloso deriva do tema — em cada um ele
+            tem a própria paleta, para o sinal se ler igual em todos.
           </span>
-          <i>Ao reabrir um processo já analisado, as conversas voltam e as peças não
-          precisam ser baixadas de novo. Ficam guardados <b>neste computador</b> o
-          texto das peças, a lista do que foi selecionado e as conversas — <b>não</b> os
-          PDFs. Tudo é apagado depois de 14 dias, e cada processo tem um botão
-          “Esquecer” no próprio painel.</i>
-        </label>
-        <!-- Conferência humana antes de enviar, no modo sigiloso. Ligada por
-             padrão: a anonimização automática erra, e o que escapar vai inteiro
-             ao provedor. A opção existe para quem aceita o risco de propósito
-             — e mora AQUI, e não só na caixa, para a dispensa ter caminho de
-             volta (a caixa oferece "não perguntar de novo"; esta linha é o
-             "voltar a perguntar"). -->
-        <label class="field field-check">
-          <span class="chk">
-            <input type="checkbox" id="sigiloAprovar" checked>
-            <b>Modo sigiloso: conferir as peças anonimizadas antes de enviar</b>
-          </span>
-          <i>Depois do reconhecimento local, uma caixa mostra o texto exatamente como
-          vai sair, peça por peça, e espera a sua aprovação — dá para editar, mascarar
-          à mão ou liberar um valor antes de enviar. A detecção automática pode deixar
-          passar um nome, e o que escapar vai inteiro para a IA. Desligue só se aceitar
-          esse risco; a caixa de auditoria continua mostrando o que saiu.</i>
-        </label>
-        <!-- Apagar TUDO de uma vez. Existe por duas razões: é a saída para quem
-             quer começar do zero sem desligar o recurso, e é o que torna a
-             promessa de privacidade acionável num clique só — "some em 14 dias"
-             não serve para quem quer que suma agora. -->
-        <div class="mem-acts">
-          <button class="btn btn-sec" id="limparMemoria" type="button">
-            Apagar a memória de todos os processos
-          </button>
-          <span class="mem-status" id="memStatus"></span>
-        </div>
+        </section>
 
-        <!-- MEDIÇÃO DO MOTOR DE OCR.
-             A extensão mede, na primeira página que reconhece, se a placa de
-             vídeo é mais rápida que o processador para este modelo — e guarda a
-             resposta, porque ela é da máquina e não muda de um processo para o
-             outro. O botão existe para o dia em que a máquina muda: driver
-             novo, placa nova, ou o notebook que passou a rodar na GPU
-             dedicada. Sem ele, uma medição de meses atrás valeria para sempre.
-             É a mesma disciplina da memória do `safety_settings` do Gemini:
-             memorizar a descoberta, e deixar como refazê-la. -->
-        <div class="mem-acts">
-          <button class="btn btn-sec" id="remedirOcr" type="button">
-            Medir de novo o motor de OCR
-          </button>
-          <span class="mem-status" id="ocrStatus"></span>
-        </div>
-
-        <div class="save-row">
-          <div class="save-hint" id="saveHint"><span>Alterações não salvas</span></div>
-          <div class="save-acts">
-            <button class="btn btn-sec" id="testKey" type="button">Testar chave</button>
-            <button class="btn" id="save">Salvar configuração</button>
+        <section class="cfg-sec" id="sec-privacidade">
+          <div class="cfg-hd"><h2>Privacidade e dados locais</h2></div>
+          <!-- Mesma caixa do popup, com os textos longos que lá não cabem: o
+               componente é o mesmo, só a densidade muda (DESIGN.md §5). Ela
+               abre a seção porque enuncia os três fatos de que as duas opções
+               abaixo são consequência. -->
+          <div class="privacy">
+            <p class="priv-l">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <span>As chaves ficam <b>neste navegador</b> — nunca em nossos servidores.</span>
+            </p>
+            <p class="priv-l warn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18.5a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><path d="M12 17.2h.01"/></svg>
+              <span>As peças selecionadas são enviadas à API do provedor do modelo escolhido
+              (Anthropic, Google ou OpenAI). Processos podem conter <b>dados pessoais ou
+              sigilosos</b> — use conforme as normas do seu tribunal.
+              <a href="https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md" target="_blank" rel="noopener">Política de privacidade</a>.
+              Em segredo de justiça, a Resolução CNJ 615 pede <b>anonimização na origem</b> —
+              <a href="help.html#sigilo" target="_blank">veja como fazer →</a></span>
+            </p>
+            <p class="priv-l net">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z"/></svg>
+              <span><b>Conexão por cabo faz muita diferença.</b> A espera de um turno quase
+              nunca é da IA: é o PJe entregando as peças <b>uma de cada vez</b>, cerca de 5 s
+              cada. No Wi-Fi instável isso se multiplica por dezenas de documentos e a extensão
+              parece travada, quando na verdade está esperando o tribunal.
+              <a href="help.html#rede" target="_blank">Por que a sua conexão importa tanto →</a></span>
+            </p>
           </div>
-          <div class="save-status" id="saveStatus"></div>
-        </div>
-        <!-- Mesma caixa do popup, com os textos longos que lá não cabem: a
-             página de opções não é outra tela, é a mesma com respiro
-             (DESIGN.md §5). -->
-        <div class="privacy">
-          <p class="priv-l">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-            <span>As chaves ficam <b>neste navegador</b> — nunca em nossos servidores.</span>
-          </p>
-          <p class="priv-l warn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18.5a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><path d="M12 17.2h.01"/></svg>
-            <span>As peças selecionadas são enviadas à API do provedor do modelo escolhido
-            (Anthropic, Google ou OpenAI). Processos podem conter <b>dados pessoais ou
-            sigilosos</b> — use conforme as normas do seu tribunal.
-            <a href="https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md" target="_blank" rel="noopener">Política de privacidade</a>.
-            Em segredo de justiça, a Resolução CNJ 615 pede <b>anonimização na origem</b> —
-            <a href="help.html#sigilo" target="_blank">veja como fazer →</a></span>
-          </p>
-          <p class="priv-l net">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z"/></svg>
-            <span><b>Conexão por cabo faz muita diferença.</b> A espera de um turno quase
-            nunca é da IA: é o PJe entregando as peças <b>uma de cada vez</b>, cerca de 5 s
-            cada. No Wi-Fi instável isso se multiplica por dezenas de documentos e a extensão
-            parece travada, quando na verdade está esperando o tribunal.
-            <a href="help.html#rede" target="_blank">Por que a sua conexão importa tanto →</a></span>
-          </p>
-        </div>
 
-        <!-- Anonimização na origem: vem LOGO DEPOIS da caixa de privacidade
-             porque é ali que a pergunta nasce ("as peças vão à API, e processos
-             podem conter dados sigilosos"). Até aqui a extensão enunciava o
-             dever do art. 19, §3º, IV e não apontava caminho nenhum.
-
-             Reusa o cartão `.lib` (ícone + título + descrição + seta) sem CSS
-             novo. Não entra na seção "Suas bibliotecas" logo abaixo: aquelas são
-             coleções que o usuário CONSTRÓI dentro da extensão; esta é uma
-             ferramenta separada, que ele instala fora dela — daí a seta ↗ em vez
-             da →, e a seção própria.
-
-             O destino é o GUIA, não o GitHub: o instalador tem ~660 MB, só roda
-             em Windows x64 e baixa mais 1,7 GB na primeira execução. Quem
-             descobre isso depois do download descobriu tarde. -->
-        <h2 class="sec-tit serif">Antes de enviar dados sigilosos</h2>
-        <div class="libs">
-          <a class="lib" href="help.html#sigilo" target="_blank">
-            <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.6c0 4.5-3.2 8-7.5 8.9-4.3-.9-7.5-4.4-7.5-8.9V6z"/><path d="M9 12.2l2.1 2.1 4-4.2"/></svg></span>
-            <span class="tx">
-              <b>TecJustiça Sigilo — anonimizar no seu computador</b>
-              <i>Mascara nomes, CPF, endereços e número do processo antes que o documento saia
-              daqui; o arquivo anonimizado volta pelo clipe de anexo. Programa gratuito e
-              separado, 100% local.</i>
+          <!-- Memória de processos. O interruptor existe porque este é o único
+               recurso que guarda TRECHO DOS AUTOS no disco por conta própria (as
+               minutas e os modelos são coisas que o usuário mandou salvar). Ligado
+               por padrão: o ganho é grande e concreto, e a alternativa — pedir
+               permissão numa caixa antes de qualquer uso — seria fricção para
+               quase todo mundo. O que torna isso defensável é o resto: a faixa de
+               retomada anuncia a memória na tela, o botão de apagar fica junto
+               dela, e nada sobrevive a 14 dias. -->
+          <label class="field field-check">
+            <span class="chk">
+              <input type="checkbox" id="memoriaCaso" checked>
+              <b>Lembrar dos processos entre sessões</b>
             </span>
-            <span class="arrow" aria-hidden="true">↗</span>
-          </a>
-        </div>
-        <p class="libs-nota">
-          Em processo em <b>segredo de justiça</b>, a Resolução CNJ 615 (art. 19, §3º, IV) veda
-          usar IA privada ou externa <b>salvo</b> anonimização na origem.
-        </p>
+            <i>Ao reabrir um processo já analisado, as conversas voltam e as peças não
+            precisam ser baixadas de novo. Ficam guardados <b>neste computador</b> o
+            texto das peças, a lista do que foi selecionado e as conversas — <b>não</b> os
+            PDFs. Tudo é apagado depois de 14 dias, e cada processo tem um botão
+            “Esquecer” no próprio painel.</i>
+          </label>
+          <!-- Conferência humana antes de enviar, no modo sigiloso. Ligada por
+               padrão: a anonimização automática erra, e o que escapar vai inteiro
+               ao provedor. A opção existe para quem aceita o risco de propósito
+               — e mora AQUI, e não só na caixa, para a dispensa ter caminho de
+               volta (a caixa oferece "não perguntar de novo"; esta linha é o
+               "voltar a perguntar"). -->
+          <label class="field field-check">
+            <span class="chk">
+              <input type="checkbox" id="sigiloAprovar" checked>
+              <b>Modo sigiloso: conferir as peças anonimizadas antes de enviar</b>
+            </span>
+            <i>Depois do reconhecimento local, uma caixa mostra o texto exatamente como
+            vai sair, peça por peça, e espera a sua aprovação — dá para editar, mascarar
+            à mão ou liberar um valor antes de enviar. A detecção automática pode deixar
+            passar um nome, e o que escapar vai inteiro para a IA. Desligue só se aceitar
+            esse risco; a caixa de auditoria continua mostrando o que saiu.</i>
+          </label>
+          <!-- Apagar TUDO de uma vez. Existe por duas razões: é a saída para quem
+               quer começar do zero sem desligar o recurso, e é o que torna a
+               promessa de privacidade acionável num clique só — "some em 14 dias"
+               não serve para quem quer que suma agora. -->
+          <div class="mem-acts">
+            <button class="btn btn-sec" id="limparMemoria" type="button">
+              Apagar a memória de todos os processos
+            </button>
+            <span class="mem-status" id="memStatus"></span>
+          </div>
+
+          <!-- MEDIÇÃO DO MOTOR DE OCR.
+               A extensão mede, na primeira página que reconhece, se a placa de
+               vídeo é mais rápida que o processador para este modelo — e guarda a
+               resposta, porque ela é da máquina e não muda de um processo para o
+               outro. O botão existe para o dia em que a máquina muda: driver
+               novo, placa nova, ou o notebook que passou a rodar na GPU
+               dedicada. Sem ele, uma medição de meses atrás valeria para sempre.
+               É a mesma disciplina da memória do `safety_settings` do Gemini:
+               memorizar a descoberta, e deixar como refazê-la.
+
+               Fica nesta seção porque o OCR local é o que evita mandar o PDF: é
+               a máquina do usuário fazendo o trabalho, que é do que a seção
+               trata. -->
+          <div class="mem-acts">
+            <button class="btn btn-sec" id="remedirOcr" type="button">
+              Medir de novo o motor de OCR
+            </button>
+            <span class="mem-status" id="ocrStatus"></span>
+          </div>
+
+          <!-- Anonimização na origem: vem LOGO DEPOIS da caixa de privacidade
+               porque é ali que a pergunta nasce ("as peças vão à API, e processos
+               podem conter dados sigilosos"). Até aqui a extensão enunciava o
+               dever do art. 19, §3º, IV e não apontava caminho nenhum.
+
+               Reusa o cartão `.lib` (ícone + título + descrição + seta) sem CSS
+               novo. Não entra na seção "Bibliotecas": aquelas são coleções que o
+               usuário CONSTRÓI dentro da extensão; esta é uma ferramenta
+               separada, que ele instala fora dela — daí a seta ↗ em vez da →.
+
+               O destino é o GUIA, não o GitHub: o instalador tem ~660 MB, só roda
+               em Windows x64 e baixa mais 1,7 GB na primeira execução. Quem
+               descobre isso depois do download descobriu tarde. -->
+          <h3 class="sec-tit serif">Antes de enviar dados sigilosos</h3>
+          <div class="libs">
+            <a class="lib" href="help.html#sigilo" target="_blank">
+              <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.6c0 4.5-3.2 8-7.5 8.9-4.3-.9-7.5-4.4-7.5-8.9V6z"/><path d="M9 12.2l2.1 2.1 4-4.2"/></svg></span>
+              <span class="tx">
+                <b>TecJustiça Sigilo — anonimizar no seu computador</b>
+                <i>Mascara nomes, CPF, endereços e número do processo antes que o documento saia
+                daqui; o arquivo anonimizado volta pelo clipe de anexo. Programa gratuito e
+                separado, 100% local.</i>
+              </span>
+              <span class="arrow" aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <p class="libs-nota">
+            Em processo em <b>segredo de justiça</b>, a Resolução CNJ 615 (art. 19, §3º, IV) veda
+            usar IA privada ou externa <b>salvo</b> anonimização na origem.
+          </p>
+        </section>
 
         <!-- Bibliotecas: as duas coleções que o usuário constrói ao longo do
              tempo e que, até aqui, só eram alcançáveis de dentro de uma aba de
              autos aberta. Cadastrar modelos é tarefa de PREPARAÇÃO; recuperar
              uma minuta antiga, idem. Nenhuma das duas depende de um processo. -->
-        <h2 class="sec-tit serif">Suas bibliotecas</h2>
-        <div class="libs">
-          <a class="lib" href="modelos.html" target="_blank">
-            <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h7v14H4z"/><path d="M13 6h7v14h-7z"/></svg></span>
-            <span class="tx">
-              <b>Modelos de peças</b>
-              <i>Cadastre sentenças, decisões e despachos seus — a minuta segue a estrutura deles.</i>
-            </span>
-            <span class="arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="lib" href="editor.html" target="_blank">
-            <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14"/><path d="M15 4l5 5-9 9H6v-5z"/></svg></span>
-            <span class="tx">
-              <b>Minhas minutas</b>
-              <i>Reabra e continue os rascunhos guardados neste computador (7 dias).</i>
-            </span>
-            <span class="arrow" aria-hidden="true">→</span>
-          </a>
-        </div>
-        <p class="libs-nota">
-          As duas ficam <b>apenas neste computador</b> e não sincronizam entre dispositivos.
-        </p>
-
-        <div class="foot">
-          <a href="help.html" target="_blank">Ajuda e preços</a>
-          <a href="changelog.html" target="_blank">Novidades</a>
-          <a href="https://wa.me/5588993650420?text=Ol%C3%A1!%20Sobre%20a%20extens%C3%A3o%20TecJusti%C3%A7a%20PJe%3A%20" target="_blank" rel="noopener">Falar comigo (WhatsApp)</a>
-          <a href="https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacidade</a>
-          <a href="https://tecjustica.substack.com/" target="_blank" rel="noopener">Apoiar o projeto</a>
-        </div>
-
-        <!-- A caixa completa cabe AQUI (e não no popup): a página de opções é a
-             versão com as explicações longas, e quem a abriu já parou para ler. -->
-        <div class="apoio">
-          <p><b>A extensão é gratuita e de código aberto</b>, e recebe melhorias toda
-          semana — o que custa horas de trabalho e tokens de API nos testes com processos
-          reais. Nenhum recurso é pago: você usa tudo com a sua própria chave.</p>
-          <!-- O pedido mais BARATO para quem lê: grátis e meio minuto. Vem antes
-               dos dois de dinheiro de propósito — pedir o caro primeiro faz o
-               barato parecer consolo. A política da Chrome Web Store PROÍBE
-               incentivar avaliação: nada é oferecido em troca, aqui nem em
-               lugar nenhum. -->
-          <p>Há uma forma de ajudar que não custa nada: <b>uma avaliação na Chrome Web
-          Store</b>. É o que mais ajuda outras pessoas a encontrarem a extensão —
-          e leva meio minuto.</p>
-          <p><a class="ap-star" href="https://chromewebstore.google.com/detail/imgfakkieoijdhdpafjjlefcckbmbppm/reviews" target="_blank" rel="noopener">★ Avaliar a extensão ↗</a></p>
-          <p>Se ela está sendo útil, dá para retribuir de duas formas:</p>
-          <div class="pix">
-            <img class="pix-qr" src="../icons/pix-qr.svg" width="108" height="108"
-                 alt="QR Code do PIX para Marcos Antonio Rafael da Fonseca, Nubank">
-            <div class="pix-tx">
-              <p class="pix-t"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.5h4.8"/><path d="M10.4 2.5v3.6L7.9 9.4a4 4 0 0 0-.8 2.4V20a1.5 1.5 0 0 0 1.5 1.5h6.8a1.5 1.5 0 0 0 1.5-1.5v-8.2a4 4 0 0 0-.8-2.4l-2.5-3.3V2.5"/><path d="M7.1 12.6h9.8"/><path d="M9.6 15.4h4.8"/></svg>Me pague uma Heineken</p>
-              <p class="pix-m">Um apoio de uma vez só, no valor que você achar justo.<br>
-              PIX · Nubank · Marcos Antonio Rafael da Fonseca<br>
-              chave <span class="pix-k">(88) 99365-0420</span></p>
-              <button type="button" class="pix-copy" data-pix="00020101021126360014br.gov.bcb.pix0114+55889936504205204000053039865802BR5921MARCOS A R DA FONSECA6009FORTALEZA62070503***6304D296"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a2 2 0 0 0-2 2v9"/></svg><span class="lbl">Copiar código PIX</span></button>
-            </div>
+        <section class="cfg-sec" id="sec-bibliotecas">
+          <div class="cfg-hd"><h2>Suas bibliotecas</h2></div>
+          <div class="libs">
+            <a class="lib" href="modelos.html" target="_blank">
+              <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h7v14H4z"/><path d="M13 6h7v14h-7z"/></svg></span>
+              <span class="tx">
+                <b>Modelos de peças</b>
+                <i>Cadastre sentenças, decisões e despachos seus — a minuta segue a estrutura deles.</i>
+              </span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="lib" href="editor.html" target="_blank">
+              <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14"/><path d="M15 4l5 5-9 9H6v-5z"/></svg></span>
+              <span class="tx">
+                <b>Minhas minutas</b>
+                <i>Reabra e continue os rascunhos guardados neste computador (7 dias).</i>
+              </span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a>
           </div>
-          <p>Ou assine o <b>TecJustiça</b> no Substack, por <b>R$ 10 mensais</b>, apoiando
-          os próximos projetos de forma contínua.</p>
-          <a class="assinar" href="https://tecjustica.substack.com/" target="_blank" rel="noopener">Assinar o TecJustiça — R$ 10/mês ↗</a>
-        </div>
-      </div>
+          <p class="libs-nota">
+            As duas ficam <b>apenas neste computador</b> e não sincronizam entre dispositivos.
+          </p>
+        </section>
+
+        <section class="cfg-sec" id="sec-apoio">
+          <div class="cfg-hd"><h2>Sobre e apoio</h2></div>
+          <!-- A caixa completa cabe AQUI (e não no popup): a página de opções é a
+               versão com as explicações longas, e quem a abriu já parou para ler. -->
+          <div class="apoio">
+            <p><b>A extensão é gratuita e de código aberto</b>, e recebe melhorias toda
+            semana — o que custa horas de trabalho e tokens de API nos testes com processos
+            reais. Nenhum recurso é pago: você usa tudo com a sua própria chave.</p>
+            <!-- O pedido mais BARATO para quem lê: grátis e meio minuto. Vem antes
+                 dos dois de dinheiro de propósito — pedir o caro primeiro faz o
+                 barato parecer consolo. A política da Chrome Web Store PROÍBE
+                 incentivar avaliação: nada é oferecido em troca, aqui nem em
+                 lugar nenhum. -->
+            <p>Há uma forma de ajudar que não custa nada: <b>uma avaliação na Chrome Web
+            Store</b>. É o que mais ajuda outras pessoas a encontrarem a extensão —
+            e leva meio minuto.</p>
+            <p><a class="ap-star" href="https://chromewebstore.google.com/detail/imgfakkieoijdhdpafjjlefcckbmbppm/reviews" target="_blank" rel="noopener">★ Avaliar a extensão ↗</a></p>
+            <p>Se ela está sendo útil, dá para retribuir de duas formas:</p>
+            <div class="pix">
+              <img class="pix-qr" src="../icons/pix-qr.svg" width="108" height="108"
+                   alt="QR Code do PIX para Marcos Antonio Rafael da Fonseca, Nubank">
+              <div class="pix-tx">
+                <p class="pix-t"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.5h4.8"/><path d="M10.4 2.5v3.6L7.9 9.4a4 4 0 0 0-.8 2.4V20a1.5 1.5 0 0 0 1.5 1.5h6.8a1.5 1.5 0 0 0 1.5-1.5v-8.2a4 4 0 0 0-.8-2.4l-2.5-3.3V2.5"/><path d="M7.1 12.6h9.8"/><path d="M9.6 15.4h4.8"/></svg>Me pague uma Heineken</p>
+                <p class="pix-m">Um apoio de uma vez só, no valor que você achar justo.<br>
+                PIX · Nubank · Marcos Antonio Rafael da Fonseca<br>
+                chave <span class="pix-k">(88) 99365-0420</span></p>
+                <button type="button" class="pix-copy" data-pix="00020101021126360014br.gov.bcb.pix0114+55889936504205204000053039865802BR5921MARCOS A R DA FONSECA6009FORTALEZA62070503***6304D296"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a2 2 0 0 0-2 2v9"/></svg><span class="lbl">Copiar código PIX</span></button>
+              </div>
+            </div>
+            <p>Ou assine o <b>TecJustiça</b> no Substack, por <b>R$ 10 mensais</b>, apoiando
+            os próximos projetos de forma contínua.</p>
+            <a class="assinar" href="https://tecjustica.substack.com/" target="_blank" rel="noopener">Assinar o TecJustiça — R$ 10/mês ↗</a>
+          </div>
+
+          <div class="foot">
+            <a href="help.html" target="_blank">Ajuda e preços</a>
+            <a href="changelog.html" target="_blank">Novidades</a>
+            <a href="https://wa.me/5588993650420?text=Ol%C3%A1!%20Sobre%20a%20extens%C3%A3o%20TecJusti%C3%A7a%20PJe%3A%20" target="_blank" rel="noopener">Falar comigo (WhatsApp)</a>
+            <a href="https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacidade</a>
+            <a href="https://tecjustica.substack.com/" target="_blank" rel="noopener">Apoiar o projeto</a>
+          </div>
+        </section>
+      </main>
     </div>
 
     <script src="popup.js"></script>
+    <!-- Destaque da seção corrente na navegação lateral. Arquivo PRÓPRIO, e não
+         mais uma função no `popup.js`: aquele é compartilhado com o popup, que
+         não tem navegação nenhuma — e a regra desta casa é que o popup.js só
+         toque em elemento que exista nas duas telas. -->
+    <script src="options-nav.js"></script>
     <!-- Só o botão "Copiar código PIX" da caixa de apoio; o popup.html não o
          carrega porque lá não há caixa de apoio, só o link do rodapé. -->
     <script src="apoio.js"></script>
