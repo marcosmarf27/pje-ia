@@ -2868,6 +2868,21 @@ categoria que a rede de testes **não cobria**, e é isso que vale registrar.
   continua com peso: os toggles acesos ganham fundo tingido, então "ligado"
   passou a ser a única coisa que aparece como superfície ali — que é
   exatamente o que aquela linha precisa dizer.
+- **PLANO CUMPRIDO PELA METADE: no `.estreito` o tipo caía e a row NÃO voltava
+  a uma linha.** O plano do redesign dizia as duas coisas na mesma frase; o
+  código fez só a primeira, e o id ficou sozinho na segunda linha do card.
+  Onde isso morde é o modo PADRÃO — o flutuante tem 420px, logo é `.estreito`,
+  e ali a `.docs` é uma FAIXA de 264px em que sobram ~96px para o `.doclist`:
+  com card de ~59px cabia UMA peça e meia, e a segunda aparecia partida ao
+  meio pelo rodapé, que se lê como falha de render e não como "há mais para
+  rolar". Com `grid-template-areas: "chk nome meta ver"` o card cai para ~43px
+  e a faixa mostra duas peças inteiras mais a borda da terceira. **O markup não
+  muda** — quem faz o reflow são as ÁREAS, e é para isso que a segunda linha
+  existe como área e não como elemento.
+  - Só a CAPTURA acha um defeito assim: `getComputedStyle` reporta a `.docrow`
+    viva e correta, e a medição de largura da fileira (que eu tinha) diz que
+    nada estourou. O que estourou foi a ALTURA de uma lista rolável, e isso não
+    é erro — é densidade.
 
 ## Temas do painel e o carimbo do modo sigiloso (`panel.css` + `panel.js`)
 
@@ -5260,7 +5275,22 @@ arquivo NÃO carrega:
   diferentes, e nenhuma substitui a outra:
   - **`impressao.mjs`** — para CADA elemento da árvore sombra, 11 propriedades
     de cor computadas, em oito retratos. Responde *"alguma cor mudou onde não
-    devia?"*. É ela que torna verificável a promessa do tema `institucional`.
+    devia?"* — e só isso: mede **um tema por execução**, então prova de
+    não-regressão nunca é prova de que o tema novo funciona (quem responde por
+    isso é o `t-temas-contraste`).
+    - **UMA BASELINE DE REGRESSÃO VISUAL SÓ VALE ENQUANTO A ÁRVORE É A MESMA, e
+      quem reconstrói markup a REGRAVA no mesmo commit.** A `base-v0.59.json`
+      ficou órfã na v0.60 e ninguém percebeu: os caminhos de seletor mudaram, e
+      comparar contra ela devolve **2.773 elementos novos/ausentes**. Nem com
+      `TEMA=institucional` ela serve — aquele tema preserva os ~130 TOKENS, e a
+      comparação ainda acusa **1.604** diferenças, porque **o redesign mudou
+      COMPONENTES, não só cores**: token intacto num componente reconstruído
+      pinta outra coisa. O custo de deixar assim não é o arquivo velho: é a
+      rodada seguinte invocar a ferramenta como prova, receber milhares de
+      diferenças legítimas, e o hábito virar ignorar o resultado. Baseline da
+      v0.60.1: `base-v0.60.json`, 4.335 elementos × 11 = **47.685**, fechando em
+      zero. A antiga fica no repo como RETRATO do visual que o `institucional`
+      promete preservar — só não é mais oráculo.
   - **`capturar.mjs`** — um PNG por tema × estado do sigilo, mais o vazio, a
     view de tempo e o movimento reduzido. Responde *"a tela está certa?"*, que é
     outra pergunta: sombra `inset` pintada abaixo dos filhos, caixa 0×0 que não

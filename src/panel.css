@@ -2236,9 +2236,20 @@ button > svg { flex: none; }
   padding: 1px 6px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%;
 }
-/* No estreito o tipo cai: ali a coluna vira uma faixa de 264px de altura e o
-   nome da peça é o que precisa de largura. */
+/* No estreito o tipo cai E A ROW VOLTA A UMA LINHA — as duas metades da mesma
+   decisão. Ali a coluna vira uma FAIXA de 264px de altura, dos quais o
+   `.doclist` fica com ~96px: um card de duas linhas custa ~59px, então cabia
+   UMA peça e meia, e a segunda aparecia cortada ao meio pelo rodapé. Com o id
+   ao lado do nome o card custa ~43px e a faixa mostra duas peças inteiras mais
+   o começo da terceira, que é o que faz o corte se ler como "há mais para
+   rolar" em vez de defeito de render. O markup NÃO muda: quem faz o reflow é
+   o `grid-template-areas`, e é por isso que a linha 2 existe como área e não
+   como elemento. */
 .wrap.estreito .docrow .d-tipo { display: none; }
+.wrap.estreito .docrow {
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas: "chk nome meta ver";
+}
 
 /* Exceção: o id da peça é numeral que se copia para procurar no PJe. */
 .d-id { user-select: text; -webkit-user-select: text; }

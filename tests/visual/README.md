@@ -7,16 +7,37 @@ Duas ferramentas que medem coisas diferentes e não se substituem.
 node tests/visual/telas.mjs tests/visual/capturas-telas 8981
 
 # a impressão digital: para CADA elemento da árvore sombra, 11 propriedades de cor
-node tests/visual/impressao.mjs tests/visual/base-v0.59.json 8901      # grava
-node tests/visual/impressao.mjs /dev/null 8901 tests/visual/base-v0.59.json  # compara
+node tests/visual/impressao.mjs tests/visual/base-v0.60.json 8901      # grava
+node tests/visual/impressao.mjs /dev/null 8901 tests/visual/base-v0.60.json  # compara
 
 # a captura de pixel: um PNG por tema e por estado do modo sigiloso
 node tests/visual/capturar.mjs tests/visual/capturas 8911
 ```
 
-Linha de base em 05/09/2026, na v0.59.0: **3.338 elementos × 11 propriedades =
-36.718**, em seis retratos (largo/estreito × normal/sigilo, mais os dois do
+Linha de base em 05/09/2026, na v0.60.1: **4.335 elementos × 11 propriedades =
+47.685**, em seis retratos (largo/estreito × normal/sigilo, mais os dois do
 estado vazio). Determinística: duas execuções seguidas dão **zero** diferenças.
+
+### A `base-v0.59.json` está APOSENTADA, e vale saber por quê
+
+Ela media a árvore ANTIGA. O redesign da v0.60 reconstruiu o markup do painel,
+então os caminhos de seletor mudaram: comparar contra ela hoje devolve **2.773
+elementos novos/ausentes**, e a ferramenta não tem como distinguir "o elemento
+sumiu" de "o elemento mudou de endereço".
+
+Ela também não serve com `TEMA=institucional`, que era o plano. Aquele tema
+preserva os ~130 TOKENS da v0.59 — e a comparação ainda assim acusa **1.604**
+diferenças, porque **o redesign mudou COMPONENTES, não só cores**: a `.docrow`
+virou cartão com borda e fundo próprios, o compositor virou um cartão único, o
+cabeçalho ganhou quatro zonas. Um token intacto num componente reconstruído
+pinta outra coisa.
+
+**A lição é sobre a rede, não sobre o tema**: uma baseline de regressão visual
+só vale enquanto a ÁRVORE é a mesma. Ao reconstruir markup, ela precisa ser
+regravada no mesmo commit — senão a rodada seguinte a invoca como prova, ela
+devolve milhares de diferenças legítimas, e o hábito vira ignorar o resultado.
+O arquivo antigo fica no repo porque é o retrato do visual da v0.59, que o tema
+`institucional` promete preservar; ele só não é mais um oráculo.
 
 ## `telas.mjs` — as satélites
 
@@ -33,10 +54,11 @@ captura pela metade — pior que captura nenhuma, porque parece defeito de layou
 ## Por que DUAS
 
 - **`impressao.mjs`** responde *"alguma cor mudou onde não devia?"*. É o que
-  torna o redesign da v0.60 verificável: o tema `institucional` recebe os ~130
-  tokens do padrão de hoje, e se a impressão bater com esta baseline, o visual
-  antigo sobreviveu **por construção** — inspecionar um diff de cinquenta
-  substituições à mão não prova nada.
+  torna verificável uma rodada de saneamento de tokens: se a impressão bater
+  com a baseline, o visual sobreviveu **por construção** — inspecionar um diff
+  de cinquenta substituições à mão não prova nada. Ela mede **um tema só** (o
+  padrão, ou o de `TEMA=`): prova de NÃO-REGRESSÃO não é prova de que o tema
+  novo funciona, e quem responde por isso é o `t-temas-contraste`.
 - **`capturar.mjs`** responde *"a tela está certa?"*, que é outra pergunta.
   `getComputedStyle` reporta regra viva e correta em todos os casos abaixo, e
   nenhum deles aparece numa comparação de propriedades:
