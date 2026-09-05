@@ -208,5 +208,29 @@ async function abrir(arquivo, storage) {
   t(!/\(\)/.test(auto.textContent), "o rotulo Automatico nao fica com parenteses vazios: " + auto.textContent);
 }
 
+// 9) AS CONTAGENS DE VERSÃO DO CHANGELOG SÃO CALCULADAS, e não escritas à mão.
+//    O próprio arquivo carrega um comentário avisando que isso já saiu do ar
+//    uma vez ("estava em 65 com 76 linhas — defasagem silenciosa de 11
+//    versões, porque nada aqui a calcula"). Saiu de novo: a v0.61.0 encontrou
+//    "92 versões" e "As 73 versões" numa tabela com 107 linhas. Um número que
+//    nada calcula envelhece calado — então passa a ser conferido.
+{
+  const html = fs.readFileSync(__RAIZ + "/src/changelog.html", "utf-8");
+  const linhas = (html.match(/<td><span class="v">/g) || []).length;
+  t(linhas > 0, "o histórico do changelog tem linhas de versão");
+  const pares = [
+    [/foram <strong>(\d+) vers/, 'a abertura ("foram N versões")'],
+    [/As (\d+) vers[oõ]es, da mais recente/, 'o lead do histórico ("As N versões")'],
+  ];
+  for (const [re, onde] of pares) {
+    const m = html.match(re);
+    t(!!m, "changelog: " + onde + " existe");
+    if (m) {
+      t(Number(m[1]) === linhas,
+        "changelog: " + onde + " bate com as " + linhas + " linhas da tabela", m[1]);
+    }
+  }
+}
+
 console.log("\n" + ok + " OK, " + fail + " falhas");
 process.exit(fail ? 1 : 0);

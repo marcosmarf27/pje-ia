@@ -22,26 +22,10 @@
         />
         <span class="s" id="subtitulo">carregando…</span>
       </div>
-      <div class="acoes">
-        <span class="grupo drop-wrap" role="group" aria-label="Rascunhos">
-          <button id="rascunhos" class="ghost" title="Ver e abrir minutas guardadas neste computador"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h5.5l2 2H20v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg><span>Rascunhos</span></button>
-          <div id="drop" class="drop" hidden aria-label="Minutas guardadas"></div>
-        </span>
-        <span class="grupo" role="group" aria-label="Exportar">
-          <button id="copiar" title="Copiar com formatação para colar no editor de minutas do PJe">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a2 2 0 0 0-2 2v9"/></svg><span>Copiar formatado</span>
-          </button>
-          <button id="docx" title="Baixar o documento em Word (.docx)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg><span>.docx</span></button>
-          <button id="reid" hidden title="Esta minuta foi gerada em modo sigiloso: os nomes foram trocados por rótulos ([PESSOA_1]) antes de ir à IA. Restaura os nomes pela tabela guardada neste computador."><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0"/></svg><span>Restaurar nomes</span></button>
-          <button id="imprimir" title="Imprimir ou salvar em PDF"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="7" rx="2"/><path d="M7 14h10v6H7z"/></svg><span>Imprimir</span></button>
-        </span>
-        <span class="grupo estado">
-          <span id="salvo" class="salvo" aria-live="polite"></span>
-          <button id="descartar" class="ghost" title="Apagar este rascunho do computador">
-            Descartar
-          </button>
-        </span>
-      </div>
+      <!-- O que sobrou no topo é IDENTIDADE: quem sou, que documento é este.
+           As AÇÕES foram para a coluna da direita — ver o comentário da
+           `.lateral`, abaixo. O `.acoes` continua existindo como classe (o
+           `editor.js` e o modo-lista o usam), só mudou de lugar. -->
     </header>
 
     <!-- O Jodit monta a barra de ferramentas AQUI (config `toolbar`), fora do
@@ -50,22 +34,56 @@
     <div id="barra" class="barra"></div>
 
     <main class="mesa">
-      <!-- Registro da orientação que gerou a minuta (Res. CNJ 615/2025, arts.
-           19, §6º e 21, §2º). Preenchido por `mostrarOrigem`; some quando a
-           minuta é anterior a esta versão. Fica FORA da folha: o que vai ao
-           PJe é o ato. -->
-      <details class="origem" id="origem" hidden></details>
-      <div class="folha-wrap">
-        <textarea id="ed" aria-label="Texto da minuta"></textarea>
+      <div class="doc">
+        <div class="folha-wrap">
+          <textarea id="ed" aria-label="Texto da minuta"></textarea>
+        </div>
+        <div class="aviso" id="aviso" hidden></div>
       </div>
-      <div class="aviso" id="aviso" hidden></div>
-    </main>
 
-    <p class="rodape-nota">
-      Rascunho guardado neste computador para você reabrir depois — use
-      <b>Descartar</b> quando terminar. Confira o texto e as citações antes de usar:
-      a minuta é uma sugestão, não um ato.
-    </p>
+      <!-- AS AÇÕES VIVEM NA LATERAL, e não no cabeçalho, por três razões:
+           (1) empilhadas com rótulo elas se leem como uma LISTA de coisas que
+           dá para fazer com o documento — no topo eram sete pílulas de ícone
+           pequeno numa fileira, onde "Copiar formatado" e "Descartar" tinham o
+           mesmo peso; (2) o topo mais a barra do Jodit comiam ~100px de altura
+           de uma tela cujo conteúdo é uma folha A4 em pé; (3) a origem do ato e
+           o aviso de rascunho eram faixas soltas (uma acima da folha, outra no
+           fim da página) — são METADADO, e metadado tem coluna.
+           A ordem é a do trabalho: levar ao PJe → de onde veio → o rascunho. -->
+      <aside class="lateral">
+        <section class="lt-bloco acoes" aria-label="Levar ao PJe">
+          <h2 class="lt-h">Levar ao PJe</h2>
+          <button id="copiar" title="Copiar com formatação para colar no editor de minutas do PJe">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a2 2 0 0 0-2 2v9"/></svg><span>Copiar formatado</span>
+          </button>
+          <button id="docx" title="Baixar o documento em Word (.docx)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg><span>Baixar .docx</span></button>
+          <button id="imprimir" title="Imprimir ou salvar em PDF"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="7" rx="2"/><path d="M7 14h10v6H7z"/></svg><span>Imprimir ou salvar em PDF</span></button>
+          <button id="reid" hidden title="Esta minuta foi gerada em modo sigiloso: os nomes foram trocados por rótulos ([PESSOA_1]) antes de ir à IA. Restaura os nomes pela tabela guardada neste computador."><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0"/></svg><span>Restaurar nomes</span></button>
+        </section>
+
+        <!-- Registro da orientação que gerou a minuta (Res. CNJ 615/2025, arts.
+             19, §6º e 21, §2º). Preenchido por `mostrarOrigem`; some quando a
+             minuta é anterior a esta versão. Fica FORA da folha: o que vai ao
+             PJe é o ato. -->
+        <details class="origem" id="origem" hidden></details>
+
+        <section class="lt-bloco acoes" aria-label="Este rascunho">
+          <h2 class="lt-h">Este rascunho</h2>
+          <span id="salvo" class="salvo" aria-live="polite"></span>
+          <span class="drop-wrap">
+            <button id="rascunhos" class="ghost" title="Ver e abrir minutas guardadas neste computador"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h5.5l2 2H20v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg><span>Outras minutas</span></button>
+            <div id="drop" class="drop" hidden aria-label="Minutas guardadas"></div>
+          </span>
+          <button id="descartar" class="ghost perigo" title="Apagar este rascunho do computador">
+            Descartar
+          </button>
+          <p class="rodape-nota">
+            Guardado neste computador para você reabrir depois. Confira o texto e as
+            citações antes de usar: a minuta é uma <b>sugestão</b>, não um ato.
+          </p>
+        </section>
+      </aside>
+    </main>
 
     <script src="../vendor/jodit.min.js"></script>
     <script src="../vendor/docx.iife.js"></script>

@@ -4564,6 +4564,66 @@ Regras que não podem cair:
   ninguém: revisar e assinar, o art. 19, §3º, IV (segredo de justiça em IA externa), o
   art. 19, §7º (informar o tribunal) e o §3º, I (capacitação).
 
+## A barra do modo minuta (v0.61.0) — duas perguntas, e nenhuma caixa âmbar
+
+> Relato do dono do projeto: *"isso não tá bom, tá confuso"*; depois, *"Não me
+> faça pensar, do Krug. Tem que ser o mais fluido possível e o mais fácil de ser
+> usado. **Hoje é o principal problema da extensão**."*
+
+Ela tinha **oito blocos empilhados e três caixas âmbar**. Duas das três avisavam
+sobre o estado PADRÃO; a terceira acusava o usuário antes de ele fazer nada.
+
+- **O SEGUNDO `<select>` PERGUNTAVA O QUE A LINHA DE CIMA JÁ RESPONDIA, e por
+  isso deixou de existir.** `MLIB.CATEGORIAS` e `ESPECIES_ATO` têm os MESMOS
+  valores (`sentenca`, `despacho`, `ata`, `oficio`, `mandado`, `decisao`,
+  `outro`), e o mecanismo é "todos os modelos daquela categoria vão ao
+  contexto". Dada a espécie, o conjunto está determinado: sobra um BINÁRIO.
+  Virou `<input type="checkbox" class="mm-chk" checked>` com a contagem no
+  rótulo (`.mm-txt`).
+- **`categoriaDaEspecie(esp)` é a fonte ÚNICA da tradução**, e `cat` só existe
+  em `ESPECIES_ATO` onde a categoria difere do valor: `acordao` → `decisao`
+  (o MLIB agrupa "Decisões, votos e acórdãos"). Um segundo mapa divergiria — e
+  errar ali **não dá erro**: a minuta sai sem os modelos, calada.
+- **A nota de divergência ("o ato é Sentença e os modelos são de Despachos")
+  não foi removida — o ESTADO dela ficou inalcançável.** `atualizarNotaModelos`
+  ficou com UM ramo, o do teto de contexto, que é a única coisa ali que o
+  usuário não tem como saber sozinho.
+- **REVISÃO DE DECISÃO, pedida pelo usuário.** A regra da v0.48 era *"a linha de
+  modelos NUNCA some por biblioteca vazia"*, para quem nunca cadastrou não
+  concluir que a feature não existe. **A affordance CONTINUA** — é o
+  `+ Cadastrar peças-modelo de Sentenças` no rodapé, que até NOMEIA a espécie.
+  O que sai é o campo vazio: um seletor sem opção nenhuma é pior que um convite.
+  Como a maioria nunca cadastrou modelo, este é o estado COMUM.
+- **A `.perfil-nota` deixou de ser aviso e virou FATO.** Quem redige o ato é
+  informação de primeira ordem para quem assina (*"é importante escolher um
+  modelo bom para a geração de expedientes"*), e só aparecia quando havia TROCA,
+  em âmbar. Hoje é linha neutra presente em todo o modo minuta, e a
+  justificativa da troca foi para o `title` — ela se lê UMA vez e ocupava duas
+  linhas do rodapé em toda minuta.
+- **A `.mt-nota` virou texto de APOIO na mesma linha do "Analisar o que é
+  cabível".** No estado inicial nada está errado; o que diz "falta um passo" é o
+  asterisco do rótulo e o Enviar apagado. Caixa de aviso na primeira olhada
+  acusa antes do gesto.
+- **A `.minutabar` virou COLUNA.** Era `flex-wrap` com cada bloco pedindo
+  `flex-basis: 100%` para forçar a própria linha — uma coluna escrita com as
+  ferramentas de uma linha. A `.minuta-linha` é flex de largura de CONTEÚDO
+  (um seletor de oito opções não tem por que ocupar 700px), e por isso o
+  `.estreito` não precisa de regra própria: os dois itens quebram sozinhos.
+- **MEDIDO em oito estados**: a barra caiu de ~260px para 168px com a tese
+  preenchida, e as caixas âmbar de três para ZERO em todos.
+- **`tests/t-minutabar.mjs` (26 asserções) é NOVO, e a lacuna que ele fecha foi
+  descoberta aqui: a barra não tinha teste NENHUM.** O `grep` por
+  `.minuta-modelo-sel` só achava a cópia regenerada em `tests/espelho/`, que o
+  `t-worker` produz a cada execução e ninguém assere. **Grep que só acha
+  resultado em `tests/espelho/` é grep que não achou nada.** Provado por
+  MUTAÇÃO nas duas metades (tirar o `cat` do acórdão derruba 2 asserções; fazer
+  a caixa nunca sumir derruba outras 2).
+- **NÃO fundir o textarea da tese com o campo de instrução do compositor** —
+  são dois campos de texto no mesmo gesto e é o "faz pensar" que sobra, mas a
+  `INSTRUCAO_MINUTA_PADRAO` está duplicada em dois arquivos com teste de
+  igualdade byte a byte, e `blocoInstrucao` decide a moldura por ela ser o
+  default. É trabalho de uma rodada própria.
+
 ## Minuta e editor de texto — página `src/editor.html`
 
 Substitui o antigo `.docx` por skill da Anthropic (removido: era a maior fonte de
@@ -4699,6 +4759,38 @@ Layout de duas colunas acima de 900px (filtros sticky + lista agrupada por tempo
   faria sentido para o usuário). Não reintroduzir o botão `source`.
 - `vendor/` é **intocado**; nenhum bundle entra em página de tribunal. `src/editor.html`
   está em `web_accessible_resources` (aberto de `*.jus.br`); os subrecursos não precisam.
+
+### A coluna lateral do editor (v0.61.0)
+
+> *"Coloca as opções aí na lateral direita. Esse editor tá muito feio."* — com a
+> captura de um despacho real aberto.
+
+As sete ações saíram do cabeçalho e viraram dois blocos com nome na coluna
+direita: **Levar ao PJe** (`#copiar` em destaque, `#docx`, `#imprimir`,
+`#reid`) e **Este rascunho** (`#salvo`, `#rascunhos`, `#descartar`). A
+`.origem` e a `.rodape-nota`, que eram faixas soltas (uma acima da folha, outra
+no fim da página), viraram cartões dessa coluna.
+
+- **UM ARQUIVO, DUAS TELAS — e mover um nó muda o que a regra da OUTRA
+  alcança.** `editor.html` é o editor com `?id` e a lista "Minhas minutas" sem
+  ele. A regra que escondia as ações na lista era `.modo-lista .acoes .grupo`,
+  porque os botões viviam dentro de `<span class="grupo">`; ao levá-los para a
+  lateral os `.grupo` deixaram de existir, a regra parou de casar, e **"Minhas
+  minutas" passou a oferecer "Copiar formatado" e "Descartar" sem documento
+  aberto**. Foi o dono do projeto quem viu, minutos depois de recarregar. Hoje a
+  regra mira a REGIÃO (`.modo-lista .lateral`): **região sobrevive a rearranjo,
+  encaixe de filhos não.**
+- **`.acoes` traz `margin-left: auto` e `align-items: center` de quando era uma
+  fileira no canto direito do cabeçalho.** Numa COLUNA os dois centram a pilha e
+  destroem o eixo de leitura. É a lição do `.hd button`, de novo: **não basta
+  declarar o que se quer, é preciso DESFAZER o que a regra genérica impôs.**
+- **Os botões vestiam `--on-hd` e `--veu-*` — a tinta e os véus da CHROME.**
+  Certos no cabeçalho, errados sobre um cartão `--surface`. É o mesmo defeito
+  que a v0.60.1 achou no `.chip-mini` e no `pre` da bolha: **ao mover um
+  componente para outra superfície, trocar a família de tokens junto.**
+- `--w-lateral` é 260px porque é o que faz "Imprimir ou salvar em PDF" caber
+  numa linha: rótulo que quebra numa pilha destrói o eixo que a pilha cria.
+  Abaixo de 1180px a lateral vira faixa ACIMA da folha (uma A4 tem ~794px).
 
 ## Biblioteca de modelos de peças (`modelos.js` + `panel.js` + `content.js`)
 
@@ -5265,6 +5357,50 @@ arquivo NÃO carrega:
   - **Numa espera longa, nenhuma chamada isolada pode ser fatal** — `finally`
     NÃO engole exceção, e um comando que anuncia esperar dez minutos morria aos
     12 segundos por um `await` desguarnecido.
+
+## A tela "Meus modelos de peças" alcançou a irmã (v0.61.0)
+
+**Duas telas irmãs divergiram, e ninguém viu.** `editor.html` no modo-lista
+("Minhas minutas") ganhou na v0.42 filtros com contagem, agrupamento por tempo,
+duas colunas e cards ricos; `modelos.html` ficou numa coluna de 720px centrada,
+com cards de três linhas, desperdiçando mil pixels. Boa parte do que o mockup de
+redesign pedia para esta tela **já existia na irmã**.
+
+- **Chips de espécie com contagem, e as VAZIAS entram com zero.** É a resposta ao
+  relato *"poucas categorias, deixe mais aberto"*: o seletor antigo só mostrava
+  categoria que tivesse modelo, e a leitura de quem chega é "a extensão só
+  aceita estas três espécies". Os chips respondem também "o que dá para
+  cadastrar?".
+- **Pré-visualização à direita** (`textContent`, NUNCA `innerHTML`: o texto veio
+  de um `.docx` do usuário). Até aqui, ver o texto de um modelo exigia abrir a
+  EDIÇÃO dele. Por isso o clique na linha passou a ABRIR a prévia, e "Editar" é
+  botão explícito: conferir qual dos três é o certo virou gesto barato e
+  reversível.
+- **Sem badge de categoria no card, e não por esquecimento**: a lista já é
+  AGRUPADA por ela, e pintar as espécies de ato criaria um segundo vocabulário
+  de cores ao lado do `--cat-*` do painel, que significa outra coisa (a
+  categoria da PEÇA do processo).
+- **`.primario` era uma classe que só funcionava no cabeçalho**, e isso foi um
+  defeito criado pela CORREÇÃO da v0.60.1: para vencer `.topo button` (0,1,1) a
+  regra foi escopada em `.topo .primario`, e o "Editar" da prévia — que nasceu
+  depois com a mesma classe — saiu cinza. Hoje quem pinta é a regra GERAL, e o
+  escopo em `.topo` só existe para vencer a genérica, repetindo os mesmos
+  valores. **Ao escopar uma regra para vencer uma disputa, conferir se a classe
+  ainda vale fora daquele escopo.**
+
+### A varredura de TOKEN FANTASMA (a rede mais barata desta rodada)
+
+`var(--x)` **sem fallback**, apontando para um token que a folha dona não
+declara, deixa a declaração inteira INVÁLIDA — em silêncio. `background` vira
+transparente, `border-color` vira `currentColor`. Nenhum teste de contraste pega
+isso, porque para ele a propriedade simplesmente não existe. Foi assim que
+quatro `--veu-*` ficaram fantasmas no `ui.css` na v0.60.1.
+
+O script vive no scratchpad (não há `package.json` no repo) e leva ~1 s: para
+cada folha, `declarados(cadeia) ⊇ usados(folha)`. **A cadeia importa** —
+`panel.css` vive no Shadow DOM e NÃO herda o `ui.css`, enquanto `editor.css`,
+`modelos-page.css` e `mapa.css` herdam. Ele pegou `--w-modelos` e `--w-lateral`
+**duas vezes na mesma sessão**, no instante em que foram escritos.
 
 ## Desenvolvimento e teste
 

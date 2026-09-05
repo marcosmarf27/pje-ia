@@ -89,6 +89,13 @@ button {
    O fundo tambem estava errado por outro motivo: `var(--hd)` e a CHROME, que
    na v0.60 ficou branca — um botao primario branco com tinta branca. Quem
    pinta acao aqui e o par `--btn-*`, como o `.btn` do ui.css. */
+/* SEGUNDA metade da correcao, e ela veio de um defeito que a PRIMEIRA criou:
+   ao escopar a regra em `.topo`, `.primario` virou uma classe que so funciona
+   no cabecalho — e o "Editar" da pre-visualizacao, que a nasceu depois com a
+   mesma classe, saiu cinza. Quem pinta acao e a regra GERAL; o escopo em
+   `.topo` existe so para vencer o `.topo button`, e por isso repete os mesmos
+   valores em vez de declarar outros. */
+.primario,
 .topo .primario {
   background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
   color: var(--on-acao);
@@ -96,17 +103,17 @@ button {
   border-color: transparent;
   box-shadow: var(--sh-btn);
 }
+.primario:hover,
 .topo .primario:hover {
   background: linear-gradient(180deg, var(--btn-de-h), var(--btn-para-h));
 }
-.primario:hover { filter: brightness(1.07); }
 button svg { flex: none; }
 .ghost {
   background: var(--surface);
   border-color: var(--linha);
   color: var(--text);
 }
-.ghost:hover { background: #f2f5f7; }
+.ghost:hover { background: var(--hover); }
 
 /* -------------------------------------------------------------------- mesa */
 .mesa {
@@ -117,6 +124,10 @@ button svg { flex: none; }
   padding: 26px 18px var(--mesa-pb);
 }
 .col { width: 100%; max-width: 720px; margin: 0 auto; }
+/* A LISTA e a unica das tres telas que ganha a largura toda: e ela que tem
+   duas colunas (linhas + pre-visualizacao). O formulario e a importacao
+   continuam estreitos — um campo de texto de 1100px nao se le. */
+#telaLista { max-width: var(--w-modelos); }
 
 /* ------------------------------------------------------------------- busca */
 .barra-busca {
@@ -140,7 +151,7 @@ button svg { flex: none; }
   color: var(--text);
   background: transparent;
 }
-.barra-busca input::placeholder { color: #93a1ae; }
+.barra-busca input::placeholder { color: var(--muted-3); }
 .barra-busca input::-webkit-search-cancel-button { cursor: pointer; }
 .cnt { font-size: var(--fs-meta); color: var(--muted); flex: none; }
 
@@ -170,14 +181,14 @@ body.editando .topo .acoes { visibility: hidden; }
   font-weight: 400;
   color: var(--pje-2);
   background: var(--paper);
-  border-bottom: 1px solid #e4edf2;
+  border-bottom: 1px solid var(--line);
 }
 .ghd .gn {
   font-family: system-ui, sans-serif;
   font-size: var(--fs-micro);
   font-weight: 600;
   color: var(--pje-2);
-  background: #dceaf2;
+  background: var(--line);
   border-radius: 20px;
   padding: 1px 7px;
 }
@@ -186,13 +197,13 @@ body.editando .topo .acoes { visibility: hidden; }
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: 1px solid #eef1f3;
+  border-bottom: 1px solid var(--hover);
   cursor: pointer;
   outline: none;
 }
 .mrow:last-child { border-bottom: none; }
 .mrow:hover { background: var(--paper); }
-.mrow:focus-visible { background: #f2f8fb; box-shadow: inset 3px 0 0 var(--pje); }
+.mrow:focus-visible { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--pje); }
 .mrow .info { flex: 1; min-width: 0; }
 .mrow .mt {
   display: block;
@@ -218,7 +229,7 @@ body.editando .topo .acoes { visibility: hidden; }
   margin-right: 7px;
   padding: 1px 7px;
   border-radius: 6px;
-  background: #e2eef5;
+  background: var(--line);
   color: var(--pje-2);
   font-size: var(--fs-nano);
   font-weight: 600;
@@ -235,7 +246,7 @@ body.editando .topo .acoes { visibility: hidden; }
   border-color: var(--linha);
   color: var(--muted);
 }
-.mrow .acts button:hover { background: #f0f4f7; color: var(--text); }
+.mrow .acts button:hover { background: var(--hover); color: var(--text); }
 /* exclusão em dois cliques (nunca confirm() nativo — trava a página) */
 .mrow .acts .del.arm {
   background: var(--erro);
@@ -638,4 +649,91 @@ body.editando .topo .acoes { visibility: hidden; }
   .imp-cat { max-width: none; width: 100%; }
   .imp-catwrap { justify-content: space-between; }
   .imp-mais span { display: none; }
+}
+
+/* ---------- Chips de especie, mesa de duas colunas e pre-visualizacao ------
+   A tela irma ("Minhas minutas", editor.html no modo-lista) ja tinha filtros
+   com contagem, duas colunas e cards ricos desde a v0.42; esta ficou numa
+   coluna estreita centrada, com cards de tres linhas, desperdicando mil pixels.
+   Duas telas irmas divergiram — e o pedido do usuario ("aplicar o novo design
+   nas telas de modelos") e, em boa parte, aplicar aqui o que la ja existe. */
+.mp-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 0 0 14px;
+}
+.mp-chips[hidden] { display: none; }
+.mp-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--text-2); border-radius: var(--r-pill);
+  padding: 5px 12px; font: inherit; font-size: var(--fs-meta); font-weight: 600;
+  cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.mp-chip:hover { background: var(--hover); border-color: var(--line-strong); }
+.mp-chip[aria-pressed="true"] {
+  background: var(--pje); border-color: var(--pje); color: var(--on-acao);
+}
+.mp-chip[aria-pressed="true"] .cn { background: var(--veu-luz); color: inherit; }
+.mp-chip .cn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: var(--r-pill); background: var(--hover-2);
+  font-size: var(--fs-nano); font-weight: 700; color: var(--muted);
+}
+/* A ESPECIE SEM NENHUM MODELO CONTINUA NA FILEIRA, com zero. Ela responde uma
+   pergunta que a lista sozinha nao responde — "o que da para cadastrar?" —, e
+   foi o relato do usuario diante do seletor antigo, que so mostrava categoria
+   com modelo: "poucas categorias, deixe mais aberto". */
+.mp-chip.vazio { color: var(--muted); border-style: dashed; }
+.mp-chip.vazio .cn { opacity: 0.65; }
+
+.mp-mesa { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+/* A pre-visualizacao so ganha coluna quando ha largura para as duas; abaixo
+   disso ela vira um bloco embaixo da lista, no fluxo. */
+@media (min-width: 1000px) {
+  .mp-mesa:has(.mp-previa:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+    align-items: start;
+  }
+}
+/* Item de grid tem `min-width: auto` e se recusa a encolher abaixo do
+   conteudo: sem isto um `<pre>` de linha longa na previa estica a mesa e a
+   lista aparece cortada. Mesma armadilha do `.mp-filtros` da tela irma. */
+.mp-mesa > * { min-width: 0; }
+
+.mp-previa {
+  position: sticky; top: 84px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--sh-card);
+  padding: 16px; max-height: calc(100vh - 120px);
+}
+.mp-previa[hidden] { display: none; }
+.mp-previa .pv-hd { display: flex; flex-direction: column; gap: 4px; }
+.mp-previa .pv-t {
+  margin: 0; font-size: var(--fs-lg); font-weight: 650; line-height: 1.3;
+  color: var(--text);
+}
+.mp-previa .pv-meta { font-size: var(--fs-micro); color: var(--muted); }
+.mp-previa .pv-desc { font-size: var(--fs-meta); color: var(--text-3); }
+/* O CORPO E O CONTEUDO QUE VAI AO MODELO, e ele viaja como TEXTO — por isso
+   `pre` com `white-space: pre-wrap`, e nunca innerHTML: veio de um .docx do
+   usuario. Mesma regra da ficha de importacao. */
+.mp-previa .pv-corpo {
+  flex: 1; min-height: 0; overflow: auto;
+  margin: 0; padding: 12px; box-sizing: border-box;
+  background: var(--paper); border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--fs-meta); line-height: 1.55;
+  color: var(--text-2); white-space: pre-wrap; word-break: break-word;
+}
+.mp-previa .pv-acts { display: flex; gap: 8px; }
+.mp-previa .pv-acts button { flex: 1; margin-top: 0; }
+
+/* A linha ABERTA na previa fica marcada: sem isso, com a coluna da direita
+   cheia, nao ha como saber de qual das linhas aquele texto veio. */
+.mrow.aberta { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--pje); }
+.mrow .mmeta {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  margin-top: 3px; font-size: var(--fs-micro); color: var(--muted-2);
 }

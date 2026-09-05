@@ -157,6 +157,10 @@
      respiro; mais que isso, os parágrafos passam do confortável. */
   --w-cfg: 1120px;
   --w-cfg-nav: 200px;
+  /* "Meus modelos de peças": a LISTA é a única das três telas com duas colunas
+     (linhas + pré-visualização) e por isso pede largura; o formulário e a
+     importação continuam nos 720px do `.col`. */
+  --w-modelos: 1180px;
   --dur-1: 140ms;
   --dur-2: 220ms;
   --dur-3: 300ms;

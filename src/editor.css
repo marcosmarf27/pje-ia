@@ -19,6 +19,10 @@
   --mg-inf: 2cm;
   --mg-esq: 3cm;
   --mg-dir: 2cm;
+  /* Coluna das ações do documento. 260px é o que faz "Imprimir ou salvar em
+     PDF" caber numa linha só: rótulo que quebra numa pilha de botões destrói
+     o eixo de leitura que a pilha existe para criar. */
+  --w-lateral: 260px;
 }
 
 html,
@@ -429,7 +433,25 @@ body {
   overflow: auto;
   padding: 26px 18px 60px;
   background: var(--canvas);
+  /* DUAS COLUNAS: a folha, centrada no espaco que sobra, e a lateral das
+     acoes. `minmax(0, ...)` nos dois porque item de grid tem `min-width:
+     auto` e uma tabela larga dentro da folha esticaria a mesa inteira. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--w-lateral));
+  gap: 24px;
+  align-items: start;
 }
+/* Abaixo disto a lateral nao cabe ao lado de uma A4 (21cm ~ 794px): ela vira
+   uma faixa ACIMA da folha, para as acoes continuarem visiveis sem rolagem. */
+@media (max-width: 1180px) {
+  .mesa { grid-template-columns: minmax(0, 1fr); }
+  .lateral { position: static; max-width: var(--folha-w); margin: 0 auto; }
+  .lt-bloco.acoes { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .lt-bloco .lt-h { width: 100%; }
+  .lt-bloco.acoes button { flex: 0 1 auto; }
+  .lt-bloco .rodape-nota { width: 100%; }
+}
+.doc { min-width: 0; }
 /* A largura da folha vive AQUI, não no .jodit-container: o Jodit escreve
    `max-width:100%; width:auto` no style inline do container, e inline vence
    qualquer regra de classe. */
@@ -566,11 +588,24 @@ body {
 /* modo lista (página sem ?id): a tela inteira vira a lista de rascunhos, e a
    barra do editor e os botões de exportar não fazem sentido — somem. O botão
    "🗂 Rascunhos" sai JUNTO: aqui a página inteira já é a lista, e abrir um
-   dropdown com exatamente o mesmo conteúdo em cima dela era só ruído. */
+   dropdown com exatamente o mesmo conteúdo em cima dela era só ruído.
+
+   UM ARQUIVO, DUAS TELAS — e mover um nó muda o que a regra da OUTRA alcança.
+   Esta regra era `.modo-lista .acoes .grupo`, porque os botões viviam dentro de
+   `<span class="grupo">` no cabeçalho. Ao levá-los para a coluna lateral, os
+   `.grupo` deixaram de existir, a regra parou de casar e "Minhas minutas" —
+   uma tela que não tem documento aberto — passou a oferecer "Copiar formatado"
+   e "Descartar". Foi o dono do projeto quem viu, minutos depois de recarregar.
+   Por isso agora ela mira a REGIÃO (`.lateral`), não a estrutura interna dela:
+   a região sobrevive a rearranjos, o encaixe dos filhos não. */
 .modo-lista .barra,
+.modo-lista .lateral,
 .modo-lista .acoes .grupo {
   display: none !important;
 }
+/* Sem a lateral, a mesa volta a uma coluna: a coluna vazia de 260px empurrava
+   a lista de rascunhos para a esquerda do centro. */
+.modo-lista .mesa { grid-template-columns: minmax(0, 1fr); }
 .modo-lista .aviso {
   justify-content: flex-start;
   align-items: stretch;
@@ -1115,3 +1150,118 @@ body {
     margin: 2.5cm 2cm 2cm 3cm;
   }
 }
+
+/* ------------------------------------------------------- coluna lateral ---
+   As acoes do documento sairam do cabecalho. No topo eram sete pilulas de
+   icone pequeno numa fileira unica, em que "Copiar formatado" e "Descartar"
+   tinham exatamente o mesmo peso — e "Descartar" apaga o rascunho. Empilhadas
+   e agrupadas por INTENCAO ("Levar ao PJe", "Este rascunho") elas se leem como
+   uma lista do que da para fazer, e a acao destrutiva fica longe das outras. */
+.lateral {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.lt-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
+  padding: 14px;
+}
+.lt-h {
+  margin: 0;
+  font-size: var(--fs-nano);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+/* Na coluna o botao ocupa a largura toda e alinha o rotulo a ESQUERDA: uma
+   pilha de rotulos centrados nao tem eixo de leitura, e o olho varre a
+   primeira letra de cada linha. */
+/* DESFAZER o que a regra generica impos, e nao so declarar o que se quer — a
+   licao do `.hd button` do painel. `.acoes` (0,1,0) traz `margin-left: auto`
+   e `align-items: center` de quando ela era uma fileira no canto direito do
+   cabecalho; numa COLUNA os dois centram a pilha e destroem o eixo de leitura.
+   E os botoes vestiam `--on-hd` e `--veu-*`, que sao a tinta e os veus da
+   CHROME: certos no cabecalho, errados sobre um cartao `--surface`. E o mesmo
+   defeito que a v0.60.1 achou no `.chip-mini` e no `pre` da bolha. */
+.lateral .lt-bloco.acoes {
+  margin-left: 0;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+.lateral .acoes button {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 8px 11px;
+  text-align: left;
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text-2);
+}
+.lateral .acoes button:hover { background: var(--hover); border-color: var(--line-strong); }
+.lateral .acoes button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.lateral .acoes button.ghost:hover { background: var(--hover); color: var(--text-2); }
+/* A PRIMEIRA acao e a principal — "Copiar formatado" e o que leva o ato ao
+   PJe, que e o destino de 100% das minutas. As outras sao alternativas. */
+.lateral .acoes #copiar {
+  background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
+  border-color: transparent;
+  color: var(--on-acao);
+  font-weight: 600;
+  box-shadow: var(--sh-btn);
+}
+.lateral .acoes #copiar:hover {
+  background: linear-gradient(180deg, var(--btn-de-h), var(--btn-para-h));
+}
+.lateral .acoes #copiar.feito { background: var(--ok); border-color: transparent; }
+/* Descartar APAGA, e o vermelho aparece no hover: em repouso ele seria mais
+   um alerta permanente numa tela que nao tem nada de errado (a regra do §2 do
+   DESIGN.md), e o botao vive ao lado de "Outras minutas". */
+.lateral .acoes .perigo:hover {
+  background: var(--alerta-bg);
+  border-color: var(--alerta-line);
+  color: var(--alerta-ink);
+}
+.lateral .salvo { padding: 0; }
+.lateral .drop-wrap { position: relative; display: block; }
+/* O popover de rascunhos era ancorado a direita porque o botao vivia no canto
+   direito do cabecalho. Na coluna ele abre para a ESQUERDA, senao os 280px
+   saem da janela — o mesmo defeito que o `right: 0` corrigiu la. */
+.lateral .drop { right: 0; left: auto; min-width: 280px; }
+/* A nota de rascunho era uma faixa no FIM da pagina, que so aparecia rolando
+   ate embaixo de uma folha A4 inteira. Aqui ela fica ao lado do botao que
+   nomeia ("Descartar"), que e onde a frase importa. */
+.lateral .rodape-nota {
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-micro);
+  line-height: 1.45;
+  color: var(--muted);
+}
+/* A origem vira mais um cartao da coluna, com a mesma casca dos outros. */
+/* A origem vira mais um cartao da coluna: mesma casca dos outros, senao ela se
+   le como um aviso solto entre dois blocos. A borda esquerda de acento fica —
+   e o que a marca como REGISTRO (Res. CNJ 615, art. 19, §6o). */
+.lateral .origem {
+  margin: 0;
+  max-width: none;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
+  border-color: var(--line);
+  border-left: 3px solid var(--pje);
+}
+.lateral .origem[hidden] { display: none; }

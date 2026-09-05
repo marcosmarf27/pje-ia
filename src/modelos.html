@@ -37,7 +37,18 @@
           />
           <span id="contador" class="cnt"></span>
         </div>
-        <div id="lista" class="lista"></div>
+        <!-- CHIPS DE CATEGORIA, com a contagem — e as VAZIAS entram, com zero.
+             A tela mostrava só as categorias que tinham modelo, e a leitura de
+             quem chega é "a extensão só aceita estas três espécies". Aqui elas
+             respondem também "o que dá para cadastrar?". -->
+        <div id="chips" class="mp-chips" role="group" aria-label="Filtrar por espécie" hidden></div>
+        <!-- Lista + pré-visualização. Até aqui o texto de um modelo só se via
+             ABRINDO a edição dele; a coluna da direita responde "é este mesmo?"
+             sem entrar num formulário e sem risco de salvar sem querer. -->
+        <div class="mp-mesa">
+          <div id="lista" class="lista"></div>
+          <aside id="previa" class="mp-previa" hidden aria-live="polite"></aside>
+        </div>
       </section>
 
       <!-- FORMULÁRIO -->

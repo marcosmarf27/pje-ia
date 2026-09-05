@@ -21,6 +21,8 @@
   const elBarraBusca = $("#barraBusca");
   const elBusca = $("#busca");
   const elCont = $("#contador");
+  const elChips = $("#chips");
+  const elPrevia = $("#previa");
   const elFormTit = $("#formTit");
   const elFT = $("#fTitulo");
   const elFC = $("#fCategoria");
@@ -33,6 +35,8 @@
   let editId = null;
   let idNovo = "";
   let delArm = null; // id com exclusão "armada" (dois cliques)
+  let catAtiva = ""; // chip de espécie ligado; "" = todas
+  let previaId = null; // modelo aberto na coluna da direita
   let aposForm = null; // callback ao sair do formulário (usado pela importação)
 
   // --- estado e nós da IMPORTAÇÃO EM LOTE (o bloco de código está lá embaixo) ---
@@ -109,17 +113,34 @@
   // VOTOS E ACÓRDÃOS") competir com o título, que é o que se procura de fato. E
   // a categoria é justamente o eixo em que se pensa aqui — a minuta seleciona os
   // modelos POR categoria —, então ela vale como cabeçalho de seção, uma vez só.
+  // Tamanho em KB do que vai ao contexto da minuta. É o único número desta tela
+  // que o usuário não tem como estimar de olho, e ele importa: a minuta manda
+  // TODOS os modelos da categoria, e o teto de contexto é por categoria.
+  function tamanho(texto) {
+    const b = new TextEncoder().encode(String(texto || "")).length;
+    return b < 1024 ? b + " B" : (b / 1024).toFixed(b < 10240 ? 1 : 0) + " KB";
+  }
+
   function linhaHtml(m) {
     const sub = m.descricao || previa(m.texto);
     const cat = temMlib ? MLIB.rotuloCategoria(m.categoria) : "";
+    const val = m.categoria || "outro";
     const busca = norm(m.titulo + " " + cat + " " + (m.descricao || ""));
     return (
       '<div class="mrow" data-id="' + escapar(m.id) + '" data-busca="' + escapar(busca) + '" ' +
-      'tabindex="0" role="button" aria-label="Editar ' + escapar(m.titulo) + '">' +
+      'data-cat="' + escapar(val) + '" ' +
+      'tabindex="0" role="button" aria-label="Ver ' + escapar(m.titulo) + '">' +
       '<div class="info">' +
       '<span class="mt">' + escapar(m.titulo) + "</span>" +
-      '<span class="mm">' + escapar(sub) +
-      (m.atualizadoEm ? " · " + quando(m.atualizadoEm) : "") + "</span>" +
+      '<span class="mm">' + escapar(sub) + "</span>" +
+      // SEM badge de categoria, e nao por esquecimento: a lista ja e AGRUPADA
+      // por ela (o cabecalho da secao a diz uma vez), e pintar as especies de
+      // ato criaria um segundo vocabulario de cores ao lado do --cat-* do
+      // painel, que ja significa outra coisa — a categoria da PECA do processo.
+      '<span class="mmeta">' +
+      (m.atualizadoEm ? "<span>" + quando(m.atualizadoEm) + "</span>" : "") +
+      "<span>" + tamanho(m.texto) + "</span>" +
+      "</span>" +
       "</div>" +
       '<div class="acts">' +
       '<button class="edit" type="button">Editar</button>' +
@@ -128,16 +149,95 @@
     );
   }
 
+  // ----------------------------------------------------- chips de categoria
+  function renderChips() {
+    if (!elChips || !temMlib) return;
+    const conta = (v) => modelos.filter((m) => (m.categoria || "outro") === v).length;
+    let html =
+      '<button type="button" class="mp-chip" data-cat="" aria-pressed="' +
+      (catAtiva ? "false" : "true") + '">Todas<span class="cn">' + modelos.length + "</span></button>";
+    for (const c of MLIB.CATEGORIAS) {
+      const n = conta(c.valor);
+      html +=
+        '<button type="button" class="mp-chip' + (n ? "" : " vazio") + '" data-cat="' +
+        escapar(c.valor) + '" aria-pressed="' + (catAtiva === c.valor ? "true" : "false") + '">' +
+        escapar(c.rotulo) + '<span class="cn">' + n + "</span></button>";
+    }
+    elChips.innerHTML = html;
+    elChips.hidden = false;
+  }
+
+  // ------------------------------------------------------- pré-visualização
+  // `textContent` no corpo, NUNCA innerHTML: o texto veio de um .docx do
+  // usuário e pode conter qualquer coisa. Mesma regra da ficha de importação.
+  function mostrarPrevia(id) {
+    if (!elPrevia) return;
+    const m = modelos.find((x) => x.id === id);
+    if (!m) {
+      elPrevia.hidden = true;
+      elPrevia.textContent = "";
+      previaId = null;
+      return;
+    }
+    previaId = id;
+    elPrevia.textContent = "";
+    const hd = document.createElement("div");
+    hd.className = "pv-hd";
+    const t = document.createElement("h2");
+    t.className = "pv-t";
+    t.textContent = m.titulo;
+    const meta = document.createElement("div");
+    meta.className = "pv-meta";
+    meta.textContent =
+      (temMlib ? MLIB.rotuloCategoria(m.categoria) : "") +
+      (m.atualizadoEm ? " · " + quando(m.atualizadoEm) : "") +
+      " · " + tamanho(m.texto);
+    hd.appendChild(t);
+    hd.appendChild(meta);
+    if (m.descricao) {
+      const d = document.createElement("div");
+      d.className = "pv-desc";
+      d.textContent = m.descricao;
+      hd.appendChild(d);
+    }
+    const corpo = document.createElement("pre");
+    corpo.className = "pv-corpo";
+    corpo.textContent = m.texto || "";
+    const acts = document.createElement("div");
+    acts.className = "pv-acts";
+    const ed = document.createElement("button");
+    ed.type = "button";
+    ed.className = "primario";
+    ed.textContent = "Editar";
+    ed.addEventListener("click", () => abrirForm(m));
+    const fe = document.createElement("button");
+    fe.type = "button";
+    fe.className = "ghost";
+    fe.textContent = "Fechar";
+    fe.addEventListener("click", () => mostrarPrevia(null));
+    acts.appendChild(ed);
+    acts.appendChild(fe);
+    elPrevia.appendChild(hd);
+    elPrevia.appendChild(corpo);
+    elPrevia.appendChild(acts);
+    elPrevia.hidden = false;
+    for (const r of elLista.querySelectorAll(".mrow"))
+      r.classList.toggle("aberta", r.dataset.id === id);
+  }
+
   function render() {
     delArm = null;
     if (!modelos.length) {
       elBarraBusca.hidden = true;
+      if (elChips) elChips.hidden = true;
+      if (elPrevia) { elPrevia.hidden = true; previaId = null; }
       elLista.innerHTML = vazioHtml();
       elLista.classList.add("solta");
       return;
     }
     elBarraBusca.hidden = false;
     elLista.classList.remove("solta");
+    renderChips();
     let html = "";
     for (const cat of MLIB.CATEGORIAS) {
       const doGrupo = modelos.filter((m) => (m.categoria || "outro") === cat.valor);
@@ -150,6 +250,9 @@
         "</section>";
     }
     elLista.innerHTML = html;
+    // A prévia sobrevive ao re-render (a lista é reconstruída a cada gravação),
+    // mas só se o modelo ainda existir — excluir o que estava aberto a fecha.
+    if (previaId) mostrarPrevia(previaId);
     filtrar();
   }
 
@@ -157,7 +260,10 @@
     const q = norm(elBusca.value.trim());
     let n = 0;
     elLista.querySelectorAll(".mrow").forEach((row) => {
-      const bate = !q || row.dataset.busca.includes(q);
+      // DOIS critérios, e o chip é o de fora: buscar dentro de uma espécie é o
+      // gesto natural ("prescrição, entre as minhas sentenças").
+      const bate =
+        (!q || row.dataset.busca.includes(q)) && (!catAtiva || row.dataset.cat === catAtiva);
       row.hidden = !bate;
       if (bate) n++;
     });
@@ -171,7 +277,14 @@
     if (!n) {
       const d = document.createElement("div");
       d.className = "sem-res";
-      d.textContent = "Nenhum modelo corresponde a “" + elBusca.value.trim() + "”.";
+      // O vazio precisa dizer POR QUE está vazio: com um chip de espécie ligado,
+      // "nenhum modelo corresponde à busca" manda procurar erro na palavra
+      // digitada quando o que filtrou foi o chip.
+      const alvo = catAtiva && temMlib ? " em " + MLIB.rotuloCategoria(catAtiva) : "";
+      const termo = elBusca.value.trim();
+      d.textContent = termo
+        ? "Nenhum modelo" + alvo + " corresponde a “" + termo + "”."
+        : "Nenhum modelo cadastrado" + alvo + " ainda.";
       elLista.appendChild(d);
     }
     elCont.textContent = n + (n === 1 ? " modelo" : " modelos");
@@ -306,9 +419,12 @@
     const m = modelos.find((x) => x.id === row.dataset.id);
     if (!m) return;
     const btn = e.target.closest("button");
-    // clicar na LINHA (fora dos botões) edita: é a ação óbvia e a linha inteira
-    // é um alvo bem maior que o botão que só aparece no hover
-    if (!btn) return abrirForm(m);
+    // Clicar na LINHA abre a PRÉVIA, não o formulário. Antes ela editava — a
+    // ação óbvia enquanto não havia como só OLHAR o modelo. Com a coluna da
+    // direita, "ver" passou a ser o gesto barato e reversível, e "editar" um
+    // botão explícito: quem quer conferir qual dos três é o certo não entra num
+    // formulário para descobrir.
+    if (!btn) return mostrarPrevia(previaId === m.id ? null : m.id);
     if (btn.classList.contains("edit")) return abrirForm(m);
     if (!btn.classList.contains("del")) return;
     // exclusão em DOIS cliques — confirm() nativo trava a página
@@ -338,8 +454,26 @@
     if (!row || e.target.tagName === "BUTTON") return;
     e.preventDefault();
     const m = modelos.find((x) => x.id === row.dataset.id);
-    if (m) abrirForm(m);
+    // Mesmo gesto do clique — teclado e mouse nao podem fazer coisas
+    // diferentes na mesma linha.
+    if (m) mostrarPrevia(previaId === m.id ? null : m.id);
   });
+
+  // Chips de especie. Delegado no container: eles sao reconstruidos a cada
+  // gravacao, e um listener por chip morreria no primeiro cadastro.
+  if (elChips) {
+    elChips.addEventListener("click", (e) => {
+      const b = e.target.closest(".mp-chip");
+      if (!b) return;
+      const alvo = b.dataset.cat || "";
+      // Clicar no chip ja ligado DESLIGA: sem isso, voltar a "todas" exigiria
+      // achar o chip "Todas", que fica na ponta esquerda de uma fileira longa.
+      catAtiva = catAtiva === alvo ? "" : alvo;
+      for (const c of elChips.querySelectorAll(".mp-chip"))
+        c.setAttribute("aria-pressed", (c.dataset.cat || "") === catAtiva ? "true" : "false");
+      filtrar();
+    });
+  }
 
   // ---------------------------------------------------- importar de .docx
   // Cadastrar um modelo é colar uma peça inteira; quem já tem os modelos em

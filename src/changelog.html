@@ -94,7 +94,7 @@
              linhas na tabela — defasagem silenciosa de 11 versões, porque nada aqui a
              calcula. Ao lançar, conferir: o valor certo é a contagem de <tr> do
              histórico. -->
-        Da primeira versão (19 de julho de 2026) até hoje foram <strong>92 versões</strong>. Esta
+        Da primeira versão (19 de julho de 2026) até hoje foram <strong>107 versões</strong>. Esta
         página agrupa o que foi feito <strong>por recurso</strong> — é assim que se usa a
         extensão, não versão a versão. O
         <a class="link" href="#historico">histórico completo</a>, com data e uma linha por
@@ -103,100 +103,44 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.60.0</span> A extensão tem cara nova — e não é só a cor</h2>
+        <h2><span class="v novo">v0.61.0</span> Minutar ficou mais simples — e o editor ganhou uma coluna</h2>
         <p>
-          <strong>O painel foi redesenhado por inteiro.</strong> Não é uma troca de paleta: a
-          barra de cima passou de uma faixa apertada com nove ícones para <strong>quatro
-          zonas</strong> — a marca, o processo, a navegação e as ações. O número do processo saiu
-          de segunda linha do título e virou uma <strong>plaqueta própria</strong>, com o
-          tribunal, um botão de copiar e um ponto que fica âmbar quando a tela do PJe expira
-          (antes esse aviso passava rápido e sumia).
-        </p>
-        <p>
-          <strong>Os cinco ícones de tamanho de janela viraram um menu com NOME.</strong>
-          Flutuante, Lateral, Janela livre, Largo, Tela cheia — escrito, não adivinhado. Junto
-          com eles foram "ocultar as peças" e "baixar a conversa". São os mesmos comandos de
-          sempre; o que mudou é que agora dá para ler o que cada um faz antes de clicar.
+          <strong>A barra do modo minuta tinha oito blocos empilhados e três caixas de
+          aviso amarelas.</strong> Duas delas avisavam sobre o estado <em>normal</em> — uma
+          dizia “nenhuma categoria escolhida” quando nenhuma categoria é o padrão —, e
+          a terceira aparecia antes de você ter feito coisa alguma. Agora são
+          <strong>duas perguntas</strong>: que ato é este, e qual é a sua decisão.
         </p>
         <p>
-          <strong>Nasceram abas: Chat, Linha do tempo, Minutas e Configurações.</strong> A da
-          linha do tempo é a novidade que mais muda o trabalho — a lista de movimentos do
-          processo, que antes cabia numa caixinha flutuante, agora ocupa a tela: data, o ato em
-          negrito, o complemento embaixo (é onde está o <em>"decorrido prazo em…"</em>, que é o
-          que fecha a conta) e a peça como botão. Você pode perguntar sobre um movimento
-          olhando para ele: o campo de escrever continua ali, e enviar devolve ao chat.
+          <strong>O segundo seletor sumiu, e ele perguntava o que a linha de cima já
+          respondia.</strong> As categorias de peça-modelo são as mesmas espécies de ato —
+          sentença, despacho, ata, ofício, mandado — e a minuta sempre mandou
+          <em>todos</em> os modelos da categoria. Escolhida a espécie, não havia nada a
+          escolher: virou uma caixa de marcar, já ligada, dizendo quantas peças-modelo
+          vão junto. Quem ainda não cadastrou nenhuma vê, no lugar, um convite que
+          <strong>nomeia a espécie</strong> — “Cadastrar peças-modelo de Sentenças”.
         </p>
         <p>
-          <strong>A lista de peças ganhou rodapé próprio, com o medidor de contexto.</strong>
-          Ele vivia do outro lado da tela, junto do custo e do nome do modelo; agora fica ao
-          lado das peças, que é onde a pergunta dele — <em>"cabe mais alguma?"</em> — tem
-          resposta. E cada peça virou um cartão de duas linhas: o nome em cima, o id e o
-          <strong>tipo oficial do PJe</strong> embaixo (aquele que só aparecia ao passar o
-          mouse).
+          <strong>Quem redige a minuta deixou de ser um aviso e virou informação.</strong>
+          A extensão troca de modelo sozinha para redigir (um modelo bom de análise nem
+          sempre é bom de redação), e isso só aparecia em amarelo, quando havia troca.
+          Agora está sempre lá, em uma linha discreta, com “Mudar” ao lado.
         </p>
         <p>
-          <strong>O rodapé do chat era uma pilha de doze faixas e virou uma caixa só.</strong>
-          As peças do contexto em cima, o que você escreve no meio, as ferramentas embaixo e o
-          Enviar como um botão redondo escuro — o elemento de maior contraste da tela, que é o
-          que a ação principal precisa ser. Entrou também um botão <strong>@ Peça</strong>:
-          até agora o <code>@</code> só existia se você soubesse digitá-lo.
+          <strong>No editor de minutas, as ações saíram do alto e foram para uma coluna
+          à direita.</strong> Eram sete botões de ícone pequeno numa fileira única, em que
+          “Copiar formatado” e “Descartar” tinham o mesmo peso — e um deles apaga o
+          rascunho. Agora são dois grupos com nome, <strong>Levar ao PJe</strong> e
+          <strong>Este rascunho</strong>, com “Copiar formatado” em destaque. A origem do
+          ato e o aviso de rascunho, que eram faixas soltas, viraram cartões dessa coluna.
         </p>
         <p>
-          <strong>E o visual antigo não foi apagado.</strong> Ele virou o tema
-          <strong>Institucional</strong>, escolhível no botão de aparência — o mesmo azul
-          petróleo, byte a byte. Quem preferir a cara que já conhecia, troca em dois cliques.
-          A extensão passou a ter sete temas.
-        </p>
-        <p class="nota">
-          <strong>Uma correção de acessibilidade veio junto, e ela estava em produção.</strong>
-          Quem tem "reduzir animações" ligado no Windows ou no macOS abria o painel largo e
-          recebia metade dele fora da tela — sem o botão de fechar, sem o Enviar e sem a coluna
-          de peças alcançáveis. Uma regra escrita para tirar o deslocamento de entrada apagava
-          junto o que centrava a janela. Corrigido.
-        </p>
-        <p class="nota">
-          Três coisas do desenho de referência ficaram de fora <strong>de propósito</strong>,
-          porque não seriam verdade: o selo que prometia "citação verificada página a página"
-          (isso só existe nos modelos Claude — nos outros a citação vem no próprio texto), o
-          que anunciava "zero alucinação" (esta extensão não promete infalibilidade, promete
-          origem conferível) e o intervalo de folhas em cada peça, que a extensão simplesmente
-          não tem como saber.
-        </p>
-        <h2><span class="v">v0.59.0</span> Três correções que ninguém via — e a minuta a partir de um arquivo anexado</h2>
-        <p>
-          <strong>Se você abre o mesmo processo em duas abas com o modo sigiloso ligado</strong>,
-          esta versão conserta algo sério e silencioso. Cada aba mantinha sua própria tabela de
-          apelidos, e as duas davam o mesmo número a pessoas diferentes: a segunda gravação
-          apagava a primeira, e uma minuta gerada antes passava a devolver o nome errado ao
-          restaurar os nomes. Agora as tabelas são <strong>fundidas</strong>, e quem chegou
-          primeiro mantém o número — o rótulo que já saiu num texto nunca muda de dono.
-        </p>
-        <p>
-          <strong>Peça que aparece na lista mas não na linha do tempo agora baixa.</strong>
-          Desde que a lista passou a vir da rota oficial do PJe, ela traz mais peças do que a
-          linha do tempo mostra — e o PJe só libera o download depois que a peça é aberta ali.
-          O resultado era uma peça que simplesmente faltava na análise, e a IA respondendo
-          "não consta" sobre um documento que existe nos autos. A extensão agora vai buscá-la
-          sozinha, parando assim que a encontra, e devolve a rolagem para onde estava. Quando
-          a peça realmente não está na linha do tempo, a mensagem diz isso — antes ela mandava
-          "abra-a na linha do tempo", que era pedir o impossível.
-        </p>
-        <p>
-          <strong>Minuta e mapa mental agora aceitam um arquivo anexado, sem marcar peça
-          nenhuma.</strong> O contrato que a parte trouxe, o documento que chegou por e-mail, a
-          peça de outro processo: solte no 📎 e clique em Gerar. Os dois recusavam com "marque
-          as peças" mesmo com o arquivo na tela. E o cuidado que essa mudança exigiu vale ser
-          dito: quando a minuta vem só de um anexo, a extensão avisa o modelo de que o processo
-          aberto na tela é <em>contexto</em>, não o objeto — sem isso, o ato sairia com o número
-          e as partes do processo errado, bem escrito e difícil de notar na revisão. O que
-          faltar continua virando <code>[COMPLETAR: …]</code>, e o registro de origem da minuta
-          passa a nomear o arquivo de que ela foi feita.
-        </p>
-        <p>
-          Nos bastidores, os testes da extensão saíram da pasta temporária e passaram a viver
-          no repositório, com um comando só para rodar todos. Ao mudarem de lugar, três deles
-          estavam vermelhos havia semanas — nenhum por defeito do produto, todos por terem
-          ficado para trás. Teste que falha sozinho é teste que ninguém roda.
+          <strong>E a tela “Meus modelos de peças” alcançou a irmã.</strong> Ela era uma
+          coluna estreita no meio da tela enquanto “Minhas minutas” já tinha filtros,
+          contagens e duas colunas. Ganhou <strong>chips por espécie com a contagem</strong>
+          — inclusive as vazias, que respondem “o que dá para cadastrar?” — e uma
+          <strong>pré-visualização</strong>: até aqui, para ver o texto de um modelo era
+          preciso abrir a edição dele.
         </p>
       </div>
       <div class="card">
@@ -2177,7 +2121,7 @@
 
       <h1 class="serif" id="historico">Histórico completo</h1>
       <p class="lead">
-        As 73 versões, da mais recente à primeira. As marcadas com
+        As 107 versões, da mais recente à primeira. As marcadas com
         <span class="dot-marco"></span> mudaram o produto de forma visível.
       </p>
 
@@ -2187,6 +2131,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.61.0</span></td><td>05/09/2026</td><td><span class="dot-marco"></span><strong>A barra de minuta tinha oito blocos e tres caixas de aviso; ficou com duas perguntas e nenhuma.</strong> O seletor de categoria de peca-modelo <strong>deixou de existir</strong>: ele pedia o que a especie do ato ja diz, e virou uma caixa de marcar com a contagem ("Seguir as minhas 3 pecas-modelo"), ligada por padrao. Sem nenhuma cadastrada, aparece um convite que <strong>nomeia a especie</strong>. Quem redige a minuta virou uma linha permanente e discreta, em vez de um aviso amarelo que so surgia na troca. No <strong>editor</strong>, as sete acoes do alto viraram uma coluna a direita, em dois grupos com nome, e a origem do ato virou cartao dela. A tela <strong>Meus modelos</strong> ganhou chips por especie com contagem (as vazias inclusive) e <strong>pre-visualizacao</strong> do texto, que so se via abrindo a edicao</td></tr>
             <tr><td><span class="v">0.60.1</span></td><td>05/09/2026</td><td><strong>Oito correcoes que so o uso real revelou.</strong> Os chips das pecas no contexto <strong>voltaram a aparecer</strong> — eles tinham sumido por completo, e com eles o ✕ que tira uma peca do contexto. O botao <strong>@ Peca</strong> saia com a cara do navegador, cinza e com borda preta; e a faixa de ferramentas inteira estava numa fonte diferente do resto do painel (206 elementos). No menu de tamanho da janela, <strong>Flutuante nao fazia nada</strong> e <strong>Largo devolvia ao flutuante</strong>; o menu tambem saia cortado na borda e o item "Ocultar as pecas" aparecia sem nome. O <strong>nome das pecas anexadas ficava ilegivel</strong> dentro da bolha roxa da pergunta — e, no tema Noite, o texto da propria pergunta tambem. A engrenagem que abria o tamanho da janela virou o <strong>icone do modo em uso</strong>: engrenagem quer dizer configuracoes, e havia uma aba com esse nome ao lado. A barra de ferramentas ficou mais leve, o rodape da lista deixou de truncar "Carregar tudo" em "Ca..." e o botao <strong>Analisar com IA</strong> ganhou a marca do produto</td></tr>
             <tr class="marco"><td><span class="v">0.60.0</span></td><td>05/09/2026</td><td><span class="dot-marco"></span><strong>Redesenho completo do painel.</strong> A barra de cima passou de uma faixa com nove icones para <strong>quatro zonas</strong> (marca, processo, navegacao, acoes); o numero do processo virou plaqueta propria com tribunal, botao de copiar e um ponto que avisa quando a tela do PJe expira. Os cinco icones de tamanho de janela viraram um <strong>menu com nome</strong>. Nasceram abas — e a de <strong>Linha do tempo</strong> deixou de ser uma caixinha flutuante para ocupar a tela, com data, ato, complemento e a peca como botao. A lista de pecas ganhou <strong>rodape proprio com o medidor de contexto</strong>, e cada peca virou cartao de duas linhas com o tipo oficial do PJe. O rodape do chat, que eram doze faixas empilhadas, virou <strong>uma caixa so</strong>, com o Enviar redondo e um botao @ Peca. Paleta indigo sobre slate, cabecalho claro, Geist + Inter + JetBrains Mono. <strong>O visual antigo virou o tema Institucional</strong>, byte a byte. E veio uma correcao de acessibilidade que estava em producao: com "reduzir animacoes" ligado, o painel largo aparecia descentrado, com metade fora da tela</td></tr>
             <tr class="marco"><td><span class="v">0.59.0</span></td><td>04/09/2026</td><td><span class="dot-marco"></span><strong>Três correções silenciosas e a minuta a partir de um anexo.</strong> Com o modo sigiloso ligado, <strong>duas abas no mesmo processo</strong> mantinham tabelas de apelidos independentes e davam o mesmo número a pessoas diferentes — a segunda gravação apagava a primeira, e uma minuta gerada antes passava a devolver o nome errado ao restaurar os nomes; agora as tabelas são fundidas e quem chegou primeiro mantém o número. <strong>Peça que aparece na lista mas não na linha do tempo</strong> voltou a baixar: desde que a lista passou a vir da rota oficial ela traz mais peças do que a tela mostra, e o PJe só libera o download depois de a peça ser aberta ali — o resultado era uma peça faltando na análise e a IA dizendo “não consta” sobre documento que existe. E <strong>minuta e mapa mental passaram a aceitar arquivo anexado sem peça marcada</strong>, avisando o modelo de que o processo aberto na tela é contexto e não o objeto: sem isso o ato sairia com as partes do processo errado. Os testes da extensão saíram da pasta temporária e passaram a viver no repositório</td></tr>
