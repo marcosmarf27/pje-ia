@@ -10,9 +10,9 @@
 
 :root {
   /* canvas neutro atrás da página, como a área de trabalho do Word */
-  --canvas: #eceef1;
+  --canvas: #eef2f6;
   --canvas-2: #e3e6e9;
-  --pagina: #ffffff;
+  --pagina: var(--surface);
   /* A4 e margens do padrão forense (3cm/2cm) — as mesmas medidas do .docx. */
   --folha-w: 21cm;
   --mg-sup: 2.5cm;
@@ -45,7 +45,7 @@ body {
   gap: 12px;
   padding: 9px 16px;
   background: var(--hd);
-  color: #fff;
+  color: var(--on-hd-forte);
   box-shadow: 0 1px 4px rgba(5, 32, 46, 0.25);
   flex: none;
   z-index: 3;
@@ -58,7 +58,7 @@ body {
   width: 30px; height: 30px; box-sizing: border-box; padding: 6px;
   border-radius: var(--r-ctrl);
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 var(--veu-luz);
   flex: none;
 }
 .topo .tit {
@@ -72,7 +72,7 @@ body {
 .topo .tit .t {
   font-size: var(--fs-lead);
   line-height: 1.15;
-  color: #fff;
+  color: var(--on-hd-forte);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -82,12 +82,12 @@ body {
   max-width: 40vw;
 }
 .topo .tit .t:hover {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--veu-borda);
 }
 .topo .tit .t:focus {
   outline: none;
   border-color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--veu-1);
 }
 .topo .tit .s {
   font-size: var(--fs-meta);
@@ -117,8 +117,8 @@ body {
   align-items: center;
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: var(--veu-1);
+  color: var(--on-hd);
   border-radius: 7px;
   padding: 5px 10px;
   font: inherit;
@@ -140,14 +140,14 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 .acoes button.ghost:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--veu-2);
+  color: var(--on-hd-forte);
 }
 /* confirmação do copiar/descartar sem alert(): o próprio botão responde */
 .acoes button.feito {
-  background: #fff;
+  background: var(--surface);
   color: var(--ok);
-  border-color: #fff;
+  border-color: var(--on-acao);
   font-weight: 600;
 }
 .acoes .estado {
@@ -198,7 +198,7 @@ body {
   max-width: min(360px, calc(100vw - 24px));
   max-height: 62vh;
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid #cfd5da;
   border-radius: 8px;
   box-shadow: 0 8px 28px -8px rgba(0, 0, 0, 0.35);
@@ -223,7 +223,7 @@ body {
   gap: 7px;
   margin-bottom: 4px;
   padding: 6px 8px;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid #e7ecf0;
 }
 .rbusca > svg {
@@ -237,7 +237,7 @@ body {
   background: transparent;
   font: inherit;
   font-size: var(--fs-ui);
-  color: #1a2730;
+  color: var(--ink);
   padding: 2px 0;
 }
 .rbusca-in::placeholder {
@@ -290,7 +290,7 @@ body {
   display: block;
   font-size: var(--fs-ui);
   font-weight: 600;
-  color: #1a2730;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -298,7 +298,7 @@ body {
 .ropen .rm {
   display: block;
   font-size: var(--fs-micro);
-  color: #5d6b7a;
+  color: var(--muted);
   margin-top: 1px;
 }
 /* excluir — discreto, revelado no hover/foco da linha (padrão Gmail/Notion).
@@ -338,15 +338,15 @@ body {
 }
 .rdel.armado {
   background: #c0392b;
-  border-color: #a5301f;
-  color: #fff;
+  border-color: var(--erro);
+  color: var(--on-acao);
   padding: 0 10px;
 }
 .vazio,
 .sem-res {
   padding: 14px 12px;
   font-size: var(--fs-ui);
-  color: #5d6b7a;
+  color: var(--muted);
   line-height: 1.4;
 }
 .sem-res {
@@ -365,20 +365,20 @@ body {
   text-align: center;
   gap: 10px;
   padding: 46px 24px 50px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
-.vazio-pg svg { color: #b8c4cd; }
+.vazio-pg svg { color: var(--muted-3); }
 .vazio-pg .vt {
-  font-family: Georgia, serif;
+  font-family: var(--ff-display);
   font-size: var(--fs-lead);
-  color: #1a2730;
+  color: var(--ink);
   margin-top: 2px;
 }
 .vazio-pg .vd {
   font-size: var(--fs-body);
-  color: #5d6b7a;
+  color: var(--muted);
   line-height: 1.55;
   max-width: 46ch;
   /* texto centralizado e curto quebra em linhas de comprimento muito desigual
@@ -388,7 +388,7 @@ body {
 }
 /* o emoji não pode ficar órfão no fim de uma linha, longe do rótulo do botão */
 .vazio-pg .vd b { white-space: nowrap; }
-.vazio-pg .vd b { color: #33424f; }
+.vazio-pg .vd b { color: var(--text-2); }
 .vazio-pg .vlinks {
   display: flex;
   gap: 16px;
@@ -411,8 +411,8 @@ body {
 .barra {
   flex: none;
   z-index: 2;
-  background: #fff;
-  border-bottom: 1px solid #d7dbdf;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   padding: 0 8px;
 }
@@ -443,7 +443,7 @@ body {
 /* O Jodit substitui o <textarea> por .jodit-container; é ele que vira a página
    branca. Sombra neutra e suave, como a folha do Word. */
 .jodit-container.jodit {
-  border: 1px solid #d7dbdf;
+  border: 1px solid var(--line-strong);
   border-radius: 2px;
   background: var(--pagina);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 6px 18px -8px rgba(0, 0, 0, 0.15);
@@ -554,13 +554,13 @@ body {
   gap: 10px;
   padding: 40px;
   text-align: center;
-  color: #3a4650;
+  color: var(--text-2);
   background: var(--canvas);
 }
 .aviso b {
-  font-family: Georgia, serif;
+  font-family: var(--ff-display);
   font-size: var(--fs-lead);
-  color: #1a2730;
+  color: var(--ink);
 }
 
 /* modo lista (página sem ?id): a tela inteira vira a lista de rascunhos, e a
@@ -597,7 +597,7 @@ body {
 .lista-h {
   font-family: var(--ff-serif, Georgia, serif);
   font-size: var(--fs-lead);
-  color: var(--ink, #1a2730);
+  color: var(--ink, var(--ink));
   margin: 0 0 8px;
 }
 
@@ -611,33 +611,33 @@ body {
   width: 100%;
   max-width: var(--folha-w);
   margin: 0 auto var(--sp-3, 10px);
-  background: var(--surface, #fff);
-  border: 1px solid var(--line-card, #e4ebee);
-  border-left: 3px solid var(--pje, #14607e);
+  background: var(--surface, var(--surface));
+  border: 1px solid var(--line-card, var(--line-card));
+  border-left: 3px solid var(--pje, var(--pje));
   border-radius: var(--r-md, 8px);
   padding: var(--sp-2, 6px) var(--sp-3, 10px);
   font-size: var(--fs-meta);
-  color: var(--muted, #6b7c85);
+  color: var(--muted, var(--muted));
 }
 .origem[hidden] { display: none; }
 .origem summary {
   cursor: pointer;
-  color: var(--text-2, #3e5561);
+  color: var(--text-2, var(--text-2));
   list-style-position: outside;
 }
-.origem summary b { color: var(--pje-2, #0e4459); }
+.origem summary b { color: var(--pje-2, var(--pje-2)); }
 .origem .og-tese {
   margin: var(--sp-2, 6px) 0 0;
   padding-left: var(--sp-3, 10px);
-  border-left: 2px solid var(--line, #e2eaee);
-  color: var(--text, #0e323f);
+  border-left: 2px solid var(--line, var(--line));
+  color: var(--text, var(--ink));
   font-style: italic;
   line-height: 1.5;
 }
 .origem .og-meta {
   margin: var(--sp-2, 6px) 0 0;
   font-size: var(--fs-micro);
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
   line-height: 1.45;
 }
 @media print {
@@ -677,8 +677,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4, 14px);
-  background: var(--surface, #fff);
-  border: 1px solid var(--line-card, #e4ebee);
+  background: var(--surface, var(--surface));
+  border: 1px solid var(--line-card, var(--line-card));
   border-radius: var(--r-box, 10px);
   padding: var(--sp-3b, 12px);
   /* OBRIGATÓRIO: item de grid tem `min-width: auto`, isto é, recusa-se a
@@ -693,12 +693,12 @@ body {
   display: flex;
   align-items: center;
   gap: var(--sp-2, 6px);
-  border: 1px solid var(--line-input, #dae3e8);
+  border: 1px solid var(--line-input, var(--line-input));
   border-radius: var(--r-ctrl, 9px);
   padding: 0 var(--sp-2b, 8px);
-  background: var(--surface, #fff);
+  background: var(--surface, var(--surface));
 }
-.mp-busca svg { color: var(--muted-3, #93a3ac); flex: none; }
+.mp-busca svg { color: var(--muted-3, var(--muted-3)); flex: none; }
 .mp-busca:focus-within {
   border-color: var(--line-focus, #6fa5b9);
   box-shadow: var(--ring, 0 0 0 3px rgba(46, 126, 156, 0.13));
@@ -711,7 +711,7 @@ body {
   background: transparent;
   font: inherit;
   font-size: var(--fs-ui);
-  color: var(--text, #0e323f);
+  color: var(--text, var(--ink));
   padding: 8px 0;
 }
 .mp-busca-in::-webkit-search-cancel-button { cursor: pointer; }
@@ -722,7 +722,7 @@ body {
   font-weight: 600;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
   margin-bottom: var(--sp-1, 4px);
 }
 .mp-opt {
@@ -737,7 +737,7 @@ body {
   padding: 5px var(--sp-2, 6px);
   font: inherit;
   font-size: var(--fs-ui);
-  color: var(--text-2, #3e5561);
+  color: var(--text-2, var(--text-2));
   cursor: pointer;
   text-align: left;
   transition: background 120ms ease, color 120ms ease;
@@ -749,22 +749,22 @@ body {
   font-family: var(--ff-mono, monospace);
   font-size: var(--fs-nano);
   font-weight: 600;
-  color: var(--muted-2, #74858e);
-  background: var(--accent-bg, #dfeaee);
+  color: var(--muted-2, var(--muted-2));
+  background: var(--accent-bg, var(--accent-bg));
   border-radius: var(--r-pill, 20px);
   padding: 1px 7px;
 }
-.mp-opt:hover { background: var(--hover, #eff4f6); }
-.mp-opt.on { background: var(--accent-bg, #dfeaee); color: var(--pje-2, #0e4459); font-weight: 600; }
-.mp-opt.on b { background: var(--surface, #fff); color: var(--pje-2, #0e4459); }
+.mp-opt:hover { background: var(--hover, var(--hover)); }
+.mp-opt.on { background: var(--accent-bg, var(--accent-bg)); color: var(--pje-2, var(--pje-2)); font-weight: 600; }
+.mp-opt.on b { background: var(--surface, var(--surface)); color: var(--pje-2, var(--pje-2)); }
 .mp-ordem {
   font: inherit;
   font-size: var(--fs-ui);
-  color: var(--text, #0e323f);
-  border: 1px solid var(--line-input, #dae3e8);
+  color: var(--text, var(--ink));
+  border: 1px solid var(--line-input, var(--line-input));
   border-radius: var(--r-md, 8px);
   padding: 6px 8px;
-  background: var(--surface, #fff);
+  background: var(--surface, var(--surface));
   cursor: pointer;
 }
 .mp-ordem:focus {
@@ -778,18 +778,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1, 4px);
-  border-top: 1px solid var(--line-2, #edf1f3);
+  border-top: 1px solid var(--line-2, var(--line-2));
   padding-top: var(--sp-3, 10px);
   font-size: var(--fs-micro);
-  color: var(--muted, #6b7c85);
+  color: var(--muted, var(--muted));
   line-height: 1.45;
 }
-.mp-teto b { color: var(--text-2, #3e5561); font-size: var(--fs-meta); }
+.mp-teto b { color: var(--text-2, var(--text-2)); font-size: var(--fs-meta); }
 .mp-ajuda {
   align-self: flex-start;
   border: none;
   background: transparent;
-  color: var(--pje-2, #0e4459);
+  color: var(--pje-2, var(--pje-2));
   font: inherit;
   font-size: var(--fs-micro);
   font-weight: 600;
@@ -810,19 +810,19 @@ body {
   font-weight: 600;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
 }
 .mp-sec::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--line, #e2eaee);
+  background: var(--line, var(--line));
 }
 .mp-sec b {
   order: 3;
   font-family: var(--ff-mono, monospace);
   font-size: var(--fs-nano);
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
   letter-spacing: 0;
 }
 .mp-sec.urgente { color: var(--warn-ink, #a96b14); }
@@ -831,14 +831,14 @@ body {
 
 .mcard {
   position: relative;
-  background: var(--surface, #fff);
-  border: 1px solid var(--line-card, #e4ebee);
+  background: var(--surface, var(--surface));
+  border: 1px solid var(--line-card, var(--line-card));
   border-radius: var(--r-box, 10px);
   box-shadow: var(--sh-card, 0 1px 2px rgba(14, 50, 63, 0.04));
   transition: border-color 140ms ease, box-shadow 140ms ease, opacity 170ms ease,
     transform 170ms ease;
 }
-.mcard:hover { border-color: var(--pje, #14607e); }
+.mcard:hover { border-color: var(--pje, var(--pje)); }
 .mcard.saindo { opacity: 0; transform: translateX(-8px); }
 .mc-open {
   display: block;
@@ -848,7 +848,7 @@ body {
   color: inherit;
 }
 .mc-open:focus-visible {
-  outline: 2px solid var(--pje, #14607e);
+  outline: 2px solid var(--pje, var(--pje));
   outline-offset: -2px;
   border-radius: var(--r-box, 10px);
 }
@@ -859,7 +859,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -871,23 +871,23 @@ body {
   border-radius: 50%;
   background: var(--cat-outro, #b7c4cb);
 }
-.mc-esp.cat-decisao::before { background: var(--cat-decisao, #de8b2c); }
-.mc-esp.cat-audiencia::before { background: var(--cat-audiencia, #2f9268); }
+.mc-esp.cat-decisao::before { background: var(--cat-decisao, var(--warn)); }
+.mc-esp.cat-audiencia::before { background: var(--cat-audiencia, var(--ok)); }
 .mc-esp.cat-outro::before { background: var(--cat-outro, #b7c4cb); }
 /* o prazo restante — a informação que a tela não dava */
 .mc-vida {
   margin-left: auto;
   font-size: var(--fs-micro);
-  color: var(--muted-2, #74858e);
+  color: var(--muted-2, var(--muted-2));
   white-space: nowrap;
 }
 .mc-vida.n-aviso { color: var(--warn-ink, #a96b14); font-weight: 600; }
 .mc-vida.n-critico,
-.mc-vida.n-fim { color: var(--erro, #a5301f); font-weight: 600; }
+.mc-vida.n-fim { color: var(--erro, var(--erro)); font-weight: 600; }
 .mc-tit {
   font-family: var(--ff-serif, Georgia, serif);
   font-size: var(--fs-lg);
-  color: var(--ink, #0e323f);
+  color: var(--ink, var(--ink));
   margin: 3px 0 2px;
   line-height: 1.3;
   overflow: hidden;
@@ -900,17 +900,17 @@ body {
   flex-wrap: wrap;
   gap: var(--sp-2, 6px);
   font-size: var(--fs-micro);
-  color: var(--muted, #6b7c85);
+  color: var(--muted, var(--muted));
 }
 .mc-meta > * + *::before { content: "· "; }
 /* número do processo: numeral que o usuário COMPARA e COPIA → mono (§3) */
 .mc-proc {
   font-family: var(--ff-mono, monospace);
   font-size: var(--fs-nano);
-  color: var(--text-2, #3e5561);
+  color: var(--text-2, var(--text-2));
   letter-spacing: 0.02em;
 }
-.mc-ed { color: var(--ok, #2f9268); font-weight: 600; }
+.mc-ed { color: var(--ok, var(--ok)); font-weight: 600; }
 /* procedencia, nao estado: o ato veio de arquivo de FORA dos autos. Cor da
    marca (institucional), nunca --warn: nao ha nada de errado com a minuta --
    o que muda e do que ela foi feita, e por isso o chip precede o numero. */
@@ -918,7 +918,7 @@ body {
 .mc-previa {
   margin-top: 5px;
   font-size: var(--fs-meta);
-  color: var(--muted, #6b7c85);
+  color: var(--muted, var(--muted));
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -931,19 +931,19 @@ body {
   margin-top: var(--sp-2b, 8px);
   height: 3px;
   border-radius: 2px;
-  background: var(--line-2, #edf1f3);
+  background: var(--line-2, var(--line-2));
   overflow: hidden;
 }
 .mc-barra i {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: var(--line-strong, #d8e2e6);
+  background: var(--line-strong, var(--line-strong));
   transition: width 200ms ease;
 }
-.mc-barra i.n-aviso { background: var(--warn, #de8b2c); }
+.mc-barra i.n-aviso { background: var(--warn, var(--warn)); }
 .mc-barra i.n-critico,
-.mc-barra i.n-fim { background: var(--erro, #a5301f); }
+.mc-barra i.n-fim { background: var(--erro, var(--erro)); }
 .mc-del {
   position: absolute;
   top: var(--sp-2b, 8px);
@@ -954,17 +954,17 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sp-2b, 8px);
-  background: var(--surface, #fff);
-  border: 1px solid var(--line-card, #e4ebee);
+  background: var(--surface, var(--surface));
+  border: 1px solid var(--line-card, var(--line-card));
   border-radius: var(--r-box, 10px);
   padding: var(--sp-5, 20px);
   font-size: var(--fs-ui);
-  color: var(--muted, #6b7c85);
+  color: var(--muted, var(--muted));
 }
 .mp-limpar {
-  border: 1px solid var(--line-strong, #d8e2e6);
-  background: var(--surface, #fff);
-  color: var(--text-2, #3e5561);
+  border: 1px solid var(--line-strong, var(--line-strong));
+  background: var(--surface, var(--surface));
+  color: var(--text-2, var(--text-2));
   border-radius: var(--r-sm, 7px);
   padding: 5px 10px;
   font: inherit;
@@ -972,7 +972,7 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
-.mp-limpar:hover { background: var(--hover-2, #f5fafc); border-color: var(--pje, #14607e); }
+.mp-limpar:hover { background: var(--hover-2, var(--hover-2)); border-color: var(--pje, var(--pje)); }
 
 /* ---- telas estreitas: a coluna vira FAIXA ----
    Empilhados como no desktop, os oito filtros de espécie mais os de processo
@@ -1008,18 +1008,18 @@ body {
     margin: 0 var(--sp-1, 4px) 0 0;
     position: sticky;
     left: 0;
-    background: var(--surface, #fff);
+    background: var(--surface, var(--surface));
     padding-right: var(--sp-2, 6px);
   }
   .mp-opt {
     flex: none;
     width: auto;
-    border: 1px solid var(--line-strong, #d8e2e6);
+    border: 1px solid var(--line-strong, var(--line-strong));
     border-radius: var(--r-pill, 20px);
     padding: 4px var(--sp-2b, 8px);
     font-size: var(--fs-meta);
   }
-  .mp-opt.on { border-color: var(--pje, #14607e); }
+  .mp-opt.on { border-color: var(--pje, var(--pje)); }
   .mp-opt b { padding: 0 5px; }
   /* Ordenar cabe ao lado do rótulo; o teto vira uma linha só. */
   .mp-grupo:has(.mp-ordem) { overflow: visible; mask-image: none; }
@@ -1033,8 +1033,8 @@ body {
   }
 }
 .lista-b {
-  background: #fff;
-  border: 1px solid #d7dbdf;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -1051,8 +1051,8 @@ body {
   position: static;
   margin: 0 0 12px;
   padding: 9px 12px;
-  background: #fff;
-  border: 1px solid #d7dbdf;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
 }
 .lista-box .rbusca-in {
@@ -1065,9 +1065,9 @@ body {
   padding: 7px 16px;
   font-size: var(--fs-micro);
   line-height: 1.35;
-  color: #5d6b7a;
+  color: var(--muted);
   background: #f3f5f7;
-  border-top: 1px solid #d7dbdf;
+  border-top: 1px solid var(--line-strong);
   text-align: center;
 }
 .rodape-nota b {
@@ -1081,7 +1081,7 @@ body {
   body {
     height: auto;
     overflow: visible;
-    background: #fff;
+    background: var(--surface);
   }
   .topo,
   .barra,
@@ -1096,7 +1096,7 @@ body {
   .folha-wrap {
     overflow: visible;
     padding: 0;
-    background: #fff;
+    background: var(--surface);
     max-width: none;
   }
   .jodit-container.jodit {

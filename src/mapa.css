@@ -21,7 +21,7 @@ body {
   gap: 12px;
   padding: 10px 16px;
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
-  color: #fff;
+  color: var(--on-acao);
   box-shadow: 0 2px 10px rgba(5, 32, 46, 0.18);
 }
 .topo img {
@@ -78,7 +78,7 @@ body {
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  color: var(--on-acao);
   border-radius: 7px;
   padding: 5px 10px;
   font: inherit;
@@ -92,16 +92,16 @@ body {
   background: rgba(255, 255, 255, 0.24);
 }
 .acoes button.on {
-  background: #fff;
+  background: var(--surface);
   color: var(--pje-2);
-  border-color: #fff;
+  border-color: var(--pje);
   font-weight: 600;
 }
 
 .tela {
   position: relative;
   height: calc(100% - 50px);
-  background: radial-gradient(120% 120% at 50% 0%, #ffffff, var(--paper) 70%);
+  background: radial-gradient(120% 120% at 50% 0%, var(--surface), var(--paper) 70%);
 }
 
 #mapa {
@@ -111,8 +111,8 @@ body {
   /* o markmap monta o texto dos nós a partir destas variáveis; o padrão dele
      é peso 300, fino demais para o vocabulário jurídico */
   --markmap-font: 400 15px/1.35 system-ui, "Segoe UI", Arial, sans-serif;
-  --markmap-a-color: #0e4459;
-  --markmap-code-bg: #eaf2f7;
+  --markmap-a-color: var(--pje-2);
+  --markmap-code-bg: var(--accent-bg);
   --markmap-code-color: #22303f;
 }
 /* o markmap embute seu CSS global dentro do próprio <svg> (embedGlobalCSS);
@@ -174,7 +174,7 @@ body {
   margin-top: 2px;
   font-size: 0.78em;
   line-height: 1.5;
-  color: #5d6b7a;
+  color: var(--muted);
 }
 #mapa .mm-src .mm-b {
   font-size: 0.95em;
@@ -296,6 +296,6 @@ body {
   .legenda { box-shadow: none; }
   .tela {
     height: 100%;
-    background: #fff;
+    background: var(--surface);
   }
 }

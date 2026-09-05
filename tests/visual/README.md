@@ -3,6 +3,9 @@
 Duas ferramentas que medem coisas diferentes e não se substituem.
 
 ```bash
+# as TELAS SATÉLITES (popup, opções, ajuda, editor, modelos, novidades)
+node tests/visual/telas.mjs tests/visual/capturas-telas 8981
+
 # a impressão digital: para CADA elemento da árvore sombra, 11 propriedades de cor
 node tests/visual/impressao.mjs tests/visual/base-v0.59.json 8901      # grava
 node tests/visual/impressao.mjs /dev/null 8901 tests/visual/base-v0.59.json  # compara
@@ -14,6 +17,18 @@ node tests/visual/capturar.mjs tests/visual/capturas 8911
 Linha de base em 05/09/2026, na v0.59.0: **3.338 elementos × 11 propriedades =
 36.718**, em seis retratos (largo/estreito × normal/sigilo, mais os dois do
 estado vazio). Determinística: duas execuções seguidas dão **zero** diferenças.
+
+## `telas.mjs` — as satélites
+
+O `capturar.mjs` fotografa o PAINEL, que vive em Shadow DOM. As demais telas são
+páginas de extensão comuns e compartilham a paleta por `ui.css` — o que
+significa que um token trocado no `panel.css` e não espelhado ali produz **duas
+identidades visuais no mesmo produto**, sem nenhum teste acusando.
+
+Elas recebem um stub de `chrome` por `Page.addScriptToEvaluateOnNewDocument`,
+que roda ANTES de qualquer script da página; um `<script>` injetado depois
+chegaria tarde e o `popup.js` morreria no primeiro `storage.get`, produzindo uma
+captura pela metade — pior que captura nenhuma, porque parece defeito de layout.
 
 ## Por que DUAS
 

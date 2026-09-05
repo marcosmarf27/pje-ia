@@ -5,9 +5,9 @@
    As variáveis de identidade (--pje, --pje-2, --line…) vêm de ui.css. */
 
 :root {
-  --canvas: #eceef1;
+  --canvas: #eef2f6;
   --canvas-2: #e3e6e9;
-  --linha: #d7dbdf;
+  --linha: var(--line-strong);
   /* respiro no fim da área rolável. É variável porque o rodapé sticky da
      importação precisa COMPENSÁ-LO: `position:sticky; bottom:0` gruda na borda
      de PADDING do scrollport, então com um valor fixo aqui o rodapé parava 40px
@@ -33,7 +33,7 @@ body {
   gap: 12px;
   padding: 9px 16px;
   background: var(--hd);
-  color: #fff;
+  color: var(--on-hd-forte);
   box-shadow: 0 1px 4px rgba(5, 32, 46, 0.25);
   flex: none;
   z-index: 3;
@@ -46,11 +46,11 @@ body {
   width: 30px; height: 30px; box-sizing: border-box; padding: 6px;
   border-radius: var(--r-ctrl);
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 var(--veu-luz);
   flex: none;
 }
 .topo .tit { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
-.topo .tit .t { font-size: var(--fs-lead); line-height: 1.2; color: #fff; }
+.topo .tit .t { font-size: var(--fs-lead); line-height: 1.2; color: var(--on-hd-forte); }
 .topo .tit .s {
   font-size: var(--fs-micro);
   color: rgba(255, 255, 255, 0.72);
@@ -74,22 +74,22 @@ button {
   transition: background 0.12s, border-color 0.12s;
 }
 .topo button {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--veu-2);
   border-color: rgba(255, 255, 255, 0.3);
-  color: #fff;
+  color: var(--on-hd);
   font-weight: 600;
 }
 .topo button:hover { background: rgba(255, 255, 255, 0.26); }
 .primario {
   background: var(--hd);
-  color: #fff;
+  color: var(--on-acao);
   font-weight: 600;
   border-color: var(--pje-2);
 }
 .primario:hover { filter: brightness(1.07); }
 button svg { flex: none; }
 .ghost {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--linha);
   color: var(--text);
 }
@@ -110,7 +110,7 @@ button svg { flex: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 8px;
   padding: 9px 12px;
@@ -141,7 +141,7 @@ body.editando .topo .acoes { visibility: hidden; }
 .lista { display: flex; flex-direction: column; gap: 14px; }
 .lista.solta { display: block; }
 .grupo {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 10px;
   overflow: hidden;
@@ -156,7 +156,7 @@ body.editando .topo .acoes { visibility: hidden; }
   font-size: var(--fs-body);
   font-weight: 400;
   color: var(--pje-2);
-  background: #f4f9fc;
+  background: var(--paper);
   border-bottom: 1px solid #e4edf2;
 }
 .ghd .gn {
@@ -178,13 +178,13 @@ body.editando .topo .acoes { visibility: hidden; }
   outline: none;
 }
 .mrow:last-child { border-bottom: none; }
-.mrow:hover { background: #f7fafc; }
+.mrow:hover { background: var(--paper); }
 .mrow:focus-visible { background: #f2f8fb; box-shadow: inset 3px 0 0 var(--pje); }
 .mrow .info { flex: 1; min-width: 0; }
 .mrow .mt {
   display: block;
   font-size: var(--fs-body);
-  color: #1a2730;
+  color: var(--ink);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -218,16 +218,16 @@ body.editando .topo .acoes { visibility: hidden; }
 .mrow .acts button {
   font-size: var(--fs-meta);
   padding: 5px 10px;
-  background: #fff;
+  background: var(--surface);
   border-color: var(--linha);
   color: var(--muted);
 }
 .mrow .acts button:hover { background: #f0f4f7; color: var(--text); }
 /* exclusão em dois cliques (nunca confirm() nativo — trava a página) */
 .mrow .acts .del.arm {
-  background: #a5301f;
-  border-color: #a5301f;
-  color: #fff;
+  background: var(--erro);
+  border-color: var(--erro);
+  color: var(--on-acao);
   font-weight: 600;
 }
 
@@ -239,12 +239,12 @@ body.editando .topo .acoes { visibility: hidden; }
   text-align: center;
   gap: 10px;
   padding: 46px 24px 50px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 12px;
 }
-.vazio-pg svg { color: #b8c4cd; }
-.vazio-pg .vt { font-family: var(--ff-serif); font-size: var(--fs-lead); color: #1a2730; margin-top: 2px; }
+.vazio-pg svg { color: var(--muted-3); }
+.vazio-pg .vt { font-family: var(--ff-serif); font-size: var(--fs-lead); color: var(--ink); margin-top: 2px; }
 .vazio-pg .vd {
   font-size: var(--fs-body);
   color: var(--muted);
@@ -252,19 +252,19 @@ body.editando .topo .acoes { visibility: hidden; }
   max-width: 48ch;
   text-wrap: pretty; /* evita a última linha sobrando com duas palavras */
 }
-.vazio-pg .vd b { color: #33424f; }
+.vazio-pg .vd b { color: var(--text-2); }
 .sem-res { padding: 24px 14px; text-align: center; font-size: var(--fs-ui); color: var(--muted); }
 
 /* ------------------------------------------------------------- formulário */
 .form-card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 12px;
   padding: 22px 24px 20px;
 }
 .form-card h2 { font-size: var(--fs-lead); color: var(--ink); margin: 0 0 4px; }
 .form-sub { font-size: var(--fs-ui); color: var(--muted); line-height: 1.5; margin: 0 0 18px; }
-.form-sub b { color: #33424f; }
+.form-sub b { color: var(--text-2); }
 
 .campo { display: block; margin-bottom: 15px; }
 .campo .rot {
@@ -289,7 +289,7 @@ body.editando .topo .acoes { visibility: hidden; }
   padding: 3px 9px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--surface);
   color: var(--pje);
   letter-spacing: 0;
   text-transform: none;
@@ -303,7 +303,7 @@ body.editando .topo .acoes { visibility: hidden; }
   font: inherit;
   font-size: var(--fs-body);
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 8px;
   padding: 9px 11px;
@@ -326,7 +326,7 @@ body.editando .topo .acoes { visibility: hidden; }
   box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
 }
 .campo .dica { display: block; font-size: var(--fs-meta); color: var(--muted); margin-top: 5px; }
-.campo .dica.estouro { color: #a5301f; font-weight: 600; }
+.campo .dica.estouro { color: var(--erro); font-weight: 600; }
 .dupla { display: flex; gap: 14px; }
 .dupla .campo { flex: 1; min-width: 0; }
 
@@ -357,12 +357,12 @@ body.editando .topo .acoes { visibility: hidden; }
   padding: 34px 20px 30px;
   border: 1.5px dashed var(--line-check);
   border-radius: var(--r-box);
-  background: #fafcfd;
+  background: var(--paper);
   color: var(--muted);
   cursor: pointer;
   transition: border-color 0.14s, background 0.14s, color 0.14s;
 }
-.imp-drop svg { color: #b8c4cd; transition: color 0.14s; }
+.imp-drop svg { color: var(--muted-3); transition: color 0.14s; }
 .imp-drop:hover,
 .imp-drop:focus-visible,
 .imp-drop.arrastando {
@@ -402,7 +402,7 @@ body.editando .topo .acoes { visibility: hidden; }
   animation: imp-gira 0.7s linear infinite;
 }
 @keyframes imp-gira { to { transform: rotate(360deg); } }
-.imp-bar { height: 4px; background: var(--line-2, #edf1f3); border-radius: 3px; overflow: hidden; }
+.imp-bar { height: 4px; background: var(--line-2, var(--line-2)); border-radius: 3px; overflow: hidden; }
 .imp-bar i {
   display: block; height: 100%; width: 0;
   background: linear-gradient(90deg, #62a9c7, var(--pje));
@@ -417,11 +417,11 @@ body.editando .topo .acoes { visibility: hidden; }
   border: 1px solid var(--linha);
   border-radius: var(--r-box);
   padding: 11px 13px 12px;
-  background: #fff;
+  background: var(--surface);
   transition: opacity 0.14s, background 0.14s;
 }
 /* desmarcada continua LEGÍVEL e editável — desmarcar não é apagar */
-.imp-ficha.fora { opacity: 0.62; background: #fafbfc; }
+.imp-ficha.fora { opacity: 0.62; background: var(--paper); }
 .imp-ficha.erro { border-color: var(--warn-line); background: var(--warn-bg); }
 
 .imp-inc { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -445,7 +445,7 @@ body.editando .topo .acoes { visibility: hidden; }
   font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 8px;
   padding: 7px 10px;
@@ -457,7 +457,7 @@ body.editando .topo .acoes { visibility: hidden; }
   font: inherit;
   font-size: var(--fs-meta);
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--linha);
   border-radius: 8px;
   padding: 7px 8px;
@@ -500,7 +500,7 @@ body.editando .topo .acoes { visibility: hidden; }
   padding: 3px 8px;
   border-radius: var(--r-tight);
   border: 1px solid var(--linha);
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   flex: none;
 }
@@ -512,7 +512,7 @@ body.editando .topo .acoes { visibility: hidden; }
   padding: 9px 11px;
   max-height: 160px;
   overflow: auto;
-  background: #fafbfc;
+  background: var(--paper);
   border: 1px solid var(--linha);
   border-radius: 8px;
   font-family: var(--ff-serif);
@@ -549,7 +549,7 @@ body.editando .topo .acoes { visibility: hidden; }
   gap: 9px;
   margin: 10px -24px -20px;
   padding: 12px 24px;
-  background: #fff;
+  background: var(--surface);
   border-top: 1px solid var(--linha);
   border-radius: 0 0 12px 12px;
   box-shadow: 0 -6px 14px -10px rgba(14, 50, 63, 0.35);
@@ -601,7 +601,7 @@ body.editando .topo .acoes { visibility: hidden; }
 }
 .imp-res-l > span { flex: 1; min-width: 0; }
 .imp-res-l b { color: #7c5310; }
-.imp-res-l button { flex: none; font-size: var(--fs-micro); padding: 4px 9px; background: #fff; border-color: var(--warn-line); color: var(--warn-ink); }
+.imp-res-l button { flex: none; font-size: var(--fs-micro); padding: 4px 9px; background: var(--surface); border-color: var(--warn-line); color: var(--warn-ink); }
 .imp-res-l button:hover { background: #fff6e6; }
 
 /* ------------------------------------------------------------------ rodapé */
@@ -612,7 +612,7 @@ body.editando .topo .acoes { visibility: hidden; }
   font-size: var(--fs-micro);
   color: var(--muted);
   text-align: center;
-  background: #f4f6f8;
+  background: var(--canvas);
   border-top: 1px solid var(--linha);
 }
 .rodape-nota b { color: #4a5a68; }

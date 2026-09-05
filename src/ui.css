@@ -3,91 +3,91 @@
    panel.css — ao mudar um valor aqui, mude lá também (o painel vive em Shadow
    DOM e não pode importar este arquivo). */
 :root {
-  --pje: #14607e;
-  --pje-2: #0e4459;
-  --pje-3: #0e4e69;
+  --pje: #4f46e5;
+  --pje-2: #4338ca;
+  --pje-3: #3730a3;
   /* Cabeçalho CHAPADO — o gradiente 96deg saiu no refinamento (DESIGN.md §2). */
-  --hd: #0e4459;
-  --mark-de: #2e7e9c;
-  --mark-para: #175d79;
-  --btn-de: #1c6c8b;
-  --btn-para: #125a78;
-  --btn-de-h: #22789a;
-  --btn-para-h: #0e4e69;
-  --line-focus: #6fa5b9;
-  --ring: 0 0 0 3px rgba(46, 126, 156, 0.13);
-  --ink: #0e323f;
-  --ink-2: #0b2a3a;
+  --hd: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --mark-de: #334155;
+  --mark-para: #0f172a;
+  --btn-de: #1e293b;
+  --btn-para: #0f172a;
+  --btn-de-h: #4f46e5;
+  --btn-para-h: #4338ca;
+  --line-focus: #818cf8;
+  --ring: 0 0 0 3px rgba(79, 70, 229, 0.14);
+  --ink: #0f172a;
+  --ink-2: #020617;
   --cream: #eaf2f7;
-  --paper: #f6f9fb;
-  --canvas: #e9eef3;
-  --text: #0e323f;
-  --text-2: #3e5561;
-  --text-3: #234e5e;
-  --muted: #6b7c85;
-  --muted-2: #74858e;
-  --muted-3: #93a3ac;
-  --eyebrow: #a0aeb6;
+  --paper: #f8fafc;
+  --canvas: #eef2f6;
+  --text: #0f172a;
+  --text-2: #334155;
+  --text-3: #475569;
+  --muted: #475569;
+  --muted-2: #64748b;
+  --muted-3: #94a3b8;
+  --eyebrow: #64748b;
   /* `--surface` e `--hover` faltavam aqui — existem no DESIGN.md §2 e no
      panel.css, e as telas satélites vinham escrevendo `#fff` na mão. Declarar
      não muda pixel nenhum do que já existe; o que muda é a próxima tela não
      precisar de literal. */
   --surface: #ffffff;
-  --surface-2: #fafcfc;
-  --surface-card: #fcfdfd;
-  --hover: #eff4f6;
-  --hover-2: #f5fafc;
-  --accent-bg: #dfeaee;
-  --accent-bg-2: #e4edf0;
-  --line: #e2eaee;
-  --line-2: #edf1f3;
-  --line-card: #e4ebee;
-  --line-input: #dae3e8;
-  --line-strong: #d8e2e6;
-  --line-check: #c3cfd5;
+  --surface-2: #ffffff;
+  --surface-card: #ffffff;
+  --hover: #f1f5f9;
+  --hover-2: #f8fafc;
+  --accent-bg: #eef2ff;
+  --accent-bg-2: #e0e7ff;
+  --line: #e2e8f0;
+  --line-2: #f1f5f9;
+  --line-card: #e2e8f0;
+  --line-input: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --line-check: #cbd5e1;
   /* Categorias de peça — o mesmo conjunto do panel.css (DESIGN.md §2). Só a
      de petição é usada hoje (a inicial do cartão da Anthropic), mas elas são um
      conjunto semântico: definir uma só convidaria à próxima omissão. */
-  --cat-decisao: #de8b2c;
-  --cat-audiencia: #2f9268;
-  --cat-peticao: #6a62c0;
-  --cat-prova: #c1508a;
-  --ok: #2f9268;
-  --ok-bg: #eaf4ef;
-  --ok-line: #cbe3d8;
-  --ok-ink: #1e5c44;
+  --cat-decisao: #d97706;
+  --cat-audiencia: #059669;
+  --cat-peticao: #0891b2;
+  --cat-prova: #e11d48;
+  --ok: #059669;
+  --ok-bg: #ecfdf5;
+  --ok-line: #a7f3d0;
+  --ok-ink: #065f46;
   /* Modo sigiloso (espelho do panel.css; ver DESIGN.md §2) */
-  --sig-hd: #143f33;
-  --sig-mark-de: #35946e;
-  --sig-mark-para: #1d6248;
-  --sig-btn-de: #2f9268;
-  --sig-btn-para: #1f6a4b;
-  --sig-btn-de-h: #35a074;
-  --sig-btn-para-h: #1a5c41;
-  --sig-halo: rgba(47, 146, 104, 0.28);
-  --warn: #de8b2c;
-  --warn-bg: #fbead2;
+  --sig-hd: linear-gradient(180deg, #e8f6ef 0%, #d3e9dd 100%);
+  --sig-mark-de: #10b981;
+  --sig-mark-para: #047857;
+  --sig-btn-de: #047857;
+  --sig-btn-para: #065f46;
+  --sig-btn-de-h: #059669;
+  --sig-btn-para-h: #047857;
+  --sig-halo: rgba(5, 150, 105, 0.3);
+  --warn: #d97706;
+  --warn-bg: #fffbeb;
   /* Espelham panel.css (ver DESIGN.md §1) — aviso suave, que informa sem
      impedir de continuar. */
-  --warn-line: #eeddba;
-  --warn-ink: #a96b14;
-  --erro: #a5301f;
-  --erro-hd: #b4402f;
+  --warn-line: #fde68a;
+  --warn-ink: #92400e;
+  --erro: #dc2626;
+  --erro-hd: #dc2626;
   /* Alerta que BLOQUEIA — espelha panel.css (DESIGN.md §2). */
-  --alerta: #b4402f;
-  --alerta-bg: #fbeee6;
-  --alerta-line: #e0b7a0;
-  --alerta-ink: #7c3212;
+  --alerta: #dc2626;
+  --alerta-bg: #fef2f2;
+  --alerta-line: #fecaca;
+  --alerta-ink: #991b1b;
   /* Famílias vendorizadas em vendor/fontes/ — os @font-face ficam no topo deste
      arquivo. Aqui as url() são relativas normais: estas páginas são servidas
      pela própria extensão, ao contrário do painel (DESIGN.md §3). */
-  --ff-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --ff-serif: "Newsreader", Georgia, "Times New Roman", serif;
-  --ff-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
-  --sh-card: 0 1px 2px rgba(14, 50, 63, 0.04);
-  --sh-seg: 0 1px 2px rgba(14, 50, 63, 0.1);
-  --sh-btn: 0 1px 2px rgba(14, 50, 63, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  --sh-pop: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
+  --ff-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --ff-serif: "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+  --ff-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --sh-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --sh-seg: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --sh-btn: 0 1px 2px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --sh-pop: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.1);
   /* Faixa de ação grudada no rodapé do popup: sombra ASCENDENTE, para dizer que
      há conteúdo passando por baixo. Mesma cor-base das demais. */
   --sh-bar: 0 -10px 14px -10px rgba(14, 50, 63, 0.22);
@@ -105,11 +105,47 @@
   --fs-ui: 13px;     /* formulários, botões */
   --fs-body: 14px;   /* texto corrido */
   --fs-lg: 15px;     /* títulos de seção */
-  --fs-lead: 17px;   /* título de página */
-  --fs-hero: 26px;   /* título de destaque */
+  --fs-lead: 18px;   /* título de página */
+  --fs-hero: 30px;   /* título de destaque */
   /* ritmo vertical — oito degraus (DESIGN.md §4) */
   --sp-1: 4px; --sp-2: 6px; --sp-2b: 8px; --sp-3: 10px;
   --sp-3b: 12px; --sp-4: 14px; --sp-5: 20px; --sp-6: 28px;
+
+  /* ------------------------------------------------------------------
+     v0.60 — o que a paleta nova trouxe e estas telas consomem.
+     Os tokens de CHROME do painel (--veu-*, --on-hd-*, as texturas do
+     modo sigiloso, a mascara da lupa) ficam de FORA de proposito:
+     nenhuma tela satelite tem cabecalho tematizado, e token declarado
+     sem consumidor e o comeco de um valor que envelhece calado.
+     ------------------------------------------------------------------ */
+  --pje-soft: #a5b4fc;
+  --surface-painel: #f8fafc;
+  --surface-3: #f8fafc;
+  --surface-list-ft: #ffffff;
+  --on-acao: #ffffff;
+  /* A FAMILIA DE TINTA DA CHROME. Ela ficou de fora na primeira passada, com o
+     argumento de que tela satelite nao tem cabecalho tematizado — e a `.brand`
+     do popup pinta `var(--hd)` desde sempre. Com a chrome virando CLARA na
+     v0.60, o `color: #fff` dela virou branco sobre branco: o nome do produto
+     sumiu do topo do popup. Token sem consumidor e ruim; consumidor sem token e
+     pior. */
+  --on-hd: #334155;
+  --on-hd-2: #64748b;
+  --on-hd-3: #475569;
+  --on-hd-forte: #0f172a;
+  --cat-outro: #94a3b8;
+  --ff-display: "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+  --r-round: 9999px;
+  --sh-erguido: 0 2px 6px rgba(15, 23, 42, 0.1), 0 34px 80px -20px rgba(15, 23, 42, 0.3);
+  --sh-panel: 0 1px 2px rgba(15, 23, 42, 0.06), 0 24px 60px -18px rgba(15, 23, 42, 0.22);
+  --w-leitura: 900px;
+  --dur-1: 140ms;
+  --dur-2: 220ms;
+  --dur-3: 300ms;
+  --dur-4: 380ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 * { box-sizing: border-box; }
@@ -146,9 +182,10 @@ body {
   gap: 12px;
   padding: 18px 20px;
   background:
-    radial-gradient(120% 140% at 100% 0%, rgba(98, 169, 199, 0.28), transparent 60%),
+    radial-gradient(120% 140% at 100% 0%, rgba(79, 70, 229, 0.07), transparent 60%),
     var(--hd);
-  color: #fff;
+  color: var(--on-hd-forte);
+  border-bottom: 1px solid var(--line);
 }
 /* Mesma marca do painel: quadrado com gradiente vertical e inset branco, e a
    imagem MENOR que ele — é o gradiente em volta que capta a luz (DESIGN.md §2). */
@@ -156,19 +193,19 @@ body {
   width: 38px; height: 38px; border-radius: var(--r-lg);
   padding: 8px; box-sizing: border-box;
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 var(--veu-luz, rgba(255, 255, 255, 0.22));
 }
 .brand .t {
-  font-family: var(--ff-serif);
+  font-family: var(--ff-display);
   font-size: var(--fs-lead);
-  font-weight: 500;
-  letter-spacing: 0.005em;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   line-height: 1.15;
 }
 .brand .s {
   font-family: var(--ff-mono);
   font-size: var(--fs-nano);
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--on-hd-2);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -251,9 +288,9 @@ label.field-check .chk input { flex: none; width: 15px; height: 15px; accent-col
 .mem-acts .btn { width: auto; margin-top: 0; }
 /* Segundo clique: a exclusão fica ARMADA e se veste de destrutiva. */
 .btn-erro {
-  background: #fff; color: var(--erro); border-color: var(--erro);
+  background: var(--surface); color: var(--erro); border-color: var(--erro);
 }
-.btn-erro:hover { background: #fff; border-color: var(--erro); color: var(--erro); }
+.btn-erro:hover { background: var(--surface); border-color: var(--erro); color: var(--erro); }
 .mem-status { font-size: var(--fs-meta); color: var(--muted); }
 .mem-status.ok { color: var(--ok); font-weight: 600; }
 
@@ -286,7 +323,7 @@ input, select, textarea {
   border: 1px solid var(--line);
   border-radius: 9px;
   font: inherit;
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -320,13 +357,13 @@ input:focus, select:focus, textarea:focus {
   font-weight: 600;
   font-size: var(--fs-body);
   cursor: pointer;
-  background: var(--hd);
-  color: #fff;
+  background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
+  color: var(--on-acao);
   transition: filter 0.15s, transform 0.05s;
 }
 .btn:hover { filter: brightness(1.05); }
 .btn:active { transform: translateY(1px); }
-.btn.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+.btn.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 
 .save-status { margin-top: 12px; font-size: var(--fs-ui); font-weight: 600; color: var(--ok); min-height: 18px; }
 
@@ -342,7 +379,7 @@ input:focus, select:focus, textarea:focus {
   width: 22px; height: 22px;
   border-radius: 50%;
   background: var(--pje);
-  color: #fff;
+  color: var(--on-acao);
   font-size: var(--fs-meta);
   font-weight: 600;
   display: flex; align-items: center; justify-content: center;
@@ -416,7 +453,7 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
   text-decoration: none;
@@ -474,7 +511,7 @@ input:focus, select:focus, textarea:focus {
      crescia a fileira inteira em 14px e deixava metade dos cartões com o texto
      desalinhado dos outros. Medido em Chrome headless: 87px de conteúdo contra
      os 77px que o texto pede. */
-  background: #fff; padding: var(--sp-3b) var(--sp-2); cursor: pointer;
+  background: var(--surface); padding: var(--sp-3b) var(--sp-2); cursor: pointer;
   font-family: inherit; transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .prov:hover { border-color: var(--line-strong); }
@@ -515,7 +552,7 @@ input:focus, select:focus, textarea:focus {
 
 .provcard {
   border: 1px solid var(--line-input); border-radius: var(--r-xl);
-  background: #fff; box-shadow: var(--sh-card);
+  background: var(--surface); box-shadow: var(--sh-card);
   margin-top: var(--sp-3b); padding: var(--sp-4);
 }
 .pc-sec + .pc-sec, .provcard > label.field { margin-top: var(--sp-4); }
@@ -575,14 +612,14 @@ input:focus, select:focus, textarea:focus {
 }
 .seg-i:hover span { color: var(--ink); }
 .seg-i input:checked + span {
-  background: #fff; color: var(--ink); font-weight: 600; box-shadow: var(--sh-seg);
+  background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--sh-seg);
 }
 .seg-i:has(input:focus-visible) span { outline: 2px solid var(--pje); outline-offset: 1px; }
 
 /* Chips de persona: preenchem o campo, nunca salvam sozinhos. */
 .personas { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2b); }
 .persona {
-  border: 1px solid var(--line); border-radius: var(--r-pill); background: #fff;
+  border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface);
   padding: 5px var(--sp-3b); font-family: inherit; font-size: var(--fs-micro);
   color: var(--text-2); cursor: pointer; transition: border-color 0.14s ease, color 0.14s ease;
 }
@@ -638,10 +675,10 @@ input:focus, select:focus, textarea:focus {
 .save-acts .btn { margin-top: 0; width: auto; }
 .save-acts .btn:not(.btn-sec) { flex: 1; min-width: 0; }
 .btn-sec {
-  flex: none; background: #fff; color: var(--text-2);
+  flex: none; background: var(--surface); color: var(--text-2);
   border: 1px solid var(--line); box-shadow: none;
 }
-.btn-sec:hover { border-color: var(--line-focus); color: var(--pje-2); background: #fff; }
+.btn-sec:hover { border-color: var(--line-focus); color: var(--pje-2); background: var(--surface); }
 /* `.lock-note` saiu: virou a primeira linha da `.privacy` (ver acima). */
 
 /* ---------- Caixa de apoio ao projeto (`.apoio`) ----------
@@ -691,7 +728,7 @@ input:focus, select:focus, textarea:focus {
    suspensório para quando a página for impressa ou o SVG não carregar. */
 .apoio .pix-qr {
   flex: none; width: 108px; height: 108px; display: block;
-  background: #fff; border-radius: var(--r-xs);
+  background: var(--surface); border-radius: var(--r-xs);
 }
 .apoio .pix-tx { min-width: 0; }
 .apoio .pix-t {
@@ -814,5 +851,5 @@ input:focus, select:focus, textarea:focus {
 .apoiar .ap-qr[open] > summary::before { transform: rotate(90deg); }
 .apoiar .ap-qr img {
   display: block; margin-top: var(--sp-2b);
-  background: #fff; border-radius: var(--r-xs);
+  background: var(--surface); border-radius: var(--r-xs);
 }
