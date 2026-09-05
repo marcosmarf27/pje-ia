@@ -86,3 +86,9 @@ tests/visual/capturas/
 #  - tests/visual/capturas-telas/ — mesma coisa para o telas.mjs (as seis
 #    satélites). A referência congelada delas vive em v0.60-png/.
 tests/visual/capturas-telas/
+
+# Material da Chrome Web Store (capturas, promo, icones de listagem): sao
+# artefatos de PUBLICACAO, gerados por store/gerar.py a partir do que ja esta
+# no repo. Versiona-los somaria ~3 MB de PNG que mudam a cada release e nao
+# entram no pacote da extensao.
+store/

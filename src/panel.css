@@ -4701,31 +4701,53 @@ button > svg { flex: none; }
   border-radius: 6px;
 }
 .minutabar-x:hover, .mapabar-x:hover { background: var(--line-strong); color: var(--text); }
-/* seletor de peça-modelo: cai na própria linha da faixa (a faixa quebra) */
-.minutabar { flex-wrap: wrap; }
+
+/* A MINUTA É UMA COLUNA, NÃO UMA FAIXA QUE QUEBRA. Ela era `flex-wrap` com
+   cada bloco pedindo `flex-basis: 100%` para forçar a própria linha - uma
+   coluna escrita com as ferramentas de uma linha. Em coluna, quem decide o
+   arranjo é cada filho, e a `.minuta-linha` pode ser um grid de verdade. */
+.minutabar {
+  flex-direction: column; align-items: stretch; gap: var(--sp-2);
+  padding: var(--sp-2) 10px var(--sp-2b);
+}
+.mb-hd { display: flex; align-items: center; gap: 8px; }
 
 /* ---------- Orientação obrigatória (Resolução CNJ 615/2025) ----------
-   Espécie do ato + tese. Ao contrário do seletor de peças-modelo, esta linha
+   Espécie do ato + tese. Ao contrário da caixa de peças-modelo, esta linha
    NÃO depende da biblioteca nem da janela de 1M: é obrigação normativa e não
    pode sumir junto com uma feature opcional. */
-.minuta-ato {
-  flex-basis: 100%; display: flex; align-items: center; gap: 6px;
-  padding-top: 2px; flex-wrap: wrap;
+/* FLEX e nao grid: os dois itens tem largura de CONTEUDO e quebram sozinhos
+   quando nao cabem — o estreito nao precisa de regra propria, e um seletor de
+   oito opcoes nao tem por que ocupar 700px so porque a linha e larga. */
+.minuta-linha {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-1) var(--sp-4);
 }
+.minuta-ato { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .minuta-ato[hidden] { display: none; }
 .minuta-ato .ma-lab { flex: none; font-weight: 600; color: var(--pje-2); }
 .minuta-ato-sel {
-  flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
+  flex: 0 1 auto; min-width: 0; max-width: 260px; font: inherit; font-size: var(--fs-meta); color: var(--text);
   border: 1px solid var(--line-strong); border-radius: var(--r-sm);
   padding: 4px 8px; background: var(--surface); cursor: pointer;
 }
 .minuta-ato-sel:focus {
   outline: none; border-color: var(--line-focus); box-shadow: var(--ring);
 }
-.minuta-tese {
-  flex-basis: 100%; display: flex; flex-direction: column; gap: var(--sp-1);
-  padding-top: var(--sp-2);
+/* Era um <select> de sete categorias; virou um binário. Marcado por padrão:
+   seguir os próprios modelos é o mecanismo, e desmarcar é a exceção. */
+.minuta-modelo {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  cursor: pointer; color: var(--text-2); user-select: none;
 }
+.minuta-modelo[hidden] { display: none; }
+.minuta-modelo:hover { color: var(--text); }
+.mm-chk {
+  flex: none; width: 15px; height: 15px; margin: 0;
+  accent-color: var(--pje); cursor: pointer;
+}
+.mm-chk:focus-visible { outline: 2px solid var(--line-focus); outline-offset: 1px; }
+.minuta-tese { display: flex; flex-direction: column; gap: var(--sp-1); }
 .minuta-tese[hidden] { display: none; }
 .mt-lab {
   display: flex; align-items: center; gap: var(--sp-1);
@@ -4750,82 +4772,73 @@ button > svg { flex: none; }
 .mt-txtarea:focus {
   outline: none; border-color: var(--line-focus); box-shadow: var(--ring);
 }
-/* Aviso SUAVE (--warn-*), nunca a .alertbar: nada está quebrado — falta um
-   passo, e a nota diz qual. Mesma regra da .sel-nota dos degraus de seleção. */
+/* A explicação e a saída DIVIDEM UMA LINHA, e ela é de APOIO, nunca de aviso.
+   Era uma caixa âmbar com borda que aparecia no estado INICIAL — acusando o
+   usuário antes de ele ter feito coisa alguma. O que diz "falta um passo" é o
+   asterisco no rótulo e o botão Enviar apagado; esta linha diz POR QUÊ. */
+.mt-pe {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  flex-wrap: wrap; row-gap: var(--sp-1);
+}
 .mt-nota {
-  font-size: var(--fs-micro); line-height: 1.4; color: var(--warn-ink);
-  background: var(--warn-bg); border: 1px solid var(--warn-line);
-  border-radius: var(--r-tight); padding: var(--sp-2) var(--sp-2b);
+  flex: 1; min-width: 0;
+  font-size: var(--fs-micro); line-height: 1.45; color: var(--muted);
 }
 .mt-nota[hidden] { display: none; }
-
-/* ---------- Perfil do modelo × minuta ----------
-   Aviso SUAVE (tokens --warn-*), irmão da .mt-nota e da .sel-nota — nunca a
-   .alertbar, que é para o que IMPEDE de continuar. Aqui a minuta funciona: o
-   que se diz é que outro modelo provavelmente escreve melhor. Ocupa a linha
-   inteira da faixa (que é flex-wrap) para não espremer os seletores. */
-.perfil-nota {
-  flex-basis: 100%;
-  font-size: var(--fs-micro); line-height: 1.45;
-  color: var(--warn-ink); background: var(--warn-bg);
-  border: 1px solid var(--warn-line); border-radius: var(--r-tight);
-  padding: var(--sp-2) var(--sp-2b); margin-top: 2px;
-}
-.perfil-nota b { font-weight: 700; }
-.perfil-nota[hidden] { display: none; }
 .mt-como {
   border: none; background: transparent; color: var(--pje-2); cursor: pointer;
   font: inherit; font-size: var(--fs-micro); font-weight: 600; padding: 0;
   text-decoration: underline; text-underline-offset: 2px;
 }
 .mt-como:hover { color: var(--pje-3); }
-/* A alternativa para quem ainda não tem a tese. Secundária de propósito: ela
+/* A alternativa para quem ainda NÃO tem a tese. Secundária de propósito: ela
    NÃO produz um ato, e um botão com o peso do "Gerar minuta" sugeriria que
    sim. */
 .mt-analise {
-  align-self: flex-start; display: inline-flex; align-items: center;
+  flex: none; display: inline-flex; align-items: center;
   border: 1px solid var(--line-strong); background: var(--surface);
-  color: var(--text-2); border-radius: var(--r-sm); padding: 4px 10px;
+  color: var(--text-2); border-radius: var(--r-sm); padding: 3px 9px;
   font: inherit; font-size: var(--fs-micro); font-weight: 600; cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }
 .mt-analise:hover { background: var(--hover-2); border-color: var(--pje); color: var(--pje-2); }
 .mt-analise[hidden] { display: none; }
-.minuta-modelo {
-  flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding-top: 2px;
-  /* O estado vazio põe TRÊS itens na linha (rótulo + frase + botão): no painel
-     estreito eles precisam poder quebrar, senão o botão Cadastrar é espremido
-     contra a borda. Com o seletor (dois itens) nada muda. */
-  flex-wrap: wrap;
+
+/* ---------- Rodapé da barra: o que ela RELATA ----------
+   Quem redige o ato é informação de primeira ordem para quem assina, e vivia
+   escondida atrás de uma condição (só aparecia quando o modelo era trocado) e
+   pintada de âmbar, como se fosse ressalva. Aqui é fato, em tom neutro. */
+.mb-pe {
+  display: flex; align-items: center; gap: var(--sp-2);
+  flex-wrap: wrap; row-gap: var(--sp-1);
 }
-.minuta-modelo[hidden] { display: none; }
-.minuta-modelo .mm-lab { flex: none; font-weight: 600; color: var(--pje-2); }
-.minuta-modelo-sel {
-  flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
-  border: 1px solid var(--line-strong); border-radius: 7px;
-  padding: 4px 8px; background: var(--surface); cursor: pointer;
+.mb-pe:empty { display: none; }
+.perfil-nota {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-micro); line-height: 1.45; color: var(--muted);
 }
-.minuta-modelo-sel:focus {
-  outline: none; border-color: var(--pje); box-shadow: var(--ring);
+.perfil-nota b { font-weight: 600; color: var(--text-2); }
+.perfil-nota[hidden] { display: none; }
+.pn-troca {
+  border: none; background: transparent; color: var(--pje-2); cursor: pointer;
+  font: inherit; font-size: var(--fs-micro); font-weight: 600; padding: 0;
+  text-decoration: underline; text-underline-offset: 2px;
 }
-.minuta-modelo-sel[hidden] { display: none; }
-/* Estado VAZIO da biblioteca: a linha não some, explica. Tom informativo
-   (--muted), não de aviso: nada está errado — o usuário só ainda não cadastrou
-   modelo nenhum, e a minuta sai no estilo padrão. */
-.mm-vazio { flex: 1; min-width: 0; color: var(--muted); }
-.mm-vazio[hidden] { display: none; }
-/* Por que ESTES modelos (e não outros) vão na minuta. Aviso SUAVE (--warn-*),
-   irmão da .mt-nota e da .perfil-nota — nunca a .alertbar: a minuta sai, só que
-   sem o que o usuário talvez esperasse. Linha inteira da faixa (flex-wrap),
-   para não espremer os seletores. */
+.pn-troca:hover { color: var(--pje-3); }
+/* Aviso SUAVE (--warn-*), irmão da .sel-nota — nunca a .alertbar, que é para o
+   que IMPEDE de continuar. Sobrou UM caso: modelos que não couberam no teto de
+   contexto. Os outros dois ramos ("nenhuma categoria" e a divergência espécie
+   × categoria) não foram removidos — o estado deles ficou inalcançável. */
 .mm-nota {
-  flex-basis: 100%;
   font-size: var(--fs-micro); line-height: 1.45;
   color: var(--warn-ink); background: var(--warn-bg);
   border: 1px solid var(--warn-line); border-radius: var(--r-tight);
-  padding: var(--sp-2) var(--sp-2b); margin-top: 2px;
+  padding: var(--sp-2) var(--sp-2b);
 }
 .mm-nota[hidden] { display: none; }
+/* O botão MANTÉM o rótulo em toda largura, ao contrário dos da barra de
+   ferramentas: um "+" sozinho não diz o que adiciona, e aqui não há o ícone
+   distintivo que torna os outros reconhecíveis sem texto. */
 .mm-add {
   flex: none; display: inline-flex; align-items: center; gap: 5px;
   border: 1px solid var(--pje); background: var(--surface); color: var(--pje-2);
@@ -4834,12 +4847,14 @@ button > svg { flex: none; }
 }
 .mm-add:hover { background: var(--accent-bg); }
 .mm-add[hidden] { display: none; }
-/* No estreito o botão MANTÉM o rótulo, ao contrário dos da barra de
-   ferramentas: um "+" sozinho ao lado de uma frase não diz o que adiciona, e
-   aqui não há o ícone distintivo que torna os outros reconhecíveis sem texto.
-   Quem cede espaço é a frase, que encolhe e quebra — o `flex-wrap` do
-   container deixa o botão descer para a linha seguinte se precisar. */
-.wrap.estreito .mm-vazio { font-size: var(--fs-micro); }
+
+/* No ESTREITO (420px, o modo padrão) a espécie e a caixa de modelos não cabem
+   lado a lado: "Seguir as minhas 3 peças-modelo" sozinho passa de 200px. */
+/* No ESTREITO o rodape vira COLUNA: a linha "Redige" e o convite disputavam
+   os 420px e quebravam em tres linhas cada um. O botao nomeia a especie de
+   proposito — cadastrar "pecas-modelo" em abstrato nao diz de que. */
+.wrap.estreito .mb-pe { flex-direction: column; align-items: stretch; }
+.wrap.estreito .mm-add { font-size: var(--fs-micro); align-self: flex-start; }
 /* o botão Enviar vira "✍️ Gerar minuta" / "🧠 Gerar mapa" — halo azul para
    marcar a mudança (a classe .docx é histórica; vale para os dois modos) */
 .send.docx { box-shadow: var(--ring); }

@@ -29,6 +29,7 @@ const CATALOGO = [
   { t: "t-worker" },
   { t: "t-openrouter" },
   { t: "t-curadoria" },
+  { t: "t-minutabar" },
   { t: "t-temas" },
   { t: "t-template-crase" },
   { t: "t-temas-coerencia" },

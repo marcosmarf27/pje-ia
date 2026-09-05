@@ -1024,12 +1024,31 @@ var PjePanel = (function () {
                    de bater com a ordem causal. -->
               <div class="status" aria-live="polite"></div>
               <div class="alertbar" role="alert" hidden></div>
+              <!-- A BARRA DE MINUTA É UMA COLUNA DE TRÊS PERGUNTAS, e a ordem
+                   delas é causal: que ato -> qual a decisão -> gerar. A espécie
+                   vem ANTES da tese porque é ela que decide se a tese é exigida
+                   e como o campo se chama; um campo que muda de nome conforme o
+                   seguinte não pode precedê-lo. -->
               <div class="minutabar" hidden>
-                <span class="docxbar-t">${SVG.minuta} <b>Modo minuta ligado</b> — revise a instrução abaixo e clique em <b>Gerar minuta</b>: a resposta abre num editor, em nova aba, pronta para revisar e levar ao PJe.</span>
-                <button class="minutabar-x" title="Cancelar a geração da minuta (Esc)">${SVG.x}</button>
-                <div class="minuta-ato">
-                  <span class="ma-lab">Espécie do ato:</span>
-                  <select class="minuta-ato-sel" aria-label="Espécie do ato a minutar" title="A espécie define se a extensão precisa da sua orientação antes de redigir: atos que decidem exigem a tese; expediente, não."></select>
+                <div class="mb-hd">
+                  <span class="docxbar-t">${SVG.minuta} <b>Minuta</b> — a resposta abre num editor, em nova aba.</span>
+                  <button class="minutabar-x" title="Cancelar a geração da minuta (Esc)">${SVG.x}</button>
+                </div>
+                <div class="minuta-linha">
+                  <div class="minuta-ato">
+                    <span class="ma-lab">Espécie</span>
+                    <select class="minuta-ato-sel" aria-label="Espécie do ato a minutar" title="A espécie define se a extensão precisa da sua orientação antes de redigir: atos que decidem exigem a tese; expediente, não."></select>
+                  </div>
+                  <!-- Era um <select> de categorias, e ele PERGUNTAVA O QUE A
+                       LINHA DE CIMA JÁ RESPONDEU: as categorias de peça-modelo
+                       têm os mesmos valores das espécies de ato. Dada a
+                       espécie, o conjunto de modelos está determinado (vão
+                       TODOS os daquela categoria), então o que sobra é um
+                       binário — seguir, ou não. -->
+                  <label class="minuta-modelo" hidden>
+                    <input type="checkbox" class="mm-chk" checked>
+                    <span class="mm-txt"></span>
+                  </label>
                 </div>
                 <div class="minuta-tese" hidden>
                   <label class="mt-lab">
@@ -1037,17 +1056,17 @@ var PjePanel = (function () {
                     <button class="mt-info" type="button" aria-label="Por que a extensão pede isto" title="Por que a extensão pede isto — Resolução CNJ 615/2025">${SVG.info}</button>
                   </label>
                   <textarea class="mt-txtarea" rows="2" spellcheck="true"></textarea>
-                  <span class="mt-nota" hidden></span>
-                  <button class="mt-analise" type="button" hidden title="Faz a pergunta no chat comum: a resposta é um estudo do que é cabível, com as origens e as ressalvas — não um ato pronto para assinar.">Analisar o que é cabível (no chat)</button>
+                  <div class="mt-pe">
+                    <span class="mt-nota" hidden></span>
+                    <button class="mt-analise" type="button" hidden title="Faz a pergunta no chat comum: a resposta é um estudo do que é cabível, com as origens e as ressalvas — não um ato pronto para assinar.">Analisar o que é cabível</button>
+                  </div>
                 </div>
-                <div class="minuta-modelo" hidden>
-                  <span class="mm-lab">Seguir modelos:</span>
-                  <select class="minuta-modelo-sel" aria-label="Categoria de peças-modelo que a minuta deve seguir" title="Escolha uma categoria: o assistente recebe as suas peças-modelo daquela espécie e segue a estrutura e o estilo da mais adequada ao caso — os fatos continuam vindo só das peças do processo."></select>
-                  <span class="mm-vazio" hidden>nenhuma cadastrada — a minuta sai no estilo padrão</span>
-                  <span class="mm-nota" hidden></span>
-                  <button class="mm-add" hidden title="Cadastre uma sentença, decisão, despacho ou ofício seu: nas próximas minutas o assistente segue a estrutura e o estilo dela.">${SVG.novo}<span class="lbl">Cadastrar</span></button>
+                <!-- Rodapé: o que a barra RELATA, e não o que ela pergunta. -->
+                <div class="mb-pe">
+                  <span class="perfil-nota" hidden></span>
+                  <button class="mm-add" hidden title="Cadastre uma sentença, decisão, despacho ou ofício seu: nas próximas minutas o assistente segue a estrutura e o estilo dela.">${SVG.novo}<span class="lbl">Cadastrar peças-modelo</span></button>
                 </div>
-                <div class="perfil-nota" hidden></div>
+                <div class="mm-nota" hidden></div>
               </div>
               <div class="mapabar" hidden>
                 <span class="docxbar-t">${SVG.mapa} <b>Modo mapa mental ligado</b> — revise a instrução abaixo e clique em <b>Gerar mapa</b>: a resposta vira um mapa mental interativo, que abre em nova aba.</span>
@@ -3192,35 +3211,57 @@ var PjePanel = (function () {
       return NOMES_MODELO[id] || id || "o modelo ativo";
     }
 
+    // DEIXOU DE SER AVISO E VIROU FATO (v0.61.0). Ela nasceu em âmbar e só
+    // aparecia quando o modelo era TROCADO — mas quem redige o ato é
+    // informação de primeira ordem para quem assina, e ficava invisível
+    // justamente em quem já configurou tudo certo. Hoje é uma linha neutra do
+    // rodapé, presente em todo o modo minuta, e o realce âmbar sobrou só para
+    // o que de fato é ressalva: a troca automática, que custa mais.
     function atualizarPerfilNota() {
       if (!perfilNota) return;
-      // Sem troca não há o que anunciar; sem info (caps ainda não chegaram) a
-      // nota não afirma nada — melhor calada que adivinhando.
-      if (!minutaMode || !minutaModeloInfo || !minutaModeloInfo.trocado) {
+      // Sem info (caps ainda não chegaram) a nota não afirma nada — melhor
+      // calada que adivinhando.
+      if (!minutaMode || !minutaModeloInfo || !minutaModeloInfo.model) {
         perfilNota.hidden = true;
         perfilNota.textContent = "";
-        return;
+          return;
       }
       const alvo = escapeHtml(nomeModelo(minutaModeloInfo.model));
-      const chat = escapeHtml(nomeModelo(minutaModeloInfo.modelChat || modeloAtualId));
       // Escolha MANUAL não recebe as afirmações do automático. "Mais adequado a
       // redigir" e "custa mais" descrevem a troca análise → redação; quem está
       // no Sol e fixa o Terra receberia as duas invertidas — o Terra não redige
       // melhor que o Sol, e custa menos. Aqui a extensão só relata o que vai
       // acontecer, que é tudo o que ela sabe.
-      perfilNota.innerHTML = minutaModeloInfo.fixado
-        ? "Esta minuta será redigida pelo <b>" +
-          alvo +
-          "</b>, que você fixou em <b>Modelo para minutas</b> nas opções — o chat " +
-          "segue no <b>" +
-          chat +
-          "</b>."
-        : "Esta minuta será redigida pelo <b>" +
-          alvo +
-          "</b> — mais adequado a redigir que o <b>" +
-          chat +
-          "</b>, que você usa no chat. Custa mais por minuta; para fixar outro, " +
-          "use <b>Modelo para minutas</b> nas opções da extensão.";
+      // O TEXTO É CURTO E A EXPLICAÇÃO VAI NO `title`: a justificativa da troca
+      // se lê UMA vez, e ela ocupava duas linhas do rodapé em toda minuta —
+      // no painel estreito, duas de um espaço que o chat perdeu.
+      let txt, dica;
+      if (!minutaModeloInfo.trocado) {
+        txt = "Redige: <b>" + alvo + "</b>";
+        dica = "O modelo que vai redigir esta minuta.";
+      } else if (minutaModeloInfo.fixado) {
+        txt = "Redige: <b>" + alvo + "</b> · fixado";
+        dica =
+          "Você fixou este modelo em «Modelo para minutas», nas opções — o chat segue no " +
+          nomeModelo(minutaModeloInfo.modelChat || modeloAtualId) + ".";
+      } else {
+        txt = "Redige: <b>" + alvo + "</b> · custa mais";
+        dica =
+          "Troca automática: este modelo é mais adequado a redigir que o " +
+          nomeModelo(minutaModeloInfo.modelChat || modeloAtualId) +
+          ", que você usa no chat, e custa mais por minuta. Para fixar outro, use " +
+          "«Modelo para minutas» nas opções.";
+      }
+      perfilNota.innerHTML = txt;
+      perfilNota.title = dica;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pn-troca";
+      b.textContent = "Mudar";
+      b.title = "Escolher o modelo que redige as minutas, nas opções da extensão";
+      b.addEventListener("click", () => configureCb && configureCb());
+      perfilNota.appendChild(document.createTextNode(" "));
+      perfilNota.appendChild(b);
       perfilNota.hidden = false;
     }
 
@@ -3242,7 +3283,10 @@ var PjePanel = (function () {
     const ESPECIES_ATO = [
       { valor: "sentenca", rotulo: "Sentença", regime: "tese", decide: true },
       { valor: "decisao", rotulo: "Decisão interlocutória / tutela", regime: "tese", decide: true },
-      { valor: "acordao", rotulo: "Acórdão / voto", regime: "tese", decide: true },
+      // `cat` só existe onde a categoria de peça-modelo NÃO é o próprio valor:
+      // a lista de MLIB.CATEGORIAS agrupa "Decisões, votos e acórdãos" numa só.
+      // É a fonte ÚNICA da tradução — um segundo mapa divergiria dela.
+      { valor: "acordao", rotulo: "Acórdão / voto", regime: "tese", decide: true, cat: "decisao" },
       { valor: "despacho", rotulo: "Despacho", regime: "sentido", decide: true },
       { valor: "oficio", rotulo: "Ofício", regime: "livre", decide: false },
       { valor: "mandado", rotulo: "Mandado / alvará", regime: "livre", decide: false },
@@ -3261,16 +3305,15 @@ var PjePanel = (function () {
         ph:
           "Ex.: Procedência parcial. Prescrição afastada (art. 206, §3º, V, CC — marco em " +
           "12/03/2023). Dano moral de R$ 8.000,00; dano material improcedente por falta de prova.",
-        falta:
-          "Informe a tese e o dispositivo: a Resolução CNJ 615 não admite que a IA " +
-          "decida o sentido do ato.",
+        // O texto é de APOIO, não de erro: no estado inicial nada está errado
+        // — o usuário ainda não escreveu. Uma caixa de aviso na primeira
+        // olhada acusa antes de o gesto acontecer.
+        falta: "A decisão é sua: a Res. CNJ 615 não deixa a IA decidir o sentido do ato.",
       },
       sentido: {
         rotulo: "O que determinar",
         ph: "Ex.: Expeça-se carta precatória para oitiva da testemunha X, em Fortaleza.",
-        falta:
-          "Diga o que determinar: a Resolução CNJ 615 não admite que a IA decida o " +
-          "sentido do ato.",
+        falta: "A determinação é sua: a Res. CNJ 615 não deixa a IA decidir por você.",
       },
     };
     const minutaAtoSel = $(".minuta-ato-sel");
@@ -3293,13 +3336,6 @@ var PjePanel = (function () {
     // Escolha MANUAL da espécie: a partir dela a detecção automática pela
     // instrução para de sobrescrever o que o usuário decidiu.
     let atoTocado = false;
-    // O mesmo para a CATEGORIA de peças-modelo. Sem distinguir escolha manual
-    // de auto-seleção, o valor anterior do <select> vencia a detecção e nunca
-    // era limpo: quem gerava uma sentença e depois pedia um despacho recebia,
-    // calado, os modelos de sentença. Declarada aqui (e não no bloco do MLIB,
-    // ~2 mil linhas abaixo) porque `setMinutaMode` a escreve.
-    let catModeloTocada = false;
-
     // Estado do botão Enviar: DUAS fontes independentes o desabilitam — o turno
     // em andamento (lockInput) e a falta de orientação. Sem um ponto único,
     // quem escrevesse por último venceria: sair do modo minuta reabilitaria o
@@ -3313,6 +3349,12 @@ var PjePanel = (function () {
 
     function especieDe(valor) {
       return ESPECIES_ATO.find((e) => e.valor === valor) || null;
+    }
+
+    // A categoria de peças-modelo da espécie escolhida. Ver o comentário do
+    // `cat` em ESPECIES_ATO: identidade, menos no acórdão.
+    function categoriaDaEspecie(esp) {
+      return esp ? esp.cat || esp.valor : "";
     }
 
     // Fonte ÚNICA da regra, lida pelo doSend, pelo gate do botão e pela nota.
@@ -3424,8 +3466,9 @@ var PjePanel = (function () {
         atoTocado = false;
         if (minutaAtoSel) minutaAtoSel.value = "";
         if (minutaTeseTxt) minutaTeseTxt.value = "";
-        if (minutaModeloSel) minutaModeloSel.value = "";
-        catModeloTocada = false;
+        // Volta a MARCADO: seguir os próprios modelos é o mecanismo, e o
+        // desmarcado é a exceção daquele turno.
+        if (minutaModeloChk) minutaModeloChk.checked = true;
       }
       atualizarPerfilNota();
       atualizarLinhaTese();
@@ -3435,16 +3478,17 @@ var PjePanel = (function () {
       minutaAtoSel.addEventListener("change", () => {
         atoTocado = true;
         atualizarLinhaTese();
-        // A divergência espécie × categoria dos modelos muda com este gesto.
-        atualizarNotaModelos();
+        // A espécie É a categoria dos modelos: trocá-la troca o conjunto que
+        // vai no contexto, a contagem da caixa e a existência dela.
+        atualizarSeletorMinuta(minutaMode);
       });
     }
-    // Re-detecta espécie e categoria enquanto o usuário DIGITA a instrução.
-    // Antes a detecção rodava só ao ligar o modo, então quem ligava com o campo
-    // vazio (ou com um prompt salvo ativo, que suprime a instrução padrão) e só
+    // Re-detecta a ESPÉCIE enquanto o usuário DIGITA a instrução. Antes a
+    // detecção rodava só ao ligar o modo, então quem ligava com o campo vazio
+    // (ou com um prompt salvo ativo, que suprime a instrução padrão) e só
     // depois escrevia "sentença de improcedência" nunca via a pré-seleção
-    // acontecer. Debounce porque `input` dispara a cada tecla e
-    // `popularSeletorModelos` reconstrói o <select>.
+    // acontecer. Debounce porque `input` dispara a cada tecla e a espécie
+    // decide também o conjunto de peças-modelo do turno.
     let tDetectar = 0;
     inEl.addEventListener("input", () => {
       if (!minutaMode) return;
@@ -3455,8 +3499,8 @@ var PjePanel = (function () {
         if (!atoTocado && minutaAtoSel && cat && especieDe(cat)) {
           minutaAtoSel.value = cat;
           atualizarLinhaTese();
+          atualizarSeletorMinuta(true);
         }
-        if (!catModeloTocada) atualizarSeletorMinuta(true);
       }, 320);
     });
     if (minutaTeseAlt) {
@@ -5836,8 +5880,8 @@ var PjePanel = (function () {
     const mlibCnt = $(".mlib-cnt");
     const mlibErr = $(".mlib-err");
     const minutaModeloWrap = $(".minuta-modelo");
-    const minutaModeloSel = $(".minuta-modelo-sel");
-    const minutaModeloVazio = $(".mm-vazio");
+    const minutaModeloChk = $(".mm-chk");
+    const minutaModeloTxt = $(".mm-txt");
     const minutaModeloAdd = $(".mm-add");
 
     let modelosLib = []; // espelho ordenado de MLIB.listar
@@ -5928,36 +5972,11 @@ var PjePanel = (function () {
     // Reconstrói o <select> do modo minuta: uma opção por CATEGORIA que tenha
     // modelos, com a contagem. Preserva a escolha MANUAL anterior; sem ela,
     // pré-seleciona pela categoria detectada na instrução.
-    function popularSeletorModelos(preselCat) {
-      if (!minutaModeloSel) return;
-      const anterior = minutaModeloSel.value; // valor = categoria
-      minutaModeloSel.innerHTML = "";
-      const nenhum = document.createElement("option");
-      nenhum.value = "";
-      nenhum.textContent = "— nenhum (estilo padrão) —";
-      minutaModeloSel.appendChild(nenhum);
-      const comModelo = new Set();
-      for (const cat of MLIB.CATEGORIAS) {
-        const n = modelosLib.filter((m) => (m.categoria || "outro") === cat.valor).length;
-        if (!n) continue;
-        comModelo.add(cat.valor);
-        const op = document.createElement("option");
-        op.value = cat.valor;
-        op.textContent = cat.rotulo + " (" + n + ")";
-        minutaModeloSel.appendChild(op);
-      }
-      // A escolha MANUAL vence a detecção; a auto-seleção, não. Enquanto os
-      // dois casos eram o mesmo `anterior`, o valor auto-selecionado numa
-      // minuta grudava e nunca era limpo: quem gerava uma sentença e depois
-      // pedia um despacho recebia, calado, os modelos de sentença.
-      if (catModeloTocada && anterior && comModelo.has(anterior))
-        minutaModeloSel.value = anterior;
-      else if (preselCat && comModelo.has(preselCat)) minutaModeloSel.value = preselCat;
-      // sem categoria detectada e só UMA categoria com modelos: pré-seleciona
-      // essa — a feature "acontece" sem exigir um clique a mais (o usuário
-      // ainda pode voltar para "nenhum")
-      else if (comModelo.size === 1) minutaModeloSel.value = comModelo.values().next().value;
-      else minutaModeloSel.value = "";
+    // A categoria de peças-modelo do turno: SEMPRE a da espécie escolhida.
+    // Não há mais escolha a fazer aqui — ver o comentário do `.minuta-modelo`
+    // no markup.
+    function catDosModelos() {
+      return categoriaDaEspecie(especieDe(minutaAtoSel ? minutaAtoSel.value : ""));
     }
 
     // Modelos enviados por minuta: TODOS os da categoria escolhida, do mais
@@ -6017,43 +6036,28 @@ var PjePanel = (function () {
         nota.hidden = !t;
       };
       if (!minutaMode || !minutaModeloWrap || minutaModeloWrap.hidden) return dizer("");
-      // Biblioteca vazia: a .mm-vazio ao lado já explica e já oferece a saída.
-      if (!modelosLib.length || !minutaModeloSel || minutaModeloSel.hidden) return dizer("");
-      const cat = minutaModeloSel.value;
-      if (!cat) {
-        return dizer(
-          "Nenhuma categoria escolhida: a minuta sai no estilo padrão, sem seguir as suas peças-modelo."
-        );
-      }
-      const { out, total } = selecaoDeModelos(cat);
-      const partes = [];
-      if (total > out.length) {
-        partes.push(
-          out.length + " de " + total + " peças-modelo desta categoria cabem no contexto; " +
-            "as demais ficam de fora (as mais recentes entram primeiro)."
-        );
-      }
-      // A espécie do ato e a categoria dos modelos são <select> INDEPENDENTES:
-      // dá para pedir "Sentença" e mandar modelos de "Despachos". Pode ser
-      // deliberado — por isso não bloqueia —, mas calado vira defeito.
-      const ato = minutaAtoSel && minutaAtoSel.value;
-      if (ato && cat !== ato && MLIB.CATEGORIAS.some((c) => c.valor === ato)) {
-        const esp = ESPECIES_ATO.find((e) => e.valor === ato);
-        partes.push(
-          "O ato é " + ((esp && esp.rotulo) || ato) + " e os modelos são de " +
-            MLIB.rotuloCategoria(cat) + "."
-        );
-      }
-      dizer(partes.join(" "));
+      if (minutaModeloChk && !minutaModeloChk.checked) return dizer("");
+      // SOBROU UM RAMO SÓ, e os outros dois não foram "removidos": o estado
+      // deles ficou inalcançável. "Nenhuma categoria escolhida" avisava sobre o
+      // padrão (ruído puro), e a divergência espécie × categoria não pode mais
+      // existir — a categoria É a da espécie. O teto continua, porque ele é a
+      // única coisa aqui que o usuário não tem como saber sozinho.
+      const { out, total } = selecaoDeModelos(catDosModelos());
+      dizer(
+        total > out.length
+          ? out.length + " de " + total + " peças-modelo desta categoria cabem no contexto; " +
+              "as demais ficam de fora (as mais recentes entram primeiro)."
+          : ""
+      );
     }
 
     function modelosMinutaSelecionados() {
-      if (!minutaModeloSel || !minutaModeloWrap || minutaModeloWrap.hidden) return [];
-      // A linha aparece também no estado VAZIO (só o convite para cadastrar):
-      // ali o <select> está oculto e não há o que enviar. Sem esta guarda a
-      // função dependeria de o select estar sem opções para devolver [].
-      if (minutaModeloSel.hidden) return [];
-      const cat = minutaModeloSel.value;
+      if (!minutaModeloWrap || minutaModeloWrap.hidden) return [];
+      // A linha só aparece quando existe modelo naquela categoria, então
+      // "oculta" e "desmarcada" são as duas — e as únicas — razões de não haver
+      // o que enviar.
+      if (minutaModeloChk && !minutaModeloChk.checked) return [];
+      const cat = catDosModelos();
       if (!cat) return [];
       const { out, total } = selecaoDeModelos(cat);
       // "sem cap silencioso": o corte agora vai à UI (atualizarNotaModelos), e o
@@ -6070,41 +6074,52 @@ var PjePanel = (function () {
       return out;
     }
 
-    // Mostra/esconde e popula o seletor conforme o modo minuta, a existência de
-    // modelos e o modelo ativo (só 1M). Chamada por setMinutaMode, pelo aoMudar
-    // do MLIB e por setModelosHabilitado.
-    // Biblioteca VAZIA não esconde a linha: mostra o convite. Sumir era o
-    // defeito — quem nunca cadastrou um modelo ligava o modo minuta e não via
-    // vestígio nenhum de que a feature existe, concluindo (com razão) que ela
-    // não estava lá. É a mesma regra da `.sel-nota` nos degraus de seleção:
-    // conjunto vazio se explica, não desaparece. O gate de janela (1M) e a
-    // ausência do MLIB continuam escondendo tudo — ali o botão da barra de
-    // ferramentas, desabilitado com tooltip, já é a explicação.
+    // Mostra/esconde a caixa "seguir os meus modelos" conforme o modo minuta, a
+    // ESPÉCIE escolhida, a existência de modelos NAQUELA categoria e o modelo
+    // ativo (só 1M). Chamada por setMinutaMode, pelo change da espécie, pelo
+    // aoMudar do MLIB e por setModelosHabilitado.
+    //
+    // REVISÃO DE DECISÃO (v0.61.0, pedida pelo usuário): a regra anterior era
+    // "a linha NUNCA some por biblioteca vazia", para quem nunca cadastrou não
+    // concluir que a feature não existe. A affordance CONTINUA — o que aparece
+    // ali é o "+ Cadastrar peças-modelo", no rodapé da barra. O que sai é o
+    // campo vazio: um seletor sem opção nenhuma é pior que um convite. O gate
+    // de janela (1M) e a ausência do MLIB continuam escondendo tudo, e ali o
+    // botão da barra de ferramentas, desabilitado com tooltip, é a explicação.
     function atualizarSeletorMinuta(on) {
       if (!minutaModeloWrap) return;
-      if (!on || !temMlib || !modelosHabilitado) {
-        minutaModeloWrap.hidden = true;
-        atualizarNotaModelos();
-        return;
+      const desligado = !on || !temMlib || !modelosHabilitado;
+      const cat = desligado ? "" : catDosModelos();
+      // Sem espécie escolhida não há categoria, e portanto nada a afirmar —
+      // nem a caixa nem o convite, que nomeia a espécie.
+      const n = cat ? modelosLib.filter((m) => (m.categoria || "outro") === cat).length : 0;
+      minutaModeloWrap.hidden = !n;
+      if (n && minutaModeloTxt) {
+        const rot = MLIB.rotuloCategoria(cat);
+        minutaModeloTxt.textContent =
+          "Seguir " + (n === 1 ? "a minha peça-modelo" : "as minhas " + n + " peças-modelo");
+        minutaModeloWrap.title =
+          "O assistente recebe " + (n === 1 ? "a sua peça-modelo" : "as suas " + n + " peças-modelo") +
+          " de " + rot + " e segue a estrutura e o estilo da mais adequada ao caso — os fatos " +
+          "continuam vindo só das peças do processo.";
       }
-      const vazio = !modelosLib.length;
-      if (minutaModeloVazio) minutaModeloVazio.hidden = !vazio;
-      if (minutaModeloAdd) minutaModeloAdd.hidden = !vazio;
-      minutaModeloSel.hidden = vazio;
-      if (!vazio) popularSeletorModelos(detectarCategoria(inEl.value));
-      minutaModeloWrap.hidden = false;
+      if (minutaModeloAdd) {
+        minutaModeloAdd.hidden = !(!desligado && cat && !n);
+        if (!minutaModeloAdd.hidden) {
+          const lbl = minutaModeloAdd.querySelector(".lbl");
+          if (lbl) lbl.textContent = "Cadastrar peças-modelo de " + MLIB.rotuloCategoria(cat);
+        }
+      }
       atualizarNotaModelos();
     }
     // Atalho do estado vazio: abre o gerenciador já no formulário — o caminho
     // até aqui (barra de ferramentas → Modelos → Novo) é justamente o que
     // ninguém percorre sem saber que existe.
-    // Escolha manual da categoria: a partir daqui a detecção pela instrução
-    // para de sobrescrevê-la (ver `catModeloTocada` no bloco do modo minuta).
-    if (minutaModeloSel) {
-      minutaModeloSel.addEventListener("change", () => {
-        catModeloTocada = true;
-        atualizarNotaModelos();
-      });
+    // Desmarcar é decisão do turno e não vai ao storage: ela vale para ESTA
+    // minuta, e uma preferência persistida faria a próxima sair sem os modelos
+    // sem ninguém ter pedido — o mesmo defeito que a categoria "grudada" tinha.
+    if (minutaModeloChk) {
+      minutaModeloChk.addEventListener("change", atualizarNotaModelos);
     }
     if (minutaModeloAdd) {
       minutaModeloAdd.addEventListener("click", (e) => {
