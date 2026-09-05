@@ -15,9 +15,14 @@
         - o CSS do painel é injetado como TEXTO, então uma url() relativa
           resolveria contra o host do tribunal e daria 404 mudo.
 
-   Newsreader e IBM Plex Sans são VARIABLE fonts: um arquivo cobre 400–600, e é
-   por isso que há um só .woff2 para os três pesos. IBM Plex Mono é estática,
-   daí os dois arquivos. Todas SIL OFL — ver vendor/LICENSES.md.
+   Geist e Inter são VARIABLE fonts: um arquivo cobre 300–700, e é por isso que
+   há um só .woff2 para todos os pesos. JetBrains Mono é estática, daí os dois
+   arquivos. Todas SIL OFL — ver vendor/LICENSES.md.
+
+   Newsreader e IBM Plex continuam declaradas enquanto houver consumidor de
+   `--ff-serif` nas telas satélites (editor, modelos). Saem quando o último
+   sair — apagar um .woff2 com consumidor vivo degrada para Georgia em
+   silêncio, que é o pior tipo de regressão visual.
    Subset `latin` (U+0000–00FF), que cobre toda a acentuação do português. */
 
 @font-face {
@@ -54,4 +59,42 @@
   font-weight: 500;
   font-display: swap;
   src: url("../vendor/fontes/plexmono-500.woff2") format("woff2");
+}
+
+/* ---------------------------------------------------------------------------
+   v0.60 — as três famílias do redesign.
+
+   Geist para TÍTULO (geométrica e neutra: dá hierarquia sem ornamento, e é o
+   que substituiu a serif do refinamento institucional), Inter para INTERFACE
+   (x-height alto, figuras tabulares, pensada para densidade) e JetBrains Mono
+   para o que o usuário COMPARA OU COPIA — id da peça, número CNJ, <kbd>,
+   eyebrow. Ver DESIGN.md §3.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("../vendor/fontes/geist.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("../vendor/fontes/inter.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../vendor/fontes/jetbrainsmono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../vendor/fontes/jetbrainsmono-500.woff2") format("woff2");
 }

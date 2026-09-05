@@ -388,6 +388,19 @@ var PjePanel = (function () {
     malote: '<path d="M3 8h18v12H3z"/><path d="M3 8l9 6 9-6"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/>',
     // caret para baixo — abre o menu do split button de download
     caret: '<path d="M6 9l6 6 6-6"/>',
+    // v0.60 — os ícones que o esqueleto novo pediu.
+    // `config` é a engrenagem do popover de Exibição; `pasta` abre a coluna de
+    // peças; `setaDir` é a seta que desliza 2px no hover dos cartões de ação;
+    // `linhaTempo` é a aba de movimentações; `raio`/`livro` fecham os três
+    // cartões de passo (o desenho de referência usa emoji ali, e o §7 do
+    // DESIGN.md proíbe emoji na interface).
+    config: '<circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+    pasta: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.4h7A1.5 1.5 0 0 1 19 9.9v7.6a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 3 17.5z"/>',
+    setaDir: '<path d="M5 12h13"/><path d="M12.5 6l6 6-6 6"/>',
+    arroba: '<circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.4v4.8a2.4 2.4 0 0 0 4.8 0V12a8.4 8.4 0 1 0-3.3 6.7"/>',
+    linhaTempo: '<path d="M3 17l4.5-5 3.5 3.5L15 10l6 6"/><path d="M3 20h18"/>',
+    raio: '<path d="M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"/>',
+    livro: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2.5 2.5 0 0 1 2 1 2.5 2.5 0 0 1 2-1h4.5A1.5 1.5 0 0 1 20 5.5v11a1.5 1.5 0 0 1-1.5 1.5H14a2.5 2.5 0 0 0-2 1 2.5 2.5 0 0 0-2-1H5.5A1.5 1.5 0 0 1 4 16.5z"/><path d="M12 5v14"/>',
     // escudo com check — anonimização antes do envio (TecJustiça Sigilo). Escudo
     // e não cadeado: cadeado já é o ícone de "a chave fica neste navegador" no
     // popup, e são garantias diferentes (uma guarda o segredo, a outra protege
@@ -468,6 +481,13 @@ var PjePanel = (function () {
     extrairTexto: ic(P.extrairTexto, 13, 2),
     malote: ic(P.malote, 14, 1.9),
     caret: ic(P.caret, 11, 2.2),
+    config: ic(P.config, 15, 1.7),
+    pasta: ic(P.pasta, 16, 1.8),
+    setaDir: ic(P.setaDir, 16, 1.9),
+    arroba: ic(P.arroba, 15, 1.8),
+    linhaTempo: ic(P.linhaTempo, 15, 1.8),
+    raio: ic(P.raio, 17, 1.8),
+    livro: ic(P.livro, 17, 1.8),
     play: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l10 7-10 7z"/></svg>',
     escudo: ic(P.escudo, 14, 1.8),
   };
@@ -791,10 +811,28 @@ var PjePanel = (function () {
 
   // Exemplos do estado vazio: clicar PREENCHE o campo (não envia — sem peça
   // marcada o envio falharia). Ensinam o gesto sem gastar um parágrafo.
+  // Os exemplos deixaram de ser chips com a frase inteira e viraram CARTÕES:
+  // título curto para varrer (ninguém lê três frases longas — procura a que
+  // parece a sua) e uma linha de apoio que diz o que vem de volta. O `texto` é
+  // o que de fato entra no campo, e continua sendo a fonte de verdade: o clique
+  // PREENCHE, nunca envia — sem peça marcada o envio falharia, e a primeira
+  // experiência de quem chega seria um erro.
   const EXEMPLOS = [
-    "Resuma a petição inicial e a contestação",
-    "Monte a linha do tempo dos atos do processo",
-    "Quais as teses da defesa e as provas que as sustentam?",
+    {
+      titulo: "Resumir inicial e contestação",
+      apoio: "confronto de teses e o que é incontroverso",
+      texto: "Resuma a petição inicial e a contestação",
+    },
+    {
+      titulo: "Montar a linha do tempo",
+      apoio: "cronologia dos atos, com data e peça de origem",
+      texto: "Monte a linha do tempo dos atos do processo",
+    },
+    {
+      titulo: "Mapear teses e provas",
+      apoio: "o que a defesa alega e o que sustenta cada ponto",
+      texto: "Quais as teses da defesa e as provas que as sustentam?",
+    },
   ];
 
   // Formata um valor em dólares para exibição (vírgula decimal pt-BR).
@@ -878,28 +916,47 @@ var PjePanel = (function () {
       <button class="launcher"><span class="sc">${SVG.prompts}</span> Analisar com IA</button>
       <div class="panel">
         <div class="hd">
-          <span class="mark"><img src="${iconUrl}" alt=""></span>
-          <span class="tit-wrap">
+          <div class="hd-marca">
+            <span class="mark"><img src="${iconUrl}" alt=""></span>
             <span class="ttl">Assistente dos Autos</span>
-            <span class="cnj-row">
-              <span class="cnj" title="Número do processo em análise"></span>
-              <button class="sigselo" hidden aria-expanded="false">${SVG.tarja}<span class="ss-a"></span><span class="ss-t"></span><span class="ss-n"></span></button>
-            </span>
-          </span>
-          <div class="hd-grp">
-            <button class="dl" title="Baixar a conversa em arquivo (.md)" aria-label="Baixar a conversa em arquivo">${SVG.download}</button>
-            <button class="convs" title="Conversas guardadas deste processo" aria-label="Conversas guardadas deste processo" aria-haspopup="true" aria-expanded="false" hidden>${SVG.convs}<span class="convs-n" aria-hidden="true"></span></button>
+          </div>
+          <div class="hd-processo" hidden>
+            <span class="hp-dot" title="Sessão do PJe ativa"></span>
+            <span class="cnj" title="Número do processo em análise"></span>
+            <span class="hp-trib"></span>
+            <button class="hp-copiar" title="Copiar o número do processo" aria-label="Copiar o número do processo">${SVG.copy}</button>
+          </div>
+          <nav class="hd-nav" role="tablist" aria-label="Seções do painel">
+            <button class="hn-i" role="tab" data-view="chat" aria-selected="true">${SVG.prompts}<span class="lbl">Chat</span></button>
+            <button class="hn-i" role="tab" data-view="tempo" aria-selected="false">${SVG.linhaTempo}<span class="lbl">Linha do tempo</span></button>
+            <button class="hn-i hn-fora" data-abre="minutas" title="Abre as suas minutas guardadas em outra aba">${SVG.minuta}<span class="lbl">Minutas</span><span class="hn-ext" aria-hidden="true">↗</span></button>
+            <button class="hn-i hn-fora" data-abre="config" title="Abre as configurações da extensão em outra aba">${SVG.config}<span class="lbl">Configurações</span><span class="hn-ext" aria-hidden="true">↗</span></button>
+          </nav>
+          <div class="hd-acoes">
+            <button class="sigselo" hidden aria-expanded="false">${SVG.tarja}<span class="ss-a"></span><span class="ss-t"></span><span class="ss-n"></span></button>
+            <span class="hd-sep" aria-hidden="true"></span>
             <button class="reset" title="Nova conversa — a atual fica guardada na lista ao lado" aria-label="Nova conversa">${SVG.reset}</button>
-          </div>
-          <div class="hd-grp">
+            <button class="convs" title="Conversas guardadas deste processo" aria-label="Conversas guardadas deste processo" aria-haspopup="true" aria-expanded="false" hidden>${SVG.convs}<span class="convs-n" aria-hidden="true"></span></button>
             <button class="tema" title="Aparência do painel" aria-label="Aparência do painel" aria-haspopup="true" aria-expanded="false">${SVG.tema}</button>
-            <button class="docsvis" title="Ocultar a lista de peças (mais espaço para o chat)" aria-label="Ocultar ou exibir a lista de peças" aria-pressed="false">${SVG.docshide}</button>
-            <button class="expand" title="Painel largo (mostra as peças na lateral)" aria-label="Painel largo">${SVG.expand}</button>
-            <button class="side" title="Painel lateral (mantém o processo visível ao lado)" aria-label="Painel lateral">${SVG.side}</button>
-            <button class="free" title="Janela livre (arraste pelo título; redimensione pelo canto inferior direito)" aria-label="Janela livre">${SVG.free}</button>
-            <button class="fs" title="Tela cheia" aria-label="Tela cheia">${SVG.fs}</button>
+            <button class="exibicao" title="Exibição: tamanho da janela, lista de peças e download da conversa" aria-label="Opções de exibição" aria-haspopup="true" aria-expanded="false">${SVG.config}</button>
+            <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
           </div>
-          <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
+        </div>
+        <!-- O POPOVER DE EXIBIÇÃO. Os botões aqui dentro são os MESMOS de antes
+             — mesma classe, mesmo handler, mesmo estado — só que agora com
+             RÓTULO. Cinco glifos sem nome no cabeçalho eram o que o "não me faça
+             pensar" chama de atrito: um menu que diz "Lateral" é mais
+             descobrível que um ícone que insinua. -->
+        <div class="exibbox" hidden role="menu" aria-label="Exibição">
+          <div class="exib-t">Tamanho da janela</div>
+          <button class="exib-i flutuante" role="menuitemradio" aria-checked="true">${SVG.sideL}<span class="lbl">Flutuante</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i side" role="menuitemradio" aria-checked="false">${SVG.side}<span class="lbl">Lateral</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i free" role="menuitemradio" aria-checked="false">${SVG.free}<span class="lbl">Janela livre</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i expand" role="menuitemradio" aria-checked="false">${SVG.expand}<span class="lbl">Largo</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i fs" role="menuitemradio" aria-checked="false">${SVG.fs}<span class="lbl">Tela cheia</span><span class="exib-ck">${SVG.check}</span></button>
+          <div class="exib-sep" role="separator"></div>
+          <button class="exib-i docsvis" role="menuitemcheckbox" aria-checked="false" aria-pressed="false">${SVG.docshide}<span class="lbl">Ocultar as peças</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i dl" role="menuitem">${SVG.download}<span class="lbl">Baixar a conversa (.md)</span></button>
         </div>
         <div class="content">
           <button type="button" class="docs-rail" title="Exibir a lista de peças" aria-label="Exibir a lista de peças">
@@ -910,6 +967,7 @@ var PjePanel = (function () {
           <div class="docs">
             <div class="docs-hd">
               <div class="dh-row">
+                <span class="dh-ico" aria-hidden="true">${SVG.pasta}</span>
                 <strong>Peças do processo</strong>
                 <span class="count"></span>
                 <button type="button" class="docs-fold" title="Ocultar a lista de peças (mais espaço para o chat)" aria-label="Ocultar a lista de peças">${SVG.fold}</button>
@@ -933,6 +991,19 @@ var PjePanel = (function () {
             </div>
             <div class="naosup" role="note" hidden></div>
             <div class="doclist" title="Arraste para marcar várias peças · Shift+clique marca até aqui · botão direito abre “marcar daqui para baixo/cima”"></div>
+            <div class="docs-ft">
+              <!-- O MEDIDOR DE CONTEXTO mudou de lugar: vivia no rodapé do chat
+                   e passou a viver ao lado das peças, que é onde a pergunta
+                   dele ("cabe mais peça?") tem resposta. Com a lista colapsada
+                   ele iria junto, e por isso a .docs-rail passou a carregar a
+                   porcentagem — um medidor que some não mede. -->
+              <div class="gauge" hidden title="${GAUGE_TITLE}">
+                <div class="g-lin">
+                  <span class="g-rot">Contexto</span>
+                  <span class="gauge-txt"><span class="g-full"></span><span class="g-short"></span></span>
+                </div>
+                <div class="gauge-bar"><div class="gauge-fill"></div></div>
+              </div>
             <div class="docs-tip">
               <span class="tip-i" role="note" tabindex="0" title="${TIP_PADRAO_ATTR}" aria-label="${TIP_PADRAO_ATTR}">!</span>
               <span class="tip-txt"></span>
@@ -944,58 +1015,17 @@ var PjePanel = (function () {
                 <button type="button" class="tip-zip-mais" aria-haspopup="menu" aria-expanded="false" title="Outras formas de baixar — inclusive o pacote pronto de carta precatória" aria-label="Outras formas de baixar">${SVG.caret}</button>
               </span>
             </div>
+            </div>
           </div>
           <div class="main">
             <div class="msgs"></div>
             <div class="ft">
-              <div class="mention" hidden>
-                <div class="mention-hd">
-                  <span>Adicionar peça ao contexto</span>
-                  <span class="mention-keys"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> marcar <kbd>esc</kbd> fechar</span>
-                </div>
-                <div class="mention-q" aria-hidden="true">
-                  ${SVG.lupa}<span class="mq-t"></span><span class="mq-caret"></span><span class="mq-n"></span>
-                </div>
-                <div class="mention-list" role="listbox"></div>
-              </div>
-              <div class="slash" hidden>
-                <div class="slash-hd">
-                  <span>Inserir prompt salvo</span>
-                  <span class="mention-keys"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> inserir <kbd>esc</kbd> fechar</span>
-                </div>
-                <div class="mention-q" aria-hidden="true">
-                  ${SVG.lupa}<span class="mq-t"></span><span class="mq-caret"></span><span class="mq-n"></span>
-                </div>
-                <div class="slash-list" role="listbox"></div>
-              </div>
+              <!-- O QUE PRECEDE A CAIXA. Estes blocos mudam o que o Enviar FAZ
+                   (modo minuta, modo mapa, prompt ativo) ou impedem de enviar
+                   (a barra de alerta), então precedem — a ordem de leitura tem
+                   de bater com a ordem causal. -->
               <div class="status" aria-live="polite"></div>
               <div class="alertbar" role="alert" hidden></div>
-              <div class="ctxbar" hidden></div>
-              <div class="toolbar">
-                <div class="tools">
-                  <button class="tgl-search" aria-pressed="false" title="Liga/desliga a busca de jurisprudência e legislação em fontes oficiais (STF, STJ, Planalto…). Com a busca ligada, escreva a pergunta e use o botão Enviar normalmente.">${SVG.juris}<span class="lbl">Jurisprudência</span></button>
-                  <button class="tgl-sigilo" aria-pressed="false" title="Modo sigiloso: as peças deixam de ser enviadas como ARQUIVO e passam a ser enviadas como texto com nomes, CPF, OAB, endereços e o número do processo substituídos por rótulos ([PESSOA_1]). Todo o reconhecimento acontece no seu computador; o PDF não sai da máquina. Exigido pelo art. 19, §3º, IV da Resolução CNJ 615/2025 para processo em segredo de justiça.">${SVG.tarja}<span class="lbl">Sigiloso</span></button>
-                  <button class="btn-minuta" title="Liga o modo minuta: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar minuta” — a resposta abre num editor de texto, em nova aba, de onde você copia para o PJe, baixa em Word (.docx) ou imprime.">${SVG.minuta}<span class="lbl">Minutar</span></button>
-                  <button class="btn-mapa" title="Liga o modo mapa mental: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar mapa” — a resposta abre num mapa mental interativo, em nova aba.">${SVG.mapa}<span class="lbl">Mapa mental</span></button>
-                  <button class="btn-plib" title="Seus prompts salvos: crie instruções reutilizáveis (título + texto) e insira-as na conversa digitando “/” no início do campo de mensagem. Sincronizam entre navegadores logados na mesma conta Google.">${SVG.prompts}<span class="lbl">Prompts</span></button>
-                  <button class="btn-mlib" title="Seus modelos de peças (sentenças, decisões, despachos, ofícios…): cadastre várias por categoria e, ao gerar uma minuta, escolha a categoria para o assistente seguir a estrutura e o estilo dos seus modelos — os fatos continuam saindo só das peças do processo.">${SVG.modelos}<span class="lbl">Modelos</span></button>
-                </div>
-                <div class="metarow">
-                  <div class="gauge" hidden title="${GAUGE_TITLE}">
-                    <div class="gauge-bar"><div class="gauge-fill"></div></div>
-                    <span class="gauge-txt"><span class="g-full"></span><span class="g-short"></span></span>
-                  </div>
-                  <div class="custo" hidden>
-                    <span class="custo-txt"><span class="g-full"></span><span class="g-short"></span></span>
-                  </div>
-                  <button class="linhatempo" hidden aria-expanded="false">
-                    ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
-                  </button>
-                  <button class="selo-sigilo" hidden aria-expanded="false">${SVG.tarja}<span class="sl-l"></span><span class="sl-s"></span></button>
-                  <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
-                  <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
-                </div>
-              </div>
               <div class="minutabar" hidden>
                 <span class="docxbar-t">${SVG.minuta} <b>Modo minuta ligado</b> — revise a instrução abaixo e clique em <b>Gerar minuta</b>: a resposta abre num editor, em nova aba, pronta para revisar e levar ao PJe.</span>
                 <button class="minutabar-x" title="Cancelar a geração da minuta (Esc)">${SVG.x}</button>
@@ -1026,14 +1056,71 @@ var PjePanel = (function () {
                 <button class="mapabar-x" title="Cancelar a geração do mapa mental (Esc)">${SVG.x}</button>
               </div>
               <div class="promptbar" hidden></div>
-              <div class="anexosbar" hidden></div>
-              <div class="inrow">
-                <button class="attach" title="Anexar arquivos (PDF, Word .docx, RTF, TXT ou Markdown) para analisar junto das peças — ou sozinhos" aria-label="Anexar arquivos">${SVG.clip}</button>
-                <input type="file" class="attach-input" accept=".pdf,.docx,.rtf,.txt,.md,.markdown,text/plain,text/markdown,text/rtf,application/rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden aria-hidden="true">
-                <textarea class="in" rows="1" placeholder="Pergunte sobre as peças… (@ cita uma peça · 📎 anexa arquivo)"></textarea>
-                <button class="send"><span class="lbl">Enviar</span>${SVG.enviar}</button>
+
+              <!-- A CAIXA. Três linhas separadas por hairline dentro de um
+                   cartão só: o CONTEXTO que vai junto, o que se escreve, e o
+                   que se faz com isso. Até a v0.59 eram doze faixas irmãs
+                   empilhadas, e a fronteira entre "o que eu mando" e "o que a
+                   extensão me conta" não existia. -->
+              <div class="comp-card">
+                <div class="cc-ctx" hidden>
+                  <div class="ctxbar" hidden></div>
+                  <div class="anexosbar" hidden></div>
+                </div>
+                <div class="mention" hidden>
+                  <div class="mention-hd">
+                    <span>Adicionar peça ao contexto</span>
+                    <span class="mention-keys"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> marcar <kbd>esc</kbd> fechar</span>
+                  </div>
+                  <div class="mention-q" aria-hidden="true">
+                    ${SVG.lupa}<span class="mq-t"></span><span class="mq-caret"></span><span class="mq-n"></span>
+                  </div>
+                  <div class="mention-list" role="listbox"></div>
+                </div>
+                <div class="slash" hidden>
+                  <div class="slash-hd">
+                    <span>Inserir prompt salvo</span>
+                    <span class="mention-keys"><kbd>↑↓</kbd> navegar <kbd>↵</kbd> inserir <kbd>esc</kbd> fechar</span>
+                  </div>
+                  <div class="mention-q" aria-hidden="true">
+                    ${SVG.lupa}<span class="mq-t"></span><span class="mq-caret"></span><span class="mq-n"></span>
+                  </div>
+                  <div class="slash-list" role="listbox"></div>
+                </div>
+                <div class="inrow">
+                  <button class="attach" title="Anexar arquivos (PDF, Word .docx, RTF, TXT ou Markdown) para analisar junto das peças — ou sozinhos" aria-label="Anexar arquivos">${SVG.clip}</button>
+                  <input type="file" class="attach-input" accept=".pdf,.docx,.rtf,.txt,.md,.markdown,text/plain,text/markdown,text/rtf,application/rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden aria-hidden="true">
+                  <textarea class="in" rows="1" placeholder="Pergunte sobre as peças ou peça uma minuta…   @ cita uma peça · / insere um prompt"></textarea>
+                </div>
+                <div class="cc-acts">
+                  <div class="tools">
+                    <button class="tgl-mention" title="Escolher uma peça para citar na mensagem — o mesmo que digitar @ no campo">${SVG.arroba}<span class="lbl">Peça</span></button>
+                    <button class="tgl-search" aria-pressed="false" title="Liga/desliga a busca de jurisprudência e legislação em fontes oficiais (STF, STJ, Planalto…). Com a busca ligada, escreva a pergunta e use o botão Enviar normalmente.">${SVG.juris}<span class="lbl">Jurisprudência</span></button>
+                    <button class="btn-minuta" title="Liga o modo minuta: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar minuta” — a resposta abre num editor de texto, em nova aba, de onde você copia para o PJe, baixa em Word (.docx) ou imprime.">${SVG.minuta}<span class="lbl">Minutar</span></button>
+                    <button class="btn-mapa" title="Liga o modo mapa mental: a instrução aparece no campo (edite à vontade) e o botão Enviar vira “Gerar mapa” — a resposta abre num mapa mental interativo, em nova aba.">${SVG.mapa}<span class="lbl">Mapa mental</span></button>
+                    <button class="tgl-sigilo" aria-pressed="false" title="Modo sigiloso: as peças deixam de ser enviadas como ARQUIVO e passam a ser enviadas como texto com nomes, CPF, OAB, endereços e o número do processo substituídos por rótulos ([PESSOA_1]). Todo o reconhecimento acontece no seu computador; o PDF não sai da máquina. Exigido pelo art. 19, §3º, IV da Resolução CNJ 615/2025 para processo em segredo de justiça.">${SVG.tarja}<span class="lbl">Sigiloso</span></button>
+                    <button class="btn-plib" title="Seus prompts salvos: crie instruções reutilizáveis (título + texto) e insira-as na conversa digitando “/” no início do campo de mensagem. Sincronizam entre navegadores logados na mesma conta Google.">${SVG.prompts}<span class="lbl">Prompts</span></button>
+                    <button class="btn-mlib" title="Seus modelos de peças (sentenças, decisões, despachos, ofícios…): cadastre várias por categoria e, ao gerar uma minuta, escolha a categoria para o assistente seguir a estrutura e o estilo dos seus modelos — os fatos continuam saindo só das peças do processo.">${SVG.modelos}<span class="lbl">Modelos</span></button>
+                  </div>
+                  <button class="send"><span class="lbl">Enviar</span>${SVG.enviar}</button>
+                </div>
               </div>
-              <div class="hint-key"><div class="hk-in"><b>@</b> cita peças &nbsp;·&nbsp; <b>/</b> insere um prompt salvo &nbsp;·&nbsp; <b>Enter</b> envia <span class="hk-shift">&nbsp;·&nbsp; <b>Shift+Enter</b> quebra linha</span></div></div>
+
+              <!-- O QUE A EXTENSÃO CONTA sobre o turno — fora da caixa, porque
+                   nada aqui é instrução do usuário. Inclui os atalhos, que
+                   deixaram de ser uma faixa que muda de altura sob o dedo. -->
+              <div class="metarow">
+                <div class="custo" hidden>
+                  <span class="custo-txt"><span class="g-full"></span><span class="g-short"></span></span>
+                </div>
+                <button class="linhatempo" hidden aria-expanded="false">
+                  ${SVG.relogio}<span class="lt-txt"><span class="g-full"></span><span class="g-short"></span></span>
+                </button>
+                <button class="selo-sigilo" hidden aria-expanded="false">${SVG.tarja}<span class="sl-l"></span><span class="sl-s"></span></button>
+                <button class="modelo-badge" hidden title="Modelo de IA em uso nesta conversa — clique para trocar nas opções da extensão"></button>
+                <span class="cite-note" hidden tabindex="0" role="note" title="Modelos Gemini: as citações de página aparecem no próprio texto da resposta (ex.: “conforme a Contestação, fl. 12”), sem os marcadores [n] automáticos dos modelos Claude." aria-label="Neste modelo as citações de página aparecem no próprio texto da resposta, sem os marcadores numerados dos modelos Claude.">${SVG.info}</span>
+                <span class="meta-teclas"><kbd>↵</kbd> envia <kbd>⇧↵</kbd> quebra linha</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1433,25 +1520,55 @@ var PjePanel = (function () {
       hintEl = document.createElement("div");
       hintEl.className = "hint-empty";
       hintEl.innerHTML =
-        '<span class="big">Como posso ajudar?</span>' +
+        // O SELO diz o que a extensão DE FATO faz. O desenho de referência traz
+        // aqui "Citação Verificada Página a Página · Zero Alucinação Normativa",
+        // e as duas afirmações são falsas: citação por página só existe nos
+        // modelos Claude (nos outros a citação é textual), e anunciar
+        // infalibilidade é o que este projeto já registrou como pior que não
+        // avisar nada. O que fica é a promessa que se cumpre nos quatro
+        // provedores — e que é, ela sim, a razão de usar isto em vez do chat
+        // genérico do navegador.
+        '<span class="he-selo">' + SVG.check +
+        "Cada afirmação vem com a peça, o <i>id</i> e a folha</span>" +
+        '<span class="big">Como posso ajudar neste processo?</span>' +
+        '<p class="he-sub">Analise as peças marcadas, confronte as teses e gere ' +
+        "minutas — sempre com a origem de cada afirmação apontada nos autos.</p>" +
+        // OS TRÊS PASSOS viram CARTÕES. O conteúdo é o mesmo da v0.59, porque
+        // ele estava certo; o que muda é o peso: três blocos de texto numa
+        // coluna se leem como parágrafo, três cartões se leem como um caminho.
         '<div class="passos">' +
-        '<div class="passo"><span class="pn">1</span><b>Marque as peças</b>' +
+        '<div class="passo"><span class="p-hd"><span class="p-ico">' + SVG.lista +
+        '</span><span class="pn">Passo 1</span></span>' +
+        "<b>Marque as peças</b>" +
         // "ao lado" só é verdade nos modos largos: no estreito a lista fica
         // ACIMA do chat. Duas versões no DOM, escolha no CSS — mesmo mecanismo
         // dos rótulos longo/curto do segmented (.op-l/.op-s).
         '<span><span class="p-lado">na lista ao lado</span>' +
         '<span class="p-gaveta">na gaveta acima</span> — <b>chave</b> traz a ' +
         "espinha dorsal do processo; há também a busca e o <b>@</b> no campo</span></div>" +
-        '<div class="passo"><span class="pn">2</span><b>Peça o que precisa</b>' +
+        '<div class="passo"><span class="p-hd"><span class="p-ico">' + SVG.raio +
+        '</span><span class="pn">Passo 2</span></span>' +
+        "<b>Peça o que precisa</b>" +
         "<span>resumo, linha do tempo, minuta — só o que foi marcado é lido</span></div>" +
-        '<div class="passo"><span class="pn">3</span><b>Confira a origem</b>' +
+        '<div class="passo"><span class="p-hd"><span class="p-ico">' + SVG.livro +
+        '</span><span class="pn">Passo 3</span></span>' +
+        "<b>Confira a origem</b>" +
         "<span>cada afirmação vem com a peça, o <i>id</i> e a folha</span></div>" +
         "</div>" +
+        // O CABEÇALHO DE SEÇÃO é componente novo e reutilizável: eyebrow à
+        // esquerda, nota à direita. Ele existe porque os exemplos deixaram de
+        // ser chips soltos e viraram um conjunto que precisa de nome — sem
+        // rótulo, três cartões abaixo de outros três cartões leem-se como seis.
+        '<div class="secao-hd"><span class="sh-t">Comece por aqui</span>' +
+        '<span class="sh-n">preenchem o campo — você revisa antes de enviar</span></div>' +
         '<div class="exemplos">' +
         EXEMPLOS.map(
-          (t) =>
-            '<button type="button" class="ex" title="Coloca este texto no campo de mensagem para você editar">' +
-            escapeHtml(t) +
+          (x) =>
+            '<button type="button" class="ex" data-texto="' + escapeHtml(x.texto) +
+            '" title="Coloca este texto no campo de mensagem para você revisar antes de enviar">' +
+            '<span class="ex-t">' + escapeHtml(x.titulo) + "</span>" +
+            '<span class="ex-a">' + escapeHtml(x.apoio) + "</span>" +
+            '<span class="ex-seta" aria-hidden="true">' + SVG.setaDir + "</span>" +
             "</button>"
         ).join("") +
         "</div>" +
@@ -1571,7 +1688,10 @@ var PjePanel = (function () {
       hintEl.querySelectorAll(".ex").forEach((b) => {
         b.addEventListener("click", () => {
           if (inEl.disabled) return; // resposta em curso: o campo está travado
-          inEl.value = b.textContent; // as aspas são ::before/::after, não entram
+          // `dataset.texto` e NAO `textContent`: o cartao tem titulo, apoio e
+          // seta dentro, e o que vai ao campo e a frase inteira, que nao
+          // aparece escrita em lugar nenhum.
+          inEl.value = b.dataset.texto || b.textContent;
           autoresize();
           inEl.focus();
         });
@@ -1983,12 +2103,16 @@ var PjePanel = (function () {
     // corresponde à paleta é pior que amostra nenhuma: ela promete uma cara e
     // entrega outra no clique.
     const TEMAS = [
-      { id: "", nome: "Azul TecJustiça", amostra: ["#0e4459", "#2e7e9c", "#ffffff"] },
+      { id: "", nome: "Padrão", amostra: ["#ffffff", "#4f46e5", "#f8fafc"] },
       { id: "noite", nome: "Noite", amostra: ["#122734", "#56c2e8", "#14252f"] },
       { id: "papel", nome: "Papel", amostra: ["#efe7d9", "#2c7189", "#fdfbf6"] },
       { id: "vidro", nome: "Vidro", amostra: ["#dbeef9", "#2e7e9c", "#f2f9fd"] },
       { id: "toga", nome: "Toga", amostra: ["#6b2537", "#93374b", "#fffbfc"] },
       { id: "rosa", nome: "Rosa", amostra: ["#c41f6a", "#d5327f", "#fdeff6"] },
+      // O visual da v0.24 à v0.59, preservado byte a byte. Fica por ÚLTIMO: o
+      // padrão precisa continuar sendo TEMAS[0] com id vazio (o
+      // t-temas-coerencia cobra isso, e é o contrato do `aplicarTema`).
+      { id: "institucional", nome: "Institucional", amostra: ["#0e4459", "#2e7e9c", "#ffffff"] },
     ];
     let temaAtual = "";
 
@@ -2174,6 +2298,138 @@ var PjePanel = (function () {
       aplicarModo(modoAtual() === "livre" ? "flutuante" : "livre")
     );
     backdrop.addEventListener("click", () => aplicarModo("flutuante"));
+
+    // ---- BARRA SUPERIOR v0.60 -------------------------------------------
+    // O POPOVER DE EXIBIÇÃO. Ele não reimplementa nada: os botões `.expand`,
+    // `.side`, `.free`, `.fs`, `.docsvis` e `.dl` são os MESMOS elementos de
+    // antes, com os MESMOS handlers — só mudaram de lugar e ganharam rótulo.
+    // Por isso não há um único `aplicarModo` novo aqui.
+    const exibBtn = $(".exibicao");
+    const exibBox = $(".exibbox");
+    function fecharExib() {
+      if (exibBox.hidden) return;
+      exibBox.hidden = true;
+      exibBtn.setAttribute("aria-expanded", "false");
+    }
+    // O estado marcado é calculado NA ABERTURA, e não a cada `aplicarModo`:
+    // assim a caixa não precisa ser notificada de nada e nunca fica dessincronizada.
+    function marcarExib() {
+      const m = modoAtual();
+      const mapa = { flutuante: ".flutuante", lateral: ".side", livre: ".free", expandido: ".expand", cheia: ".fs" };
+      for (const [nome, sel] of Object.entries(mapa)) {
+        const b = exibBox.querySelector(".exib-i" + sel);
+        if (b) b.setAttribute("aria-checked", String(nome === m));
+      }
+      const dv = exibBox.querySelector(".exib-i.docsvis");
+      if (dv) dv.setAttribute("aria-checked", String(wrap.classList.contains("docs-collapsed")));
+    }
+    exibBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!exibBox.hidden) return fecharExib();
+      marcarExib();
+      exibBox.hidden = false;
+      exibBtn.setAttribute("aria-expanded", "true");
+      // POSICIONADA A CADA ABERTURA. `position: fixed` e filha do `.wrap`, como
+      // a `.temabox` e a `.movbox`: o `.wrap` tem tamanho ZERO (quem tem
+      // dimensão é o `.panel`) e o `.panel` carrega `transform`, então
+      // posicionar por dentro dele jogaria a caixa para fora da tela.
+      const r = exibBtn.getBoundingClientRect();
+      const larg = exibBox.getBoundingClientRect().width || 214;
+      exibBox.style.left = Math.max(8, Math.min(r.right - larg, innerWidth - larg - 8)) + "px";
+      exibBox.style.top = r.bottom + 6 + "px";
+      const alt = exibBox.getBoundingClientRect().height || 300;
+      // Abre para CIMA quando não cabe embaixo — o painel flutuante vive colado
+      // ao rodapé da janela, e ali o cabeçalho fica no alto mas a caixa é longa.
+      if (r.bottom + 6 + alt > innerHeight - 8) {
+        exibBox.style.top = Math.max(8, r.top - alt - 6) + "px";
+      }
+    });
+    // Clique DENTRO fecha depois de agir (os handlers dos botões originais já
+    // rodaram: eles estão no mesmo elemento e disparam antes deste, que está no
+    // container). Só o alternador de peças fica aberto, para dar para ver o efeito.
+    exibBox.addEventListener("click", (e) => {
+      const b = e.target.closest(".exib-i");
+      if (!b) return;
+      if (b.classList.contains("docsvis")) return marcarExib();
+      fecharExib();
+    });
+    // Fecha pelo DOCUMENT e por `composedPath()`, nunca por `e.target`: no
+    // document o alvo de dentro do Shadow DOM chega RETARGETADO para o host, e
+    // um `closest(".exibbox")` daria null — o clique no próprio menu o fecharia
+    // antes do `click` do item. É a mesma lição da `.movbox`.
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (exibBox.hidden) return;
+        const p = e.composedPath ? e.composedPath() : [];
+        if (p.some((n) => n && n.classList && (n.classList.contains("exibbox") || n.classList.contains("exibicao")))) return;
+        fecharExib();
+      },
+      true
+    );
+    exibBox.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      fecharExib();
+      exibBtn.focus();
+    });
+
+    // A PILL DO PROCESSO. A sigla do tribunal sai do host (o rótulo antes de
+    // `jus.br`), a mesma derivação que o `pje.js` usa para montar a rota de
+    // download — aqui ela só identifica a origem na tela.
+    function siglaTribunal() {
+      try {
+        const m = /([a-z0-9-]+)\.jus\.br$/i.exec(location.hostname);
+        if (!m) return "";
+        const s = m[1].toUpperCase();
+        return s === "PJE" || s === "CLOUD" ? "" : s;
+      } catch {
+        return "";
+      }
+    }
+    $(".hp-copiar").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const n = ($(".cnj").textContent || "").trim();
+      if (!n) return;
+      try {
+        navigator.clipboard.writeText(n);
+      } catch {
+        /* sem clipboard: o número continua selecionável na tela */
+      }
+      const b = e.currentTarget;
+      b.classList.add("copiado");
+      setTimeout(() => b.classList.remove("copiado"), 1200);
+    });
+
+    // AS ABAS. `Chat` e `Linha do tempo` são views do centro; `Minutas` e
+    // `Configurações` SAEM da página, e é por isso que levam o ↗ — a navegação
+    // precisa dizer como se volta.
+    const navBox = $(".hd-nav");
+    function trocarView(v) {
+      const main = $(".main");
+      if (!main) return;
+      main.dataset.view = v;
+      for (const b of navBox.querySelectorAll('[role="tab"]'))
+        b.setAttribute("aria-selected", String(b.dataset.view === v));
+      hidePreview();
+    }
+    navBox.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.view) return trocarView(b.dataset.view);
+      // Nenhuma capacidade nova: os dois destinos já existiam. `Configurações`
+      // reusa o MESMO caminho do selo do modelo (`onConfigure` -> o worker
+      // abre a página), porque `chrome.runtime.openOptionsPage` NÃO existe em
+      // content script e lançaria no primeiro clique.
+      if (b.dataset.abre === "config") return configureCb && configureCb();
+      if (b.dataset.abre === "minutas") {
+        try {
+          window.open(chrome.runtime.getURL("src/editor.html"), "_blank");
+        } catch {
+          /* contexto da extensão perdido: o clique não faz nada, e o painel segue */
+        }
+      }
+    });
 
     // Ocultar/exibir a coluna de peças nos modos expandido/tela cheia (mais
     // espaço para o chat). Só VISUAL: os checkboxes seguem no DOM — seleção,
@@ -5305,18 +5561,13 @@ var PjePanel = (function () {
     // .inrow não move nada — nem ao ENTRAR (clicar no 📎 com o campo frio), nem
     // ao SAIR (clicar no 📎 no meio da digitação, que colapsaria a faixa e
     // moveria o botão para baixo — o mesmo defeito ao contrário).
-    if (inEl && inrowEl && ft) {
-      // Sincroniza o estado inicial: `open()` foca o campo, e se isso acontecer
-      // antes deste registro o evento `focus` já passou — clicar num campo que
-      // JÁ está focado não dispara outro, e a faixa ficaria presa colapsada.
-      if (inEl.matches(":focus")) ft.classList.add("hint-on");
-      inEl.addEventListener("focus", () => ft.classList.add("hint-on"));
-      inrowEl.addEventListener("focusout", (e) => {
-        // Foco que continua dentro da linha (um botão dela) preserva o estado.
-        if (e.relatedTarget && inrowEl.contains(e.relatedTarget)) return;
-        ft.classList.remove("hint-on");
-      });
-    }
+    // A v0.60 APOSENTOU a faixa, e com ela o defeito inteiro — não por
+    // conserto, por construção. Os atalhos se dissolveram em dois lugares que
+    // NÃO medem altura: o placeholder do campo (`@ cita uma peça · / insere um
+    // prompt`) e uma linha FIXA no `.metarow` (`↵ envia · ⇧↵ quebra linha`).
+    // Nada no rodapé cresce ou encolhe com o foco, então nenhum botão pode
+    // sair de baixo do cursor. A regra geral que fica: faixa que muda de
+    // altura não pode ser disparada pelo foco de uma linha que contém botões.
 
     // ----- Anexos do input (📎): botão, campo de arquivo e chips -----
     // A UI é reflexo: o content script é dono da lista (Map `anexos`) e a manda
@@ -7428,12 +7679,21 @@ var PjePanel = (function () {
             (dataCurta(d.juntadoEm) ? " · juntada em " + dataCurta(d.juntadoEm) : "") +
             (d.juntadoPor ? " · por " + d.juntadoPor : "") +
             (aj ? " · " + aj.motivo : "");
+          // O TIPO OFICIAL só entra quando ACRESCENTA: repetir o título com
+          // outras palavras gastaria a metade direita da linha para não dizer
+          // nada. Ele vem da grid/REST do PJe (vocabulário controlado do CNJ) e
+          // descreve a peça melhor que o título, que costuma ser o nome do
+          // arquivo que alguém subiu.
+          const tipoUtil = d.tipo && norm(d.tipo) !== norm(p.nome) ? d.tipo : "";
           row.innerHTML =
             `<input type="checkbox" value="${escapeHtml(d.id)}">` +
-            '<span class="d-dot" aria-hidden="true"></span>' +
             `<span class="d-t" title="${escapeHtml(dica)}">` +
+            '<span class="d-dot" aria-hidden="true"></span>' +
             `<span class="d-nm">${escapeHtml(p.nome)}</span>` +
+            "</span>" +
+            '<span class="d-meta">' +
             (p.id ? `<span class="d-id">${p.id}</span>` : "") +
+            (tipoUtil ? `<span class="d-tipo">${escapeHtml(tipoUtil)}</span>` : "") +
             "</span>" +
             '<button type="button" class="d-ver" title="Ver esta peça na linha do tempo do processo" aria-label="Localizar esta peça na linha do tempo">' +
             SVG.ver + "</button>";
@@ -7898,6 +8158,30 @@ var PjePanel = (function () {
       setProcesso(num) {
         const el = $(".cnj");
         if (el) el.textContent = num || "";
+        // A PILL só existe quando há processo. Um chip com um dot verde e nada
+        // dentro afirmaria uma sessão que ninguém verificou.
+        const pill = $(".hd-processo");
+        if (pill) pill.hidden = !num;
+        const tr = $(".hp-trib");
+        if (tr) {
+          const sg = siglaTribunal();
+          tr.textContent = sg;
+          tr.hidden = !sg;
+        }
+      },
+      // O ÚNICO MÉTODO NOVO DA RODADA. O dot da pill do processo é verde
+      // enquanto a sessão do PJe responde e âmbar quando a view JSF expirou —
+      // `telaMorta` é estado do content.js e o painel não tem como enxergá-lo.
+      // A alternativa seria um dot sempre verde, que é pior que não ter dot:
+      // um sinal que nunca muda afirma um estado que ninguém conferiu.
+      setSessao(estado) {
+        const d = $(".hp-dot");
+        if (!d) return;
+        const morta = estado === "expirou";
+        d.classList.toggle("morta", morta);
+        d.title = morta
+          ? "A tela do PJe expirou nesta aba — reabra o processo para baixar novas peças"
+          : "Sessão do PJe ativa";
       },
       // Resultado do mapa mental: em vez do markdown cru (longo e repetitivo)
       // a bolha vira um card com as ações, e o texto fica num <details>

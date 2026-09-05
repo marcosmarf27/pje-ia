@@ -41,11 +41,18 @@
       const painel = PjePanel.mount();
       painel.setConfigured(true);
       painel.setProcesso && painel.setProcesso("0000860-39.2017.8.06.0203");
+      // IDS DE NOVE DIGITOS e TIPO oficial, como o PJe entrega de verdade:
+      // `partesTitulo` so separa o id do nome com 6+ digitos, e o chip de tipo
+      // so aparece quando ele DIFERE do titulo. Com o fixture antigo ("101 -
+      // Peticao inicial") a linha da peca era medida sem nenhum dos dois.
       painel.setDocs([
-        { id: "101", titulo: "101 - Petição inicial" },
-        { id: "102", titulo: "102 - Contestação" },
-        { id: "103", titulo: "103 - Sentença" },
-        { id: "104", titulo: "104 - Laudo pericial" },
+        { id: "185463738", titulo: "185463738 - Peticao inicial", tipo: "Peticao Inicial" },
+        { id: "212239678", titulo: "212239678 - Contestacao", tipo: "Contestacao" },
+        { id: "193352686", titulo: "193352686 - Decisao Saneadora", tipo: "Decisao de Mero Expediente" },
+        { id: "212696984", titulo: "212696984 - Ata da audiencia de instrucao", tipo: "Ata de Audiencia" },
+        { id: "224081605", titulo: "224081605 - Replica", tipo: "Peticao" },
+        { id: "212416060", titulo: "212416060 - Substabelecimento", tipo: "Procuracao" },
+        { id: "212416061", titulo: "212416061 - Laudo pericial contabil", tipo: "Laudo Pericial" },
       ]);
       painel.addMessage("user", "Houve prescrição neste processo?");
       painel.addMessage("assistant", "Não. O prazo foi interrompido pela citação válida em 12/03/2021, e desde então correram apenas 3 anos.");

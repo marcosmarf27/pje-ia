@@ -6,209 +6,255 @@
    "escondidos" ficam visíveis como faixas vazias. Vale para todo o painel. */
 [hidden] { display: none !important; }
 
-.wrap {
-  /* ---------------------------------------------------------------------
+.wrap {  /* ---------------------------------------------------------------------
      TOKENS — ver DESIGN.md (raiz do repo) antes de mudar qualquer valor.
      Estes nomes são espelhados em ui.css/editor.css/modelos-page.css: ao
      alterar um token aqui, altere lá também (o painel vive em Shadow DOM e
      não pode importar o CSS das páginas).
+
+     v0.60 — "Cognitive Precision". A paleta institucional petróleo saiu do
+     padrão e virou o tema `institucional`, byte a byte: quem já usa a
+     extensão não perde a cara que conhece, e a impressão digital de 36.718
+     propriedades prova que ela sobreviveu. O que entra é indigo sobre slate,
+     com CHROME CLARA — a primeira vez que o cabeçalho do painel não é escuro.
      --------------------------------------------------------------------- */
-  --pje: #14607e;      /* primária — ações, links, foco, badges */
-  --pje-2: #0e4459;    /* hover da primária, texto de link */
-  --pje-3: #0e4e69;    /* hover de link, pressionado */
-  --pje-soft: #8ba4b4; /* medidores */
-  /* Cabeçalho CHAPADO — o gradiente 96deg saiu no refinamento institucional.
-     Quem capta luz agora é o quadrado de 32px da marca (--mark-*), porque o
-     painel abre logo abaixo da barra do próprio PJe e dois gradientes da mesma
-     família empilhados liam como uma faixa só. Ver DESIGN.md §2. */
-  --hd: #0e4459;
-  --mark-de: #2e7e9c;  /* quadrado da marca — 180deg */
-  --mark-para: #175d79;
-  /* Botão primário: mesmo gradiente vertical da marca, um tom acima. O --sh-btn
-     traz um inset branco no topo — é ele que faz o degradê virar superfície. */
-  --btn-de: #1c6c8b;
-  --btn-para: #125a78;
-  --btn-de-h: #22789a;
-  --btn-para-h: #0e4e69;
-  --line-focus: #6fa5b9;                    /* borda do campo em foco */
-  --ring: 0 0 0 3px rgba(46, 126, 156, 0.13); /* halo de foco */
-  --ink: #0e323f;      /* títulos serifados, nome de peça em destaque */
-  --ink-2: #0b2a3a;
-  --paper: #f6f9fb;
-  --canvas: #e9eef3;   /* fundo atrás das páginas */
-  --text: #0e323f;
-  --text-2: #3e5561;   /* itens de lista, rótulo de botão secundário */
-  --text-3: #234e5e;   /* chip de exemplo, texto sobre superfície tingida */
-  --muted: #616f78;
-  --muted-2: #74858e;  /* meta, contadores */
-  --muted-3: #93a3ac;  /* placeholders, ícones inativos */
-  --eyebrow: #a0aeb6;  /* eyebrow mono uppercase */
+
+  /* ---------- AÇÃO ----------
+     Indigo. Ele NÃO é a cor do botão primário (ver --btn-*): é o acento —
+     links, foco, estado ativo, ícone de ação, dot de peça marcada. */
+  --pje: #4f46e5;
+  /* Também é o FUNDO da bolha do usuário, com --on-acao por cima. O duplo
+     papel é antigo e continua valendo: ao clareá-lo para servir de tinta,
+     a bolha some. */
+  --pje-2: #4338ca;
+  --pje-3: #3730a3;
+  --pje-soft: #a5b4fc;
+
+  /* ---------- CHROME ----------
+     CLARA, e é a mudança estrutural da v0.60. Consequências obrigatórias,
+     todas abaixo: --on-hd-* viram tinta ESCURA, --veu-* viram véus ESCUROS e
+     --sig-hd acompanha a polaridade (verde CLARO, precedente do tema Papel).
+     Gradiente e não cor chapada porque `--hd` é consumido como `background` e
+     um token com duas formas é um token com dois consumidores possíveis. */
+  --hd: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  /* O quadrado de 32px da marca é o único elemento SATURADO do cabeçalho
+     claro — é ele que ancora a identidade onde antes era a faixa inteira. */
+  --mark-de: #334155;
+  --mark-para: #0f172a;
+  /* PRIMÁRIO SLATE-900, com HOVER INDIGO. É o que o desenho aprovado mostra, e
+     tem razão de ser: sobre um canvas slate claro, quase-preto é o contraste
+     máximo disponível — a ação principal fica evidente sem competir com o
+     indigo, que é acento. O hover revela a cor do sistema. */
+  --btn-de: #1e293b;
+  --btn-para: #0f172a;
+  --btn-de-h: #4f46e5;
+  --btn-para-h: #4338ca;
+  --line-focus: #818cf8;
+  --ring: 0 0 0 3px rgba(79, 70, 229, 0.14);
+
+  /* ---------- TINTA ---------- */
+  --ink: #0f172a;
+  --ink-2: #020617;
+  --text: #0f172a;
+  --text-2: #334155;
+  --text-3: #475569;
+  --muted: #475569;
+  --muted-2: #64748b;
+  --muted-3: #94a3b8;
+  --eyebrow: #64748b;
+
+  /* ---------- SUPERFÍCIES: agora são CAMADAS ----------
+     A regra do §2 — "o peso visual fica no texto da resposta" — não mudou; o
+     MECANISMO mudou. Até a v0.59 ela era obtida invertendo dois painéis (a
+     conversa branca, a lista tingida). Aqui o painel inteiro assenta sobre um
+     canvas slate e quem sobe são os CARTÕES brancos: bolha, linha de peça,
+     cartão de passo e a caixa de escrever. Elevação no lugar de inversão. */
+  --paper: #f8fafc;
+  --canvas: #eef2f6;
   --surface: #ffffff;
-  /* O fundo da JANELA. Igual a `--surface` no padrão, e é isso que mantém o
-     tema institucional byte a byte; separado porque só ele fica translúcido
-     no Vidro (ver "Temas" no DESIGN.md §2). */
-  --surface-painel: #ffffff;
-  /* A conversa é BRANCA e a lista é que fica tingida — até a v0.23 era o
-     inverso. Põe o peso visual no texto da resposta, não na navegação. */
-  --surface-2: #fafcfc;      /* coluna de peças, rodapé de entrada */
-  --surface-3: #ffffff;      /* área de conversa */
-  --surface-card: #fcfdfd;   /* cartão de passo */
-  --surface-list-ft: #f4f8f9; /* rodapé da lista (.docs-tip) */
-  --hover: #eff4f6;
-  --hover-2: #f5fafc;
-  --accent-bg: #dfeaee;   /* badge e pill de contagem */
-  --accent-bg-2: #e4edf0; /* número dos passos */
-  --line: #e2eaee;
-  --line-2: #edf1f3;
-  --line-card: #e4ebee;
-  --line-input: #dae3e8;
-  --line-strong: #d8e2e6;
-  --line-check: #c3cfd5;
-  --ok: #2f9268;
-  /* Confirmação SUAVE — o par de --ok, como --warn-bg é o par de --warn.
-     Veste a marca da peça que passou a ir como texto: é o sinal de "deu
-     certo" numa lista onde nada mais mudaria de aparência.
-     ESPELHA o ui.css, onde este token já existia (DESIGN.md §1). */
-  --ok-bg: #eaf4ef;
-  --ok-line: #cbe3d8; /* borda do banner "Pronto para usar" */
-  --ok-ink: #1e5c44;  /* texto sobre confirmação suave */
-  /* MODO SIGILOSO — a família que veste o painel inteiro quando ele está
-     ligado (cabeçalho, marca, botão primário, moldura). Verde PROFUNDO no
-     cabeçalho e não só uma borda: o modo muda o que SAI da máquina, e a
-     primeira versão (borda fina + faixa clara) foi lida como "uma coisinha
-     verde" — um estado que não se vê é um estado que se esquece ligado, ou
-     desligado. Ver DESIGN.md §5, "Modo sigiloso". ESPELHADO no ui.css. */
-  /* GRADIENTE mesmo quando a cor é uma só: o consumidor abaixo empilha a
-     textura POR CIMA dele, e uma camada de `background-image` não aceita
-     cor. Ver `.wrap.sigiloso .hd`. */
-  --sig-hd: linear-gradient(180deg, #143f33 0%, #143f33 100%);
-  --sig-mark-de: #35946e;   /* quadrado da marca — 180deg */
-  --sig-mark-para: #1d6248;
-  /* Escurecido em 03/09/2026: com #2f9268 a tinta branca dava 3,87:1, abaixo
-     do AA. Vale para o padrão e para os temas que herdam a família. */
-  --sig-btn-de: #26805e;    /* botão primário e launcher */
-  --sig-btn-para: #1a5c41;
-  --sig-btn-de-h: #2b8f68;
-  --sig-btn-para-h: #16513a;
-  --sig-halo: rgba(47, 146, 104, 0.28); /* anel externo da janela e foco */
-  /* O CARIMBO na linha do CNJ. Placa CLARA com tinta escura porque um carimbo é
-     tinta sobre papel — e sobre o cabeçalho verde profundo é o contraste máximo
-     disponível. Num tema de chrome CLARA a polaridade se inverte (placa escura,
-     tinta clara): o glifo e a forma continuam idênticos, só a luminosidade
-     acompanha o fundo. É a regra "matiz constante, luminosidade ajustada". */
-  --sig-carimbo-bg: #cfe8db;
-  --sig-carimbo-bg-h: #dcf0e6;
-  --sig-carimbo-ink: #10352a;
-  /* A TEXTURA DE REDAÇÃO do cabeçalho no modo — linhas de texto com barras
-     tarjadas por cima, a 5,5%. Substituiu a hachura a −45° da faixa antiga, que
-     era fita de isolamento (linguagem de PERIGO) num modo que confirma uma
-     proteção funcionando. Data-URI pela regra de nenhum recurso externo; o `#`
-     vai como `%23`, senão o navegador corta a URL ali e a textura some calada. */
-  --sig-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23ffffff' fill-opacity='0.055'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
-  /* O GÊMEO ESCURO da textura, para as chromes CLARAS (Papel e Vidro).
-     A textura branca a 5,5% é invisível sobre verde-claro: o modo sigiloso
-     perderia justamente o sinal ambiente que ele existe para dar. */
+  /* O fundo da JANELA — o canvas. `.msgs`, `.main` e `.content` herdam dele. */
+  --surface-painel: #f8fafc;
+  --surface-2: #ffffff;      /* coluna de peças: BRANCA, e a lista é que tinge */
+  --surface-3: #f8fafc;      /* área de conversa: o canvas; a bolha é que é branca */
+  --surface-card: #ffffff;
+  --surface-list-ft: #ffffff;
+  --hover: #f1f5f9;
+  --hover-2: #f8fafc;
+  --accent-bg: #eef2ff;      /* indigo-50 — badge, pill de contagem */
+  --accent-bg-2: #e0e7ff;    /* indigo-100 */
+
+  /* ---------- LINHAS ----------
+     Hairline slate. O sistema novo separa por LINHA de 1px e por elevação de
+     cartão, quase nunca por sombra — daí as sombras terem encolhido. */
+  --line: #e2e8f0;
+  --line-2: #f1f5f9;
+  --line-card: #e2e8f0;
+  --line-input: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --line-check: #cbd5e1;
+
+  /* ---------- ESTADOS ---------- */
+  --ok: #059669;
+  --ok-bg: #ecfdf5;
+  --ok-line: #a7f3d0;
+  --ok-ink: #065f46;
+  --warn: #d97706;
+  --warn-bg: #fffbeb;
+  --warn-line: #fde68a;
+  --warn-ink: #92400e;
+  --erro: #dc2626;
+  --erro-hd: #dc2626;
+  --alerta: #dc2626;
+  --alerta-bg: #fef2f2;
+  --alerta-line: #fecaca;
+  --alerta-ink: #991b1b;
+
+  /* ---------- MODO SIGILOSO ----------
+     A CHROME SIGILOSA ACOMPANHA A POLARIDADE DA CHROME NORMAL, e isto não é
+     preferência: `--on-hd-*` é UM conjunto, usado pelos dois estados. Com o
+     cabeçalho normal claro, a tinta é escura — e tinta escura sobre o verde
+     PROFUNDO de antes daria 1,5:1. É o precedente do tema Papel, que resolveu
+     o mesmo problema em v0.58. O sinal de que os autos não estão saindo em
+     claro passa a ser carregado pelo conjunto: matiz verde na chrome, textura
+     de redação, moldura com halo, botão primário verde e o carimbo — que aqui
+     INVERTE (placa escura, tinta clara), porque um carimbo é sempre o oposto
+     do papel em que ele bate. */
+  --sig-hd: linear-gradient(180deg, #e8f6ef 0%, #d3e9dd 100%);
+  --sig-mark-de: #10b981;
+  --sig-mark-para: #047857;
+  /* MEDIDO: com o emerald-600 (#059669) a tinta branca do Enviar dava 3,77:1,
+     abaixo do AA — o `t-temas-contraste` pegou na primeira execução. O botão
+     primário sigiloso é o controle que confirma que os autos NÃO estão saindo
+     em claro; ele não pode ser o elemento menos legível da tela. Escurecido
+     dois degraus; o hover é que clareia. */
+  --sig-btn-de: #047857;
+  --sig-btn-para: #065f46;
+  --sig-btn-de-h: #059669;
+  --sig-btn-para-h: #047857;
+  --sig-halo: rgba(5, 150, 105, 0.3);
+  --sig-carimbo-bg: #065f46;
+  --sig-carimbo-bg-h: #047857;
+  --sig-carimbo-ink: #ecfdf5;
+
+  /* AS DUAS TEXTURAS DE REDAÇÃO do cabeçalho sigiloso, e agora elas têm NOME.
+     Data-URI pela regra de nenhum recurso externo; o `#` vai como `%23`, senão
+     o navegador corta a URL ali e a textura some calada.
+
+     Até a v0.59 a branca era `--sig-textura` e a escura, a exceção do Papel.
+     Com a chrome clara virando o PADRÃO a polaridade se inverteu, e um token
+     cujo valor depende do tema é um token que o próximo tema esquece de
+     redefinir. Nomeadas, cada tema aponta para a que serve. */
+  --sig-textura-branca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23ffffff' fill-opacity='0.055'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
   --sig-textura-clara: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%230b2430' fill-opacity='0.05'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
-  --warn: #de8b2c;
-  --erro: #a5301f;
-  /* Aviso SUAVE — informa sem impedir de continuar. Veste o relatório de peças
-     que falharam, a nota de download lento e a marca de "voltar ao documento".
-     Distinto da .alertbar (que é para o que BLOQUEIA) e das categorias
-     --cat-*, que são semântica de espécie de peça.
-     Os três valores são espelhados em ui.css — ver DESIGN.md §1. */
-  --warn-bg: #fbead2;
-  --warn-line: #eeddba;
-  --warn-ink: #a96b14;
-  --erro-hd: #b4402f;
-  /* Alerta que BLOQUEIA (.alertbar, gauge crítico) — vermelho-tijolo, mais forte
-     de propósito que o trio --warn-*, que apenas informa. Eram 14 literais
-     soltos antes do refinamento. Ver DESIGN.md §2. */
-  --alerta: #b4402f;
-  --alerta-bg: #fbeee6;
-  --alerta-line: #e0b7a0;
-  --alerta-ink: #7c3212;
-  /* Sobre o cabeçalho escuro (--hd) e sobre blocos de código invertidos: o
-     branco puro estoura, então o sistema usa dois azuis muito claros. */
-  --on-hd: #eaf4f7;   /* texto/ícone principal sobre fundo escuro */
-  --on-hd-2: #bbd8e2; /* ícone secundário, estado inativo */
-  --on-hd-3: #cfe3ea; /* texto de chip sobre o cabeçalho */
-  /* TINTA sobre o cabeçalho, no branco puro. Distinto de `--on-hd` (#eaf4f7,
-     que é o texto secundário): este é o título, os ícones e o ✕ — e num tema de
-     chrome CLARA ele precisa virar tinta escura, senão o cabeçalho fica em
-     branco sobre branco. Enquanto estava escrito `#fff` em 12 regras, nenhum
-     tema o alcançava. */
-  --on-hd-forte: #ffffff;
+  --sig-textura: var(--sig-textura-clara);
+
+  /* ---------- TINTA SOBRE A CHROME ----------
+     ESCURA agora, e é a inversão que a chrome clara obriga. Enquanto estes
+     valores fossem claros, o cabeçalho ficaria branco sobre branco. */
+  --on-hd: #334155;        /* texto/ícone principal sobre a chrome */
+  --on-hd-2: #64748b;      /* ícone secundário, estado inativo */
+  --on-hd-3: #475569;      /* texto de chip sobre a chrome */
+  --on-hd-forte: #0f172a;  /* título, ícones e o ✕ */
   /* TINTA sobre superfície de AÇÃO (botão primário, launcher, toggle aceso).
-     Não muda por tema — o botão continua saturado em todos —, mas fica em token
-     para a exceção ser uma decisão e não um esquecimento. */
+     Não muda por tema — o botão continua saturado em todos. */
   --on-acao: #ffffff;
-  /* VÉUS do cabeçalho: as películas claras que dão relevo à chrome escura.
-     Num tema de chrome clara elas se invertem (película ESCURA), e é por isso
-     que precisam de nome. Só os do cabeçalho entram: o véu de um botão saturado
-     continua branco em qualquer tema. */
-  --veu-1: rgba(255, 255, 255, 0.07);   /* fundo do grupo de botões */
-  --veu-2: rgba(255, 255, 255, 0.16);   /* hover */
-  --veu-3: rgba(255, 255, 255, 0.32);   /* botão ativo */
-  --veu-borda: rgba(255, 255, 255, 0.55); /* contorno do ativo */
-  --veu-luz: rgba(255, 255, 255, 0.22);   /* o brilho no topo da marca */
-  --veu-pega: rgba(255, 255, 255, 0.3);   /* a pega de arrastar do modo livre */
-  /* categorias de peças (lista, chips, popup @ e mapa mental).
-     Petições deixou de ser AZUL porque azul é a cor de AÇÃO do sistema: uma
-     categoria azul na lista competia com botões e links, e não dava para
-     saber se o azul queria dizer "petição" ou "clicável". */
-  --cat-decisao: #de8b2c;   /* dourado — atos do juízo */
-  --cat-audiencia: #2f9268; /* verde — atas e audiências */
-  --cat-peticao: #6a62c0;   /* roxo — peças das partes */
-  --cat-prova: #c1508a;     /* magenta — laudos e pareceres */
-  --cat-outro: #b7c4cb;     /* neutro — demais documentos */
-  /* famílias — vendorizadas em vendor/fontes/, NUNCA de CDN: o painel roda na
-     página do tribunal (CSP + vazamento de requisição). Os @font-face ficam no
-     topo deste arquivo. Ver DESIGN.md §3. */
-  --ff-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --ff-serif: "Newsreader", Georgia, "Times New Roman", serif;
-  --ff-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
-  /* raios e sombras */
-  --r-xs: 4px;    /* checkbox */
-  --r-tight: 6px; /* botão de 24px, segmento dentro de segmented */
-  --r-sm: 7px;    /* botão do cabeçalho, cluster interno */
-  --r-md: 8px;    /* botão, item de lista, segmented externo */
-  --r-ctrl: 9px;  /* busca, marca, cluster do cabeçalho, Enviar */
-  --r-box: 10px;  /* cartão de chave, botão de 44px */
-  --r-lg: 11px;   /* cartão de passo */
-  --r-xl: 12px;   /* caixa de entrada */
-  --r-2xl: 14px;  /* moldura externa do painel */
-  /* 20px, NÃO 999px: a cápsula destoa dos raios de 8–12px de tudo em volta. */
-  --r-pill: 20px;
-  /* Lupa usada como MÁSCARA no status de busca (a cor vem de background, não do
-     SVG). Data URI, não arquivo: máscara é decoração de um estado transitório e
-     um recurso a mais em web_accessible_resources não se justifica. */
-  --ic-lupa-busca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20.5 20.5l-4.4-4.4'/%3E%3C/svg%3E");
-  --sh-card: 0 1px 2px rgba(14, 50, 63, 0.04);
-  --sh-seg: 0 1px 2px rgba(14, 50, 63, 0.1); /* pill ativo do segmented */
-  --sh-btn: 0 1px 2px rgba(14, 50, 63, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  --sh-pop: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
-  /* Sombra do painel ERGUIDO (durante o arrasto). Mais funda e mais espalhada
-     que a --sh-pop: é a distância do papel à mesa que o olho lê como "na mão". */
-  --sh-erguido: 0 2px 6px rgba(14, 50, 63, 0.13), 0 34px 80px -20px rgba(14, 50, 63, 0.44);
-  --sh-panel: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
-  /* Escala tipográfica — ANTES eram 13 tamanhos distintos (9.5 a 18px, com
-     meios-pixels); a variação sem intenção é o que faz a interface "parecer
-     poluída" mesmo com cada elemento correto. Sete degraus, todos inteiros:
-     nano só para numerais e teclas (id da peça, kbd, sobrescrito da citação). */
-  --fs-nano: 10px;
+
+  /* ---------- VÉUS ----------
+     ESCUROS, pela mesma razão da tinta: uma película branca sobre uma chrome
+     branca é invisível. --veu-luz é a exceção e continua branco: ele brilha
+     sobre o quadrado SATURADO da marca, que não clareou. */
+  --veu-1: rgba(15, 23, 42, 0.04);
+  --veu-2: rgba(15, 23, 42, 0.07);
+  --veu-3: rgba(15, 23, 42, 0.1);
+  --veu-borda: rgba(15, 23, 42, 0.14);
+  --veu-luz: rgba(255, 255, 255, 0.22);
+  --veu-pega: rgba(15, 23, 42, 0.16);
+
+  /* ---------- CATEGORIAS DE PEÇA ----------
+     Semânticas: a cor É o dado. O desenho de referência pinta petições de
+     INDIGO, e aqui isso não pode ser seguido — indigo passou a ser a cor de
+     AÇÃO, e uma categoria da cor dos botões recria exatamente a confusão que
+     tirou petições do azul na v0.24 ("isto quer dizer petição ou clicável?").
+     Petições vai para ciano: os quatro matizes ficam a mais de 100° um do
+     outro e nenhum a menos de 50° do indigo. */
+  --cat-decisao: #d97706;   /* âmbar — atos do juízo */
+  --cat-audiencia: #059669; /* verde — atas e audiências */
+  --cat-peticao: #0891b2;   /* ciano — peças das partes */
+  --cat-prova: #e11d48;     /* rosa — laudos e pareceres */
+  --cat-outro: #94a3b8;     /* neutro — demais documentos */
+
+  /* ---------- FAMÍLIAS ----------
+     Vendorizadas em vendor/fontes/, NUNCA de CDN: o painel roda na página do
+     tribunal (CSP + vazamento de requisição). Os @font-face vivem em
+     src/fontes.css e são injetados no document.head da PÁGINA — dentro de
+     shadow tree eles são ignorados pela spec. Ver DESIGN.md §3.
+
+     A serif saiu da interface. O tom forense passa a vir da estrutura e do
+     mono, não do ornamento — e `--ff-serif` fica como APELIDO de `--ff-display`
+     para os ~12 consumidores existentes migrarem sem uma linha de mudança. */
+  --ff-display: "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+  --ff-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --ff-serif: "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+  --ff-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* ---------- RAIOS ----------
+     Mais generosos que os do refinamento institucional: o sistema novo separa
+     por cartão, e cartão de 8px lê como cartão. A prosa do handoff pede 4px em
+     tudo; o desenho aprovado usa 8/12/16, e é ele que vale. */
+  --r-xs: 4px;      /* checkbox */
+  --r-tight: 6px;   /* botão de 24px, segmento dentro de segmented */
+  --r-sm: 8px;      /* botão do cabeçalho, cluster interno */
+  --r-md: 8px;      /* botão, item de lista, segmented externo */
+  --r-ctrl: 10px;   /* busca, marca, cluster do cabeçalho */
+  --r-box: 10px;    /* cartão de chave, botão de 44px */
+  --r-lg: 12px;     /* cartão de passo, cartão de ação */
+  --r-xl: 12px;     /* linha de peça */
+  --r-2xl: 16px;    /* a caixa de escrever e a moldura externa do painel */
+  --r-pill: 20px;   /* chip, badge, selo — NÃO 999px */
+  /* A cápsula VERDADEIRA, e ela tem exatamente dois usos: o botão circular de
+     Enviar e os dots de 6px. Fora deles vale --r-pill, porque a cápsula destoa
+     dos raios de 8–16px de tudo em volta. */
+  --r-round: 9999px;
+
+  /* ---------- SOMBRAS ----------
+     Contidas: a hierarquia vem de superfície + hairline, e sombra funda sobre
+     canvas claro vira sujeira. Só o que FLUTUA de verdade (popover, modal, a
+     caixa de escrever) recebe --sh-pop. */
+  --sh-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --sh-seg: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --sh-btn: 0 1px 2px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --sh-pop: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.1);
+  --sh-erguido: 0 2px 6px rgba(15, 23, 42, 0.1), 0 34px 80px -20px rgba(15, 23, 42, 0.3);
+  --sh-panel: 0 1px 2px rgba(15, 23, 42, 0.06), 0 24px 60px -18px rgba(15, 23, 42, 0.22);
+
+  /* ---------- ESCALA TIPOGRÁFICA ----------
+     Oito degraus inteiros. --fs-hero subiu de 26 para 30px: no desenho novo o
+     "Como posso ajudar?" é o eixo da tela vazia, e não mais um título de
+     bloco. --fs-lead subiu de 17 para 18 para acompanhar. */
+  --fs-nano: 10px;   /* id da peça, kbd, sobrescrito de citação */
   --fs-micro: 11px;  /* rótulos, meta-informação, legendas */
   --fs-meta: 12px;   /* chips, dicas, controles secundários */
   --fs-ui: 13px;     /* lista de peças, formulários */
   --fs-body: 14px;   /* mensagens e campo de entrada */
   --fs-lg: 15px;     /* título do painel, mensagens no expandido */
-  --fs-lead: 17px;   /* "Como posso ajudar?" no painel estreito */
-  --fs-hero: 26px;   /* "Como posso ajudar?" nos modos largos */
+  --fs-lead: 18px;   /* "Como posso ajudar?" no painel estreito */
+  --fs-hero: 30px;   /* "Como posso ajudar?" nos modos largos */
+  /* A LARGURA DA COLUNA DE LEITURA. Até a v0.59 as bolhas eram `max-width:70%`
+     coladas às bordas do painel; num painel de 1120px isso dá linhas de 780px,
+     largas demais para ler com conforto. A coluna centrada é o que faz o
+     workspace parecer um documento e não um terminal. */
+  --w-leitura: 900px;
+
+  /* Lupa usada como MÁSCARA no status de busca (a cor vem de background, não do
+     SVG). Data URI, não arquivo: máscara é decoração de um estado transitório e
+     um recurso a mais em web_accessible_resources não se justifica. */
+  --ic-lupa-busca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20.5 20.5l-4.4-4.4'/%3E%3C/svg%3E");
+
   /* ritmo vertical — mesma ideia: passos previsíveis em vez de valores ad hoc.
      --sp-2b e --sp-3b entraram no refinamento: o sistema trabalha muito na faixa
      6–12px, e saltar de 6 direto para 10 (+66%) se via. */
   --sp-1: 4px; --sp-2: 6px; --sp-2b: 8px; --sp-3: 10px;
   --sp-3b: 12px; --sp-4: 14px; --sp-5: 20px; --sp-6: 28px;
-
   /* ---------- MOVIMENTO ----------
      TRÊS durações e TRÊS curvas, e nada fora delas — pelo mesmo motivo que a
      tipografia tem sete degraus em vez de treze tamanhos com meio-pixel:
@@ -278,6 +324,148 @@
    condicional em vez de global. */
 .wrap[data-tema] .panel { color: var(--text); }
 
+/* ---------- INSTITUCIONAL ----------
+   O visual da v0.24 à v0.59 — petróleo `#0e4459`, Newsreader + IBM Plex,
+   cabeçalho escuro. Ele deixou de ser o padrão na v0.60 e virou um tema, e os
+   126 tokens abaixo são os do `.wrap` daquela versão, VERBATIM.
+
+   Isto não é nostalgia: é a rede de não-regressão da rodada. A impressão
+   digital de `tests/visual/` fotografa este tema e compara com a baseline da
+   v0.59 — se bater, o visual antigo sobreviveu por CONSTRUÇÃO, e não por
+   alguém ter lido um diff de cento e trinta substituições. Ver
+   tests/visual/README.md, que enumera as duas classes de diferença esperadas.
+
+   Não "melhore" um valor aqui. Se um deles mudar, o tema deixa de ser o que
+   ele existe para ser e a prova deixa de provar. */
+.wrap[data-tema="institucional"] {
+  --pje: #14607e;
+  --pje-2: #0e4459;
+  --pje-3: #0e4e69;
+  --pje-soft: #8ba4b4;
+  --hd: #0e4459;
+  --mark-de: #2e7e9c;
+  --mark-para: #175d79;
+  --btn-de: #1c6c8b;
+  --btn-para: #125a78;
+  --btn-de-h: #22789a;
+  --btn-para-h: #0e4e69;
+  --line-focus: #6fa5b9;
+  --ring: 0 0 0 3px rgba(46, 126, 156, 0.13);
+  --ink: #0e323f;
+  --ink-2: #0b2a3a;
+  --paper: #f6f9fb;
+  --canvas: #e9eef3;
+  --text: #0e323f;
+  --text-2: #3e5561;
+  --text-3: #234e5e;
+  --muted: #616f78;
+  --muted-2: #74858e;
+  --muted-3: #93a3ac;
+  --eyebrow: #a0aeb6;
+  --surface: #ffffff;
+  --surface-painel: #ffffff;
+  --surface-2: #fafcfc;
+  --surface-3: #ffffff;
+  --surface-card: #fcfdfd;
+  --surface-list-ft: #f4f8f9;
+  --hover: #eff4f6;
+  --hover-2: #f5fafc;
+  --accent-bg: #dfeaee;
+  --accent-bg-2: #e4edf0;
+  --line: #e2eaee;
+  --line-2: #edf1f3;
+  --line-card: #e4ebee;
+  --line-input: #dae3e8;
+  --line-strong: #d8e2e6;
+  --line-check: #c3cfd5;
+  --ok: #2f9268;
+  --ok-bg: #eaf4ef;
+  --ok-line: #cbe3d8;
+  --ok-ink: #1e5c44;
+  --sig-hd: linear-gradient(180deg, #143f33 0%, #143f33 100%);
+  --sig-mark-de: #35946e;
+  --sig-mark-para: #1d6248;
+  --sig-btn-de: #26805e;
+  --sig-btn-para: #1a5c41;
+  --sig-btn-de-h: #2b8f68;
+  --sig-btn-para-h: #16513a;
+  --sig-halo: rgba(47, 146, 104, 0.28);
+  --sig-carimbo-bg: #cfe8db;
+  --sig-carimbo-bg-h: #dcf0e6;
+  --sig-carimbo-ink: #10352a;
+  --sig-textura: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%23ffffff' fill-opacity='0.055'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
+  --sig-textura-clara: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='48'%3E%3Cg fill='%230b2430' fill-opacity='0.05'%3E%3Crect x='0' y='6' width='58' height='5' rx='2.5'/%3E%3Crect x='66' y='6' width='34' height='5' rx='2.5'/%3E%3Crect x='0' y='19' width='40' height='5' rx='2.5'/%3E%3Crect x='48' y='19' width='72' height='5' rx='2.5'/%3E%3Crect x='0' y='32' width='86' height='5' rx='2.5'/%3E%3Crect x='94' y='32' width='28' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E");
+  --warn: #de8b2c;
+  --erro: #a5301f;
+  --warn-bg: #fbead2;
+  --warn-line: #eeddba;
+  --warn-ink: #a96b14;
+  --erro-hd: #b4402f;
+  --alerta: #b4402f;
+  --alerta-bg: #fbeee6;
+  --alerta-line: #e0b7a0;
+  --alerta-ink: #7c3212;
+  --on-hd: #eaf4f7;
+  --on-hd-2: #bbd8e2;
+  --on-hd-3: #cfe3ea;
+  --on-hd-forte: #ffffff;
+  --on-acao: #ffffff;
+  --veu-1: rgba(255, 255, 255, 0.07);
+  --veu-2: rgba(255, 255, 255, 0.16);
+  --veu-3: rgba(255, 255, 255, 0.32);
+  --veu-borda: rgba(255, 255, 255, 0.55);
+  --veu-luz: rgba(255, 255, 255, 0.22);
+  --veu-pega: rgba(255, 255, 255, 0.3);
+  --cat-decisao: #de8b2c;
+  --cat-audiencia: #2f9268;
+  --cat-peticao: #6a62c0;
+  --cat-prova: #c1508a;
+  --cat-outro: #b7c4cb;
+  --ff-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --ff-serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --ff-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  --r-xs: 4px;
+  --r-tight: 6px;
+  --r-sm: 7px;
+  --r-md: 8px;
+  --r-ctrl: 9px;
+  --r-box: 10px;
+  --r-lg: 11px;
+  --r-xl: 12px;
+  --r-2xl: 14px;
+  --r-pill: 20px;
+  --ic-lupa-busca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20.5 20.5l-4.4-4.4'/%3E%3C/svg%3E");
+  --sh-card: 0 1px 2px rgba(14, 50, 63, 0.04);
+  --sh-seg: 0 1px 2px rgba(14, 50, 63, 0.1);
+  --sh-btn: 0 1px 2px rgba(14, 50, 63, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --sh-pop: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
+  --sh-erguido: 0 2px 6px rgba(14, 50, 63, 0.13), 0 34px 80px -20px rgba(14, 50, 63, 0.44);
+  --sh-panel: 0 1px 2px rgba(14, 50, 63, 0.1), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
+  --fs-nano: 10px;
+  --fs-micro: 11px;
+  --fs-meta: 12px;
+  --fs-ui: 13px;
+  --fs-body: 14px;
+  --fs-lg: 15px;
+  --fs-lead: 17px;
+  --fs-hero: 26px;
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-2b: 8px;
+  --sp-3: 10px;
+  --sp-3b: 12px;
+  --sp-4: 14px;
+  --sp-5: 20px;
+  --sp-6: 28px;
+  --dur-1: 140ms;
+  --dur-2: 220ms;
+  --dur-3: 300ms;
+  --dur-4: 380ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
 /* ---------- NOITE ----------
    O tema que faltava de verdade: a página do PJe é branca e ofuscante, e quem
    trabalha à noite fica com ela ao lado do painel por horas.
@@ -304,6 +492,11 @@
    nunca a COR resultante. Hoje há `t-temas-contraste`, que calcula o contraste
    dos pares que se encontram na tela — e é ele que impede a repetição. */
 .wrap[data-tema="noite"] {
+  /* A chrome deste tema é ESCURA, então a textura do sigiloso é a BRANCA.
+     Ela era herdada do base até a v0.59; com o padrão virando chrome clara,
+     o base passou a apontar para a escura e cada tema de chrome escura
+     precisa dizer qual é a sua. */
+  --sig-textura: var(--sig-textura-branca);
   /* GRADIENTE, e não cor chapada: `--hd` e `--surface-painel` são consumidos
      como `background`, então um gradiente cabe neles sem tocar em uma única
      regra de componente — o tema continua sendo só um bloco de tokens. Num
@@ -720,6 +913,11 @@
    como botão sólido. É o que o §2 pede: a diferença entre "informa" e "impede"
    tem de sobreviver, e ela sobrevive. */
 .wrap[data-tema="toga"] {
+  /* A chrome deste tema é ESCURA, então a textura do sigiloso é a BRANCA.
+     Ela era herdada do base até a v0.59; com o padrão virando chrome clara,
+     o base passou a apontar para a escura e cada tema de chrome escura
+     precisa dizer qual é a sua. */
+  --sig-textura: var(--sig-textura-branca);
   --hd: linear-gradient(135deg, #3a141d 0%, #6b2537 62%, #4a1826 100%);
   --on-hd: #f8e9ed;
   --on-hd-2: #d6adb8;
@@ -807,6 +1005,11 @@
    tem motivo: o magenta (~330°) fica a ~50° do tijolo do `--alerta` (~18°), e o
    alerta aparece como fundo claro com tinta escura, nunca como botão sólido. */
 .wrap[data-tema="rosa"] {
+  /* A chrome deste tema é ESCURA, então a textura do sigiloso é a BRANCA.
+     Ela era herdada do base até a v0.59; com o padrão virando chrome clara,
+     o base passou a apontar para a escura e cada tema de chrome escura
+     precisa dizer qual é a sua. */
+  --sig-textura: var(--sig-textura-branca);
   --hd: linear-gradient(135deg, #9c1250 0%, #c41f6a 58%, #a81455 100%);
   --on-hd: #ffffff;
   --on-hd-2: #ffe3ef;
@@ -1219,69 +1422,198 @@ button > svg { flex: none; }
   flex: none;
 }
 
-/* ---------- Cabeçalho ---------- */
+/* ---------- Cabeçalho (v0.60: quatro zonas) ----------
+   IDENTIDADE · PROCESSO · NAVEGAÇÃO · AÇÕES. A v0.59 tinha uma zona só, com o
+   título em duas linhas e nove botões-ícone espremidos à direita; a barra nova
+   separa "que ferramenta é esta" de "que processo é este" de "onde estou" de
+   "o que eu faço agora" — as três perguntas que a navegação precisa responder.
+
+   A CHROME É CLARA. É a mudança que mais consequência teve: --on-hd-* viraram
+   tinta escura, --veu-* viraram véus escuros e --sig-hd acompanhou. */
 .hd {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px 0 18px;
-  min-height: 60px;
-  /* CHAPADO — a assinatura migrou para o quadrado da marca (.mark). Ver o
-     porquê no DESIGN.md §2: o painel abre sob a barra do próprio PJe. */
+  gap: var(--sp-3);
+  padding: 0 12px 0 14px;
+  min-height: 56px;
   background: var(--hd);
   color: var(--on-hd-forte);
+  border-bottom: 1px solid var(--line);
 }
-/* Título em duas linhas: produto em cima, número do processo embaixo. Com
-   vários processos abertos em abas, não dava para saber a qual deles o painel
-   se referia sem olhar a página atrás. */
-.hd .tit-wrap {
-  display: flex; flex-direction: column; line-height: 1.1;
-  min-width: 0; flex: 1 1 auto;
-}
-/* O CNJ em MONO: é um numeral que o usuário compara entre abas. Tabular,
-   alinha na vertical e não se confunde com o nome do produto acima. */
-.hd .cnj {
-  font-family: var(--ff-mono);
-  font-size: var(--fs-nano);
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  color: var(--on-hd-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.hd .cnj:empty { display: none; }
-/* A marca é o único ponto de luz do cabeçalho agora que ele é chapado: o
-   gradiente vertical + o inset branco no topo fazem o quadrado ler como
-   superfície, não como um quadrado colorido. Ver DESIGN.md §2. */
+
+/* --- zona 1: identidade --- */
+.hd-marca { display: flex; align-items: center; gap: var(--sp-2b); flex: none; min-width: 0; }
+/* O quadrado é o único elemento SATURADO de um cabeçalho claro: é ele que
+   ancora a marca onde antes era a faixa inteira. O inset branco no topo faz o
+   gradiente ler como superfície, não como bloco pintado. */
 .hd .mark {
-  width: 32px; height: 32px; flex: none;
+  width: 30px; height: 30px; flex: none;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--r-ctrl);
+  border-radius: var(--r-sm);
   background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
   box-shadow: inset 0 1px 0 var(--veu-luz);
 }
-/* A imagem é MENOR que o quadrado de propósito: é o gradiente em volta que
-   capta a luz. Uma <img> ocupando 100% cobriria o gradiente e o quadrado
-   voltaria a ser um bloco chapado. */
-.hd .mark img { width: 20px; height: 20px; display: block; }
-/* o flex:1 saiu daqui e foi para o .tit-wrap: dentro de um container em COLUNA
-   o flex:1 esticaria a altura do título, não a largura do cabeçalho */
+.hd .mark img { width: 19px; height: 19px; display: block; }
 .hd .ttl {
-  font-family: var(--ff-serif);
-  font-size: var(--fs-lead);
-  font-weight: 500;
-  letter-spacing: 0.005em;
+  font-family: var(--ff-display);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  letter-spacing: -0.011em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* Clusters: os botões são agrupados por FUNÇÃO — [conversa] [layout] [fechar].
-   Substituem o separador de 1px que existia antes do ✕: sete botões iguais
-   lado a lado precisavam de um traço para dizer onde um grupo acabava, e o
-   agrupamento diz isso e ainda revela QUAIS botões são parentes. */
-.hd-grp {
-  display: flex; align-items: center; gap: 2px; flex: none;
+
+/* --- zona 2: o processo, numa pill própria ---
+   Até a v0.59 o CNJ era a segunda linha do título — lido como legenda da marca.
+   Ele não é: é a identidade do OBJETO em análise, e a pill o separa. O dot diz
+   se a sessão do PJe ainda responde, e o botão de copiar resolve o que antes
+   exigia selecionar dezoito caracteres com o mouse. */
+.hd-processo {
+  display: flex; align-items: center; gap: var(--sp-2);
+  flex: 0 1 auto; min-width: 0;
+  padding: 4px 4px 4px 9px;
+  border: 1px solid var(--veu-1);
+  border-radius: var(--r-md);
   background: var(--veu-1);
-  border-radius: var(--r-ctrl);
-  padding: 3px;
 }
+.hp-dot {
+  width: 6px; height: 6px; flex: none;
+  border-radius: var(--r-round);
+  background: var(--ok);
+}
+.hp-dot.morta { background: var(--warn); }
+/* O CNJ em MONO: é um numeral que o usuário compara entre abas e copia. */
+.hd .cnj {
+  font-family: var(--ff-mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--on-hd);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.hd .cnj:empty { display: none; }
+.hp-trib {
+  flex: none;
+  font-size: var(--fs-nano);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--on-hd-2);
+  background: var(--veu-2);
+  border-radius: var(--r-xs);
+  padding: 2px 5px;
+}
+.hd .hp-copiar {
+  flex: none;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; padding: 0; cursor: pointer;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--on-hd-2);
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.hd .hp-copiar:hover { background: var(--veu-2); color: var(--on-hd-forte); }
+.hd .hp-copiar.copiado { color: var(--ok); background: var(--ok-bg); }
+
+/* --- zona 3: navegação ---
+   Fica no MEIO e empurra as ações para a direita (o margin-left auto), que é a
+   convenção que o olho já conhece. Some no estreito: quatro abas não cabem em
+   420px, e ali a entrada da linha do tempo continua sendo o selo do rodapé. */
+.hd-nav {
+  display: flex; align-items: center; gap: 2px;
+  margin-left: auto;
+  flex: none;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--veu-1);
+  border: 1px solid var(--veu-1);
+}
+.hd .hn-i {
+  display: flex; align-items: center; gap: 5px;
+  width: auto; height: 26px; padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-tight);
+  background: transparent;
+  color: var(--on-hd-2);
+  font-family: var(--ff-sans);
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.hd .hn-i svg { width: 14px; height: 14px; opacity: 0.8; }
+.hd .hn-i:hover { color: var(--on-hd-forte); background: var(--veu-2); }
+/* A aba ATIVA é uma placa branca elevada dentro da calha — o mesmo gesto do
+   segmented da lista de peças, para os dois se lerem como o mesmo controle. */
+.hd .hn-i[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  box-shadow: var(--sh-seg);
+}
+.hd .hn-i[aria-selected="true"] svg { color: var(--pje); opacity: 1; }
+/* A seta diz que o destino SAI da página — "como volto?" é pergunta que a
+   navegação tem de responder antes do clique, não depois. */
+.hn-ext { font-size: var(--fs-nano); color: var(--on-hd-2); margin-left: 1px; opacity: 0.75; }
+
+/* --- zona 4: ações --- */
+.hd-acoes { display: flex; align-items: center; gap: 3px; flex: none; }
+.hd-sep { width: 1px; height: 18px; background: var(--veu-borda); margin: 0 3px; flex: none; opacity: 0.5; }
+
+/* --- o popover de Exibição ---
+   Os botões aqui dentro são os MESMOS de antes (mesma classe, mesmo handler,
+   mesmo estado); o que mudou é que ganharam RÓTULO. Cinco glifos sem nome eram
+   atrito puro: um menu que diz "Lateral" é mais descobrível que um ícone que
+   insinua, e ainda cabe numa barra que passou a ter navegação. */
+.exibbox {
+  position: fixed;
+  z-index: 12;
+  min-width: 214px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-pop);
+}
+.exib-t {
+  font-size: var(--fs-nano);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--eyebrow);
+  padding: 6px 9px 5px;
+}
+.exib-i {
+  display: flex; align-items: center; gap: var(--sp-2b);
+  width: 100%; height: 32px; padding: 0 9px;
+  border: 0; border-radius: var(--r-tight);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--ff-sans);
+  font-size: var(--fs-ui);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.exib-i:hover { background: var(--hover); color: var(--ink); }
+.exib-i svg { width: 15px; height: 15px; flex: none; color: var(--muted); }
+.exib-i .lbl { flex: 1 1 auto; }
+.exib-ck { display: flex; opacity: 0; flex: none; }
+.exib-ck svg { color: var(--pje); }
+.exib-i[aria-checked="true"] { color: var(--ink); }
+.exib-i[aria-checked="true"] .exib-ck { opacity: 1; }
+.exib-i[aria-checked="true"] svg { color: var(--pje); }
+.exib-sep { height: 1px; background: var(--line-2); margin: 5px 4px; }
+
+/* --- derivação: painel estreito ---
+   As abas somem (não cabem em 420px) e a pill perde a sigla e o copiar: o que
+   sobrevive é o que identifica o processo, que é o número. */
+.wrap.estreito .hd { min-height: 52px; padding: 0 8px 0 10px; gap: var(--sp-2); }
+.wrap.estreito .hd-nav { display: none; }
+.wrap.estreito .hd-processo { margin-left: auto; padding: 3px 7px; }
+.wrap.estreito .hp-trib, .wrap.estreito .hp-copiar { display: none; }
+.wrap.estreito .hd .ttl { display: none; }
 .hd button {
   background: transparent;
   border: none;
@@ -1293,6 +1625,12 @@ button > svg { flex: none; }
   transition: background 0.14s ease, color 0.14s ease;
 }
 .hd button:hover { background: var(--veu-2); color: var(--on-hd-forte); }
+/* ATENÇÃO — ESTA REGRA TEM ESPECIFICIDADE 0,1,1 E GOVERNA TODO BOTAO DO
+   CABEÇALHO. Qualquer controle novo aqui dentro (as abas, o copiar da pill)
+   precisa de um seletor `.hd .x` E de DESFAZER o que ela impos: `width: auto`
+   antes de mais nada, senão a aba de 100px sai com 30px e o texto empilha por
+   cima do vizinho. Foi assim que ela venceu o `.sigselo` na v0.57 e as abas na
+   primeira versao desta barra. */
 /* Conversas guardadas: ícone + CONTADOR. O botão é o único do cabeçalho que
    não é quadrado, e por um motivo — dois desenhos de balão vizinhos (listar e
    criar) são indistinguíveis a 15px, e foi exatamente esse o relato. O número
@@ -1565,19 +1903,132 @@ button > svg { flex: none; }
 .doc-q-n { flex: none; font-size: var(--fs-micro); color: var(--muted); }
 
 .doclist { overflow-y: auto; font-size: var(--fs-ui); }
-.docrow {
-  /* Tudo ancorado na PRIMEIRA linha do nome, não no centro da row: com o nome
-     ocupando até três linhas, `center` deixava o checkbox e o dot boiando na
-     altura da segunda — longe da linha por onde o olho entra na peça. Em row de
-     uma linha só o resultado é idêntico ao de antes; os `margin-top` abaixo
-     centram cada controle na linha de texto (13px × 1.32 = 17px). */
-  display: flex; gap: var(--sp-3); align-items: flex-start;
-  padding: var(--sp-2b); border-radius: var(--r-md); cursor: pointer;
-  /* Arrastar sobre a lista MARCA PEÇAS — não seleciona texto. Sem isto o
-     gesto natural de "passar o mouse marcando" pintava a lista inteira de azul
-     de seleção do navegador e não marcava nada. */
-  user-select: none; -webkit-user-select: none;
+/* ---------- Coluna de peças: o rodapé próprio (v0.60) ----------
+   A coluna passou a ter três zonas, como no desenho de referência: cabeçalho
+   (identidade + busca + degraus + legenda), lista, e um RODAPÉ que responde
+   "quanto disto já está no contexto?" — a pergunta que se faz enquanto se
+   marca, e que até a v0.59 só tinha resposta do outro lado da tela. */
+.docs-ft {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--line);
+  background: var(--surface-list-ft);
+  padding: var(--sp-2b) var(--sp-3) var(--sp-2b);
+  display: flex; flex-direction: column; gap: var(--sp-2b);
 }
+
+/* O medidor vira DUAS LINHAS aqui: rótulo + número em cima, barra embaixo.
+   Na `.metarow` ele era uma barra de 60px com o texto ao lado, porque
+   disputava a linha com custo, modelo e linha do tempo. Aqui ele tem a coluna
+   inteira, e a barra pode ser larga o bastante para se ler de relance. */
+.docs-ft .gauge {
+  display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+  width: 100%; margin: 0; padding: 0; border: 0; background: none;
+}
+.docs-ft .g-lin { display: flex; align-items: baseline; gap: var(--sp-2); }
+.docs-ft .g-rot {
+  font-size: var(--fs-micro); font-weight: 500; color: var(--text-2);
+  flex: none;
+}
+.docs-ft .g-full { display: none; }
+.docs-ft .g-short { display: inline; }
+.docs-ft .gauge-txt {
+  margin-left: auto; text-align: right; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--ff-mono); font-size: var(--fs-nano); font-weight: 500;
+  color: var(--muted-2); line-height: 1.4;
+}
+.docs-ft .gauge-bar {
+  width: 100%; height: 5px; flex: none;
+  border-radius: var(--r-round);
+  background: var(--hover);
+  overflow: hidden;
+}
+.docs-ft .gauge-fill {
+  height: 100%; border-radius: var(--r-round);
+  background: linear-gradient(90deg, var(--pje), var(--ok));
+  transition: width var(--dur-3) var(--ease-out);
+}
+
+/* A faixa de ações da lista. As duas de MAIOR valor ficam com rótulo — a de
+   escolher com IA é a menos descoberta do produto, e a de carregar tudo é a
+   que resolve "a peça não está na lista". As outras três (extrair texto,
+   .zip, precatórias) viram ícone: continuam a um clique, sem ocupar a coluna. */
+.docs-tip {
+  display: flex; align-items: center; gap: var(--sp-1);
+  flex-wrap: wrap;
+  padding: 0; margin: 0; border: 0; background: none; min-height: 0;
+}
+.docs-tip .tip-txt-ocr .lbl,
+.docs-tip .tip-zip .lbl { display: none; }
+.docs-tip .tip-ia,
+.docs-tip .tip-load { flex: 0 1 auto; }
+/* A PROCEDÊNCIA da lista fica à direita, onde o desenho de referência põe o
+   estado da sincronização — e aqui ela diz o fato: de onde a lista veio e
+   quando foi lida. Um "sincronizado" sem data afirmaria atualidade que a
+   leitura em cache não tem. */
+.docs-tip .tip-i { margin-left: auto; }
+
+/* A RAIL passa a carregar a porcentagem: com a lista colapsada o medidor iria
+   junto, e um medidor que some não mede. */
+.docs-rail .rail-n { font-family: var(--ff-mono); font-size: var(--fs-nano); }
+
+/* Ícone de pasta no título da coluna: a convenção mais barata que existe para
+   dizer "aqui dentro há documentos". */
+.dh-ico { display: flex; flex: none; color: var(--pje); }
+.dh-ico svg { width: 16px; height: 16px; }
+
+/* --- a linha da peça: um CARTÃO de duas linhas ---
+   Linha 1: ponto de categoria + nome. Linha 2: o id em mono e o tipo oficial do
+   PJe. O id só DESCEU de linha (já estava ali); o tipo vinha do `title` e passa
+   a ser visível, porque é o vocabulário controlado do tribunal e descreve a
+   peça melhor que o título, que costuma ser o nome do arquivo.
+
+   SEM badge de folhas, ao contrário do desenho de referência: a extensão não
+   conhece o intervalo de folhas de uma peça — só o total de páginas, e só
+   depois do download. Um intervalo inventado seria o pior tipo de dado. */
+.docrow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "chk nome ver" "chk meta ver";
+  align-items: center;
+  column-gap: var(--sp-2b);
+  row-gap: 1px;
+  padding: var(--sp-2b) var(--sp-2b) var(--sp-2b) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  margin-bottom: var(--sp-2);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.docrow:hover { border-color: var(--pje-soft); box-shadow: var(--sh-card); }
+.docrow > input { grid-area: chk; }
+.docrow .d-dot { grid-area: none; }
+.docrow .d-t { grid-area: nome; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.docrow .d-ver { grid-area: ver; }
+.docrow .d-meta {
+  grid-area: meta;
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-width: 0;
+}
+.docrow .d-id {
+  font-family: var(--ff-mono); font-size: var(--fs-nano); font-weight: 400;
+  color: var(--muted-3); letter-spacing: 0.01em;
+}
+/* O TIPO à direita, num chip discreto: ele qualifica, não compete com o nome. */
+.docrow .d-tipo {
+  margin-left: auto;
+  font-size: var(--fs-nano); font-weight: 500;
+  color: var(--muted-2);
+  background: var(--hover);
+  border-radius: var(--r-xs);
+  padding: 1px 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%;
+}
+/* No estreito o tipo cai: ali a coluna vira uma faixa de 264px de altura e o
+   nome da peça é o que precisa de largura. */
+.wrap.estreito .docrow .d-tipo { display: none; }
+
 /* Exceção: o id da peça é numeral que se copia para procurar no PJe. */
 .d-id { user-select: text; -webkit-user-select: text; }
 /* …mas a exceção QUEBRAVA o arrasto. Com `user-select: text` no .d-id, o
@@ -1723,13 +2174,6 @@ button > svg { flex: none; }
 /* Rodapé da lista: superfície própria (--surface-list-ft), um degrau abaixo da
    coluna. Sem ela as ações "sobre a lista inteira" flutuavam no mesmo plano
    dos itens e não se liam como um rodapé. */
-.docs-tip {
-  font-size: var(--fs-micro); color: var(--muted);
-  padding: var(--sp-3) var(--sp-4);
-  border-top: 1px solid var(--line); margin-top: 0;
-  background: var(--surface-list-ft);
-  display: flex; flex-wrap: wrap; gap: var(--sp-2b); align-items: center;
-}
 /* Quadrado âmbar com "!" — era o emoji ⚠️, que cada sistema desenha de um
    jeito e nunca casava com a cor de aviso do resto do painel. */
 .tip-i {
@@ -2614,14 +3058,145 @@ button > svg { flex: none; }
    Antes: ~380 palavras de prosa, sempre. Agora: três passos + exemplos
    clicáveis (aprende-se pelo gesto), texto explicativo num <details> fechado e
    a referência completa no help.html. */
+/* ---------- Estado vazio (v0.60) ----------
+   A tela que responde "que ferramenta é esta, o que ela faz e por onde eu
+   começo" — as três perguntas que uma primeira tela precisa responder sem que
+   ninguém tenha de decifrar nada. Selo, pergunta, uma linha de apoio, o caminho
+   em três cartões e três atalhos que preenchem o campo. */
 .hint-empty {
-  margin: auto; text-align: center; color: var(--muted);
-  max-width: 560px; font-size: var(--fs-ui); line-height: 1.55;
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--sp-3b);
+  width: 100%; max-width: var(--w-leitura);
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-4) var(--sp-4);
+  text-align: center;
 }
+
+/* O selo. Ele afirma o que a extensão cumpre nos QUATRO provedores — e é por
+   isso que fala de peça, id e folha, e não de "citação por página", que só
+   existe nos modelos Claude. */
+.he-selo {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 5px 12px 5px 9px;
+  border: 1px solid var(--accent-bg-2);
+  border-radius: var(--r-pill);
+  background: var(--accent-bg);
+  color: var(--pje-3);
+  font-size: var(--fs-meta); font-weight: 500;
+}
+.he-selo svg { width: 14px; height: 14px; flex: none; color: var(--pje); }
+.he-selo i { font-style: italic; }
+
 .hint-empty .big {
-  font-family: var(--ff-serif); font-size: var(--fs-lead); color: var(--ink);
-  display: block; margin-bottom: var(--sp-4);
+  font-family: var(--ff-display);
+  font-size: var(--fs-hero);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--ink);
 }
+.he-sub {
+  margin: 0; max-width: 46em;
+  font-size: var(--fs-body); line-height: 1.55;
+  color: var(--muted);
+}
+
+/* --- os três passos, agora cartões --- */
+.passos {
+  display: grid; grid-template-columns: 1fr; gap: var(--sp-3);
+  width: 100%; text-align: left;
+}
+.passo {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: var(--sp-3b);
+  border: 1px solid var(--line-card);
+  border-radius: var(--r-lg);
+  background: var(--surface-card);
+  box-shadow: var(--sh-card);
+}
+.p-hd { display: flex; align-items: center; gap: var(--sp-2b); margin-bottom: var(--sp-1); }
+.p-ico {
+  width: 30px; height: 30px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent-bg-2);
+  background: var(--accent-bg);
+  color: var(--pje);
+}
+.p-ico svg { width: 16px; height: 16px; }
+/* UM ACENTO SÓ nos três cartões. O desenho de referência os pinta em
+   indigo/verde/ciano; com ciano sendo a cor de PETIÇÃO na legenda logo ao lado,
+   o estado vazio mostraria a mesma cor querendo dizer duas coisas na mesma
+   tela. Categoria é semântica; cartão de passo é decoração. */
+.passo .pn {
+  margin-left: auto;
+  font-family: var(--ff-mono); font-size: var(--fs-nano); font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--pje-3);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-bg-2);
+  border-radius: var(--r-xs);
+  padding: 2px 6px;
+}
+.passo b { font-size: var(--fs-ui); font-weight: 600; color: var(--ink); }
+.passo > span { font-size: var(--fs-meta); line-height: 1.5; color: var(--muted); }
+
+/* --- cabeçalho de seção: eyebrow à esquerda, nota à direita --- */
+.secao-hd {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  width: 100%; text-align: left;
+  margin-top: var(--sp-1);
+}
+.sh-t {
+  font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--eyebrow);
+}
+.sh-n { margin-left: auto; font-size: var(--fs-micro); color: var(--muted-3); }
+
+/* --- os três atalhos, agora cartões --- */
+.exemplos {
+  display: grid; grid-template-columns: 1fr; gap: var(--sp-3);
+  width: 100%; text-align: left;
+}
+.ex {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  position: relative;
+  padding: var(--sp-3b) var(--sp-5) var(--sp-3b) var(--sp-3b);
+  border: 1px solid var(--line-card);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-card);
+  cursor: pointer;
+  font-family: var(--ff-sans);
+  text-align: left;
+  transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.ex:hover { border-color: var(--pje-soft); box-shadow: var(--sh-pop); }
+.ex::before, .ex::after { content: none; }
+.ex-t { font-size: var(--fs-ui); font-weight: 600; color: var(--ink); }
+.ex-a { font-size: var(--fs-meta); line-height: 1.45; color: var(--muted-2); }
+.ex-seta {
+  position: absolute; top: var(--sp-3b); right: var(--sp-3b);
+  display: flex; color: var(--muted-3);
+  transition: transform var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.ex:hover .ex-seta { color: var(--pje); transform: translateX(2px); }
+
+/* Três colunas só quando há largura para isso. Abaixo disso a coluna única já
+   era a regra — o painel flutuante tem 420px, e três cartões ali dariam duas
+   palavras por linha. */
+@container (min-width: 760px) {
+  .passos, .exemplos { grid-template-columns: repeat(3, 1fr); }
+}
+.wrap.expanded .passos, .wrap.expanded .exemplos,
+.wrap.full .passos, .wrap.full .exemplos,
+.wrap.livre-wide .passos, .wrap.livre-wide .exemplos { grid-template-columns: repeat(3, 1fr); }
+
+.wrap.estreito .hint-empty { padding: var(--sp-5) var(--sp-3) var(--sp-3); gap: var(--sp-3); }
+.wrap.estreito .hint-empty .big { font-size: var(--fs-lead); }
+.wrap.estreito .he-sub { font-size: var(--fs-meta); }
+
 /* O degrau `--fs-hero` existe na escala e no DESIGN.md §3 para exatamente este
    título, mas a regra que o aplicava nunca foi escrita: nos modos largos o
    "Como posso ajudar?" continuava em --fs-lead, do tamanho de uma linha de
@@ -2634,49 +3209,14 @@ button > svg { flex: none; }
 
 /* Os três passos: numeral em disco, verbo em destaque, detalhe em micro. Em
    coluna única no painel estreito — três colunas de 150px seriam ilegíveis. */
-.passos {
-  display: grid; grid-template-columns: 1fr; gap: var(--sp-2);
-  text-align: left; margin-bottom: var(--sp-3);
-}
 /* Três colunas só no modal/tela cheia: na janela livre larga a coluna de peças
    deixa ~420px de chat, e três cartões ali ficariam com duas palavras por linha. */
 .wrap.expanded .passos {
   grid-template-columns: repeat(3, 1fr); gap: var(--sp-3);
 }
-.passo {
-  display: grid; grid-template-columns: auto 1fr; gap: 2px var(--sp-2);
-  align-items: center;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-  padding: var(--sp-2) var(--sp-3);
-}
-.passo .pn {
-  grid-row: span 2; align-self: center;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--accent-bg); color: var(--pje-2);
-  font-size: var(--fs-micro); font-weight: 600;
-  display: flex; align-items: center; justify-content: center;
-}
-.passo b { color: var(--ink); font-size: var(--fs-meta); }
-.passo span { font-size: var(--fs-micro); line-height: 1.4; }
 .passo i { font-style: italic; }
 
 /* Exemplos: preenchem o campo, não enviam. */
-.exemplos {
-  display: flex; flex-wrap: wrap; gap: var(--sp-2);
-  justify-content: center; margin-bottom: var(--sp-4);
-}
-.exemplos .ex {
-  border: 1px solid var(--line); background: var(--surface); color: var(--text-3);
-  border-radius: var(--r-pill); padding: 7px var(--sp-4);
-  /* SERIF, não a sans da interface: é a única fala sugerida ao usuário, e
-     a serifa a marca como "texto", não como controle. DESIGN.md §5. */
-  font-family: var(--ff-serif); font-size: var(--fs-body); cursor: pointer;
-  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
-}
-.exemplos .ex::before { content: "“"; }
-.exemplos .ex::after { content: "”"; }
-.exemplos .ex:hover { border-color: var(--line-focus); background: var(--hover-2); color: var(--pje-2); }
-
 /* Guia recolhível: fechada por padrão, estado lembrado em storage.local. */
 .hint-empty .guia {
   text-align: left; background: var(--surface);
@@ -2797,13 +3337,113 @@ button > svg { flex: none; }
    disputava a linha): eles ficam do seu tamanho e é a meta que desce. */
 .tools { flex: 0 1 auto; }
 .toolbar { align-items: center; row-gap: var(--sp-2); flex-wrap: wrap; }
-.metarow {
-  display: flex; align-items: center; gap: var(--sp-3);
-  margin-left: auto; min-width: 0; flex-wrap: wrap;
-  /* quando não cabe tudo na linha das ferramentas, as sobras descem ANCORADAS
-     À DIREITA — assim a quebra parece deliberada, não um vazamento */
-  justify-content: flex-end;
+/* ---------- O COMPOSITOR (v0.60) ----------
+   Até a v0.59 o rodapé eram DOZE faixas irmãs empilhadas — status, alerta,
+   contexto, ferramentas, meta, minuta, mapa, prompt, anexos, a linha de
+   escrever e os atalhos —, todas com o mesmo peso visual. Não havia como ler
+   onde acabava "o que a extensão me conta" e começava "o que eu mando".
+
+   Agora são três planos: o que PRECEDE a caixa (e muda o que o Enviar faz), a
+   CAIXA, e o que a extensão CONTA depois. A caixa é um cartão só, com três
+   linhas separadas por hairline: contexto · texto · ações. */
+
+/* --- o cartão --- */
+.comp-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  box-shadow: var(--sh-pop);
+  padding: var(--sp-2b) var(--sp-3) var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  position: relative;
+  transition: border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
 }
+/* O foco acende o CARTÃO, não o campo: quem está escrevendo está usando a
+   caixa inteira — o 📎, as ferramentas e o Enviar fazem parte do mesmo gesto. */
+.comp-card:focus-within { border-color: var(--line-focus); box-shadow: var(--sh-pop), var(--ring); }
+
+/* --- linha 1: o contexto que vai junto --- */
+.cc-ctx {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line-2);
+}
+
+/* --- linha 2: o que se escreve ---
+   A borda e o fundo saíram daqui: quem carrega a moldura agora é o cartão.
+   Duas molduras aninhadas eram a leitura de "campo dentro de caixa", quando o
+   campo É a caixa. */
+.inrow {
+  display: flex; align-items: flex-end; gap: var(--sp-2);
+  border: 0; background: transparent; padding: 0; border-radius: 0;
+  box-shadow: none;
+}
+.inrow:focus-within { border: 0; box-shadow: none; }
+
+/* --- linha 3: o que se faz --- */
+.cc-acts {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-2);
+}
+.cc-acts .tools {
+  display: flex; align-items: center; gap: var(--sp-1);
+  flex: 1 1 auto; min-width: 0; flex-wrap: wrap;
+}
+/* O ENVIAR É UM CÍRCULO SLATE-900, e é o elemento de maior contraste da tela.
+   A ação principal precisa estar evidente sem depender de leitura: numa caixa
+   branca sobre canvas slate, quase-preto é o único valor que ninguém confunde
+   com decoração. O rótulo continua no DOM (leitores de tela, e o modo minuta o
+   reescreve para "Gerar minuta"); o que some é a exibição dele. */
+.cc-acts .send {
+  flex: none; margin-left: auto;
+  width: 36px; height: 36px; padding: 0;
+  border-radius: var(--r-round);
+  background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
+  color: var(--on-acao);
+  border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sh-btn);
+  transition: background var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.cc-acts .send:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--btn-de-h), var(--btn-para-h));
+}
+.cc-acts .send:active:not(:disabled) { transform: scale(0.94); }
+.cc-acts .send .lbl { display: none; }
+.cc-acts .send svg { width: 17px; height: 17px; }
+/* No modo minuta/mapa o botão volta a ter TEXTO: ali o rótulo é a única coisa
+   que diz que o Enviar deixou de mandar uma pergunta e passou a gerar um ato. */
+.wrap.modo-ato .cc-acts .send {
+  width: auto; border-radius: var(--r-pill); padding: 0 var(--sp-3b); gap: var(--sp-2);
+}
+.wrap.modo-ato .cc-acts .send .lbl { display: inline; font-size: var(--fs-ui); font-weight: 600; }
+
+/* --- o rodapé de meta, FORA do cartão ---
+   Nada aqui é instrução do usuário: é o que a extensão conta sobre o turno. */
+.metarow {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-2);
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-micro);
+  color: var(--muted-2);
+}
+/* Os atalhos deixaram de ser uma FAIXA que se revela no foco e viraram uma
+   linha fixa: a faixa mudava a altura do rodapé e empurrava a .inrow 20px para
+   cima no instante do clique — era o defeito do 📎 que "só abria na terceira
+   vez". Aqui nada cresce. */
+.meta-teclas { margin-left: auto; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.meta-teclas kbd {
+  font-family: var(--ff-mono); font-size: var(--fs-nano); font-weight: 500;
+  border: 1px solid var(--line); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--muted);
+  padding: 1px 4px; line-height: 1.5;
+}
+.wrap.estreito .meta-teclas { display: none; }
+
 .chips { max-height: 64px; overflow-y: auto; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -3040,12 +3680,6 @@ button > svg { flex: none; }
 .attach:hover { background: var(--hover); color: var(--pje); }
 .attach:disabled { opacity: 0.5; cursor: default; }
 
-.inrow {
-  display: flex; gap: 8px; align-items: flex-end;
-  border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 10px;
-  background: var(--surface); transition: border-color 0.15s, box-shadow 0.15s;
-}
-.inrow:focus-within { border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15); }
 .in {
   flex: 1; resize: none; border: none; outline: none;
   font: inherit; font-size: var(--fs-body); line-height: 1.45; padding: 5px 0;
@@ -3053,18 +3687,6 @@ button > svg { flex: none; }
 }
 /* Botão primário: gradiente vertical + inset branco no topo (--sh-btn). É o
    inset que faz o degradê parecer superfície iluminada e não um chapado sujo. */
-.send {
-  flex: none; display: inline-flex; align-items: center; gap: var(--sp-2);
-  background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
-  color: var(--on-acao); border: none; border-radius: var(--r-ctrl);
-  height: 38px; padding: 0 18px;
-  font-size: var(--fs-ui); font-weight: 600; cursor: pointer;
-  box-shadow: var(--sh-btn);
-  transition: background 0.14s ease;
-}
-.send:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--btn-de-h), var(--btn-para-h));
-}
 .send svg { flex: none; }
 .send:disabled, .in:disabled { opacity: 0.5; cursor: default; }
 /* Atalhos de teclado: informação que se aprende UMA vez. Ficam visíveis com o
@@ -3081,16 +3703,7 @@ button > svg { flex: none; }
    elemento e o navegador disparava o `click` no ancestral comum — o 📎 não
    abria o seletor de arquivos e o Enviar não enviava, sem erro nenhum. Ver o
    bloco "Atalhos de teclado" em panel.js. */
-.hint-key {
-  display: grid; grid-template-rows: 0fr;
-  font-size: var(--fs-micro); color: var(--muted);
-  transition: grid-template-rows 0.18s ease, margin-top 0.18s ease;
-  margin-top: 0;
-}
 .hk-in { overflow: hidden; min-height: 0; }
-.ft.novato .hint-key,
-.ft.hint-on .hint-key { grid-template-rows: 1fr; margin-top: var(--sp-2); }
-
 /* Nota do modo de citações (modelos Gemini: páginas citadas no próprio texto).
    Era um parágrafo fixo de duas linhas no rodapé; virou um ⓘ colado ao selo do
    modelo — a informação é sobre o modelo ativo, é ali que ela pertence. */
@@ -3780,11 +4393,11 @@ button > svg { flex: none; }
 
 /* ---------- Medidor de contexto da conversa ---------- */
 .gauge { display: flex; align-items: center; gap: var(--sp-2); margin: 0; cursor: help; min-width: 0; }
-.gauge-bar {
-  flex: 0 0 64px; height: 5px; border-radius: var(--r-pill);
-  background: var(--line-2); overflow: hidden;
-}
-.wrap.expanded .gauge-bar, .wrap.livre-wide .gauge-bar { flex-basis: 90px; }
+/* A barra vive no rodape da coluna de pecas (ver `.docs-ft .gauge-bar`), e nao
+   mais na `.metarow`: o `flex: 0 0 64px` que a fazia caber ao lado do custo
+   saiu junto com o lugar. Aqui ficam so as propriedades que independem do
+   container. */
+.gauge-bar { height: 5px; border-radius: var(--r-pill); background: var(--line-2); overflow: hidden; }
 .gauge-fill {
   height: 100%; width: 0; background: var(--pje-soft);
   border-radius: var(--r-pill); transition: width 0.3s;

@@ -68,6 +68,19 @@ const cmd = (m, p = {}) => new Promise((res) => { const i = ++id; pend.set(i, re
 const js = async (e) => (await cmd("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
 
 await cmd("Page.enable"); await cmd("Runtime.enable");
+// ERRO DE MONTAGEM TEM DE APARECER AQUI. Sem isto, um ReferenceError no
+// panel.js vira "panel.css nao chegou" — a mensagem aponta para a folha de
+// estilo, que esta perfeita, e se perde tempo no lugar errado.
+ws.addEventListener("message", (e) => {
+  const m = JSON.parse(e.data);
+  if (m.method === "Runtime.exceptionThrown") {
+    const d = m.params?.exceptionDetails;
+    console.log("  ERRO NA PAGINA: " + (d?.exception?.description || d?.text || "?"));
+  }
+  if (m.method === "Runtime.consoleAPICalled" && m.params?.type === "error") {
+    console.log("  console.error: " + m.params.args.map((a) => a.value || a.description).join(" "));
+  }
+});
 // A FLAG `--force-prefers-reduced-motion` NAO FUNCIONA neste Chrome:
 // medido, `matchMedia("(prefers-reduced-motion: reduce)").matches` continua
 // `true` com ela. Quem manda de verdade e o CDP. Sem isto mede-se sempre o
@@ -92,6 +105,27 @@ for (const tema of TEMAS) {
     await js('window.__modo("expanded")');
     await js("window.__cena(" + JSON.stringify(cena) + ")");
     await new Promise((r) => setTimeout(r, 620));
+    // DIAGSEL=".gauge,.gauge-bar" imprime as propriedades computadas de cada
+    // seletor. Existe porque a alternativa e adivinhar qual regra venceu, e
+    // `getComputedStyle` responde isso em uma execucao.
+    // DIAGSEL=".gauge,.gauge-bar" imprime as propriedades computadas de cada
+    // seletor. Existe porque a alternativa e adivinhar qual regra venceu, e
+    // `getComputedStyle` responde isso em uma execucao.
+    if (process.env.DIAGSEL) {
+      const sels = JSON.stringify(process.env.DIAGSEL.split(","));
+      const expr =
+        "(() => { const sr = document.getElementById('pje-ia-host').shadowRoot;" +
+        " return JSON.stringify(" + sels + ".map((sel) => {" +
+        "   const e = sr.querySelector(sel);" +
+        "   if (!e) return sel + ' AUSENTE';" +
+        "   const c = getComputedStyle(e), b = e.getBoundingClientRect();" +
+        "   return sel + '  ' + Math.round(b.width) + 'x' + Math.round(b.height) +" +
+        "     '  display:' + c.display + ' dir:' + c.flexDirection + ' flex:' + c.flex +" +
+        "     ' h:' + c.height + ' w:' + c.width + ' align:' + c.alignItems;" +
+        " })); })()";
+      const r = await js(expr);
+      for (const l of JSON.parse(r || "[]")) console.log("  " + l);
+    }
     if (process.env.DIAG) {
       const d = await js('(() => { const sr = document.getElementById("pje-ia-host").shadowRoot; const p = sr.querySelector(".panel"); const r = p.getBoundingClientRect(); return JSON.stringify({ reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, css: getComputedStyle(p).transform, x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) }); })()');
       console.log("  DIAG " + (tema || "padrao") + "/" + rot + " " + d);

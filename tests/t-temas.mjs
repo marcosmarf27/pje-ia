@@ -72,6 +72,17 @@ function montar(temaSalvo) {
   return { w, raiz, wrap: raiz.querySelector(".wrap"), painel: w.__painel, gravado, dados };
 }
 
+// A CONTAGEM DE TEMAS SAI DO FONTE, nunca de um numero escrito aqui. Este
+// teste ficou vermelho ao nascer o setimo tema (o `institucional`, da v0.60)
+// por afirmar "seis" — e um teste que quebra quando o produto cresce
+// corretamente e um teste que a proxima sessao aprende a ignorar. E a mesma
+// disciplina do t-temas-coerencia, que ja lia a lista de `TEMAS` do panel.js.
+const QUANTOS_TEMAS = [
+  ...readFileSync(__RAIZ + "/src/panel.js", "utf8")
+    .match(/const TEMAS = \[([\s\S]*?)\];/)[1]
+    .matchAll(/id:\s*"/g),
+].length;
+
 console.log("=== temas do painel (jsdom, panel.js real) ===");
 
 // --- 1. o tema SALVO e' aplicado no mount (a armadilha do callback sincrono)
@@ -107,7 +118,7 @@ console.log("=== temas do painel (jsdom, panel.js real) ===");
   const cx = raiz.querySelector(".temabox");
   ok(!!cx, "o botao do cabecalho abre a caixa de temas");
   const itens = cx ? cx.querySelectorAll(".tm-i") : [];
-  ok(itens.length === 6, "a caixa lista os seis temas", itens.length);
+  ok(itens.length === QUANTOS_TEMAS, "a caixa lista os " + QUANTOS_TEMAS + " temas do fonte", itens.length);
   const marcado = [...itens].filter((b) => b.getAttribute("aria-checked") === "true");
   ok(marcado.length === 1 && marcado[0].dataset.tema === "toga",
      "o tema corrente vem marcado", marcado.map((b) => b.dataset.tema).join(","));

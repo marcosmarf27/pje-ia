@@ -59,6 +59,19 @@ const cmd = (m, p = {}) => new Promise((res) => { const i = ++id; pend.set(i, re
 const js = async (e) => (await cmd("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
 
 await cmd("Page.enable"); await cmd("Runtime.enable");
+// ERRO DE MONTAGEM TEM DE APARECER AQUI. Sem isto, um ReferenceError no
+// panel.js vira "panel.css nao chegou" — a mensagem aponta para a folha de
+// estilo, que esta perfeita, e se perde tempo no lugar errado.
+ws.addEventListener("message", (e) => {
+  const m = JSON.parse(e.data);
+  if (m.method === "Runtime.exceptionThrown") {
+    const d = m.params?.exceptionDetails;
+    console.log("  ERRO NA PAGINA: " + (d?.exception?.description || d?.text || "?"));
+  }
+  if (m.method === "Runtime.consoleAPICalled" && m.params?.type === "error") {
+    console.log("  console.error: " + m.params.args.map((a) => a.value || a.description).join(" "));
+  }
+});
 // A FLAG `--force-prefers-reduced-motion` NAO FUNCIONA neste Chrome:
 // medido, `matchMedia("(prefers-reduced-motion: reduce)").matches` continua
 // `true` com ela. Quem manda de verdade e o CDP. Sem isto mede-se sempre o
