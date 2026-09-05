@@ -913,7 +913,7 @@ var PjePanel = (function () {
     wrap.className = "wrap pulse";
     wrap.innerHTML = `
       <div class="backdrop"></div>
-      <button class="launcher"><span class="sc">${SVG.prompts}</span> Analisar com IA</button>
+      <button class="launcher" title="Abrir o Assistente dos Autos"><span class="lc-mark"><img src="${iconUrl}" alt=""></span><span class="lc-t">Analisar com IA</span><span class="lc-sp">${SVG.prompts}</span></button>
       <div class="panel">
         <div class="hd">
           <div class="hd-marca">
@@ -938,25 +938,9 @@ var PjePanel = (function () {
             <button class="reset" title="Nova conversa — a atual fica guardada na lista ao lado" aria-label="Nova conversa">${SVG.reset}</button>
             <button class="convs" title="Conversas guardadas deste processo" aria-label="Conversas guardadas deste processo" aria-haspopup="true" aria-expanded="false" hidden>${SVG.convs}<span class="convs-n" aria-hidden="true"></span></button>
             <button class="tema" title="Aparência do painel" aria-label="Aparência do painel" aria-haspopup="true" aria-expanded="false">${SVG.tema}</button>
-            <button class="exibicao" title="Exibição: tamanho da janela, lista de peças e download da conversa" aria-label="Opções de exibição" aria-haspopup="true" aria-expanded="false">${SVG.config}</button>
+            <button class="exibicao" title="Tamanho da janela" aria-label="Tamanho da janela e opções de exibição" aria-haspopup="true" aria-expanded="false"><span class="ex-ic">${SVG.sideL}</span><span class="ex-cr">${SVG.caret}</span></button>
             <button class="close" title="Fechar o painel" aria-label="Fechar o painel">${SVG.close}</button>
           </div>
-        </div>
-        <!-- O POPOVER DE EXIBIÇÃO. Os botões aqui dentro são os MESMOS de antes
-             — mesma classe, mesmo handler, mesmo estado — só que agora com
-             RÓTULO. Cinco glifos sem nome no cabeçalho eram o que o "não me faça
-             pensar" chama de atrito: um menu que diz "Lateral" é mais
-             descobrível que um ícone que insinua. -->
-        <div class="exibbox" hidden role="menu" aria-label="Exibição">
-          <div class="exib-t">Tamanho da janela</div>
-          <button class="exib-i flutuante" role="menuitemradio" aria-checked="true">${SVG.sideL}<span class="lbl">Flutuante</span><span class="exib-ck">${SVG.check}</span></button>
-          <button class="exib-i side" role="menuitemradio" aria-checked="false">${SVG.side}<span class="lbl">Lateral</span><span class="exib-ck">${SVG.check}</span></button>
-          <button class="exib-i free" role="menuitemradio" aria-checked="false">${SVG.free}<span class="lbl">Janela livre</span><span class="exib-ck">${SVG.check}</span></button>
-          <button class="exib-i expand" role="menuitemradio" aria-checked="false">${SVG.expand}<span class="lbl">Largo</span><span class="exib-ck">${SVG.check}</span></button>
-          <button class="exib-i fs" role="menuitemradio" aria-checked="false">${SVG.fs}<span class="lbl">Tela cheia</span><span class="exib-ck">${SVG.check}</span></button>
-          <div class="exib-sep" role="separator"></div>
-          <button class="exib-i docsvis" role="menuitemcheckbox" aria-checked="false" aria-pressed="false">${SVG.docshide}<span class="lbl">Ocultar as peças</span><span class="exib-ck">${SVG.check}</span></button>
-          <button class="exib-i dl" role="menuitem">${SVG.download}<span class="lbl">Baixar a conversa (.md)</span></button>
         </div>
         <div class="content">
           <button type="button" class="docs-rail" title="Exibir a lista de peças" aria-label="Exibir a lista de peças">
@@ -1137,6 +1121,30 @@ var PjePanel = (function () {
               </div>
             </div>
           </div>
+        </div>
+        <!-- O POPOVER DE EXIBICAO. FILHO DO .wrap, NUNCA DO .panel: o painel
+             carrega transform (o FLIP da troca de modo e a escala do arrasto),
+             e transform cria BLOCO DE CONTENCAO para descendentes com
+             position:fixed — de dentro dele a caixa deixa de ser fixa em
+             relacao a viewport e passa a ser recortada pelo painel. Na v0.60
+             ela nasceu dentro e o menu saia cortado na borda direita, com
+             "Baixar a conversa (.md)" pela metade. Todos os outros popovers
+             (temabox, selmenu, audbox, preview) ja viviam aqui.
+        O POPOVER DE EXIBICAO. Os botões aqui dentro são os MESMOS de antes
+             — mesma classe, mesmo handler, mesmo estado — só que agora com
+             RÓTULO. Cinco glifos sem nome no cabeçalho eram o que o "não me faça
+             pensar" chama de atrito: um menu que diz "Lateral" é mais
+             descobrível que um ícone que insinua. -->
+        <div class="exibbox" hidden role="menu" aria-label="Exibição">
+          <div class="exib-t">Tamanho da janela</div>
+          <button class="exib-i flutuante" role="menuitemradio" aria-checked="true">${SVG.sideL}<span class="lbl">Flutuante</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i side" role="menuitemradio" aria-checked="false">${SVG.side}<span class="lbl">Lateral</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i free" role="menuitemradio" aria-checked="false">${SVG.free}<span class="lbl">Janela livre</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i expand" role="menuitemradio" aria-checked="false">${SVG.expand}<span class="lbl">Largo</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i fs" role="menuitemradio" aria-checked="false">${SVG.fs}<span class="lbl">Tela cheia</span><span class="exib-ck">${SVG.check}</span></button>
+          <div class="exib-sep" role="separator"></div>
+          <button class="exib-i docsvis" role="menuitemcheckbox" aria-checked="false" aria-pressed="false">${SVG.docshide}<span class="lbl">Ocultar as peças</span><span class="exib-ck">${SVG.check}</span></button>
+          <button class="exib-i dl" role="menuitem">${SVG.download}<span class="lbl">Baixar a conversa (.md)</span></button>
         </div>
         <div class="plib" hidden>
           <div class="plib-card" role="dialog" aria-modal="true" aria-label="Prompts salvos" tabindex="-1">
@@ -1333,6 +1341,23 @@ var PjePanel = (function () {
     const modeloBadge = $(".modelo-badge");
     const alertEl = $(".alertbar");
     const ctxbar = $(".ctxbar");
+    // O WRAPPER DA LINHA 1 DO CARTÃO TEM DOIS ESCRITORES — `syncSelection`
+    // escreve na `.ctxbar`, `renderAnexos` escreve na `.anexosbar` — e nenhum
+    // dos dois pode ser o dono do `hidden` dele: quem escondesse apagaria os
+    // chips do outro. A visibilidade é DERIVADA das duas, e as duas chamam
+    // esta função depois de mexer na sua barra.
+    //
+    // Enquanto isso não existia, o `.cc-ctx` nascia `hidden` no template e
+    // NINGUÉM o desescondia: com `[hidden]{display:none!important}`, os chips
+    // de contexto e os de anexo simplesmente não existiam na v0.60 — e com
+    // eles se foi o ✕ que tira do contexto uma peça cuja row está lazy, que
+    // não tem outro caminho na tela.
+    function syncCcCtx() {
+      const cc = $(".cc-ctx");
+      const an = $(".anexosbar");
+      if (!cc) return;
+      cc.hidden = (!ctxbar || ctxbar.hidden) && (!an || an.hidden);
+    }
     const mentionEl = $(".mention");
     const mentionList = $(".mention-list");
     const mentionQT = $(".mq-t"); // espelho ao vivo da busca digitada após o @
@@ -1802,6 +1827,27 @@ var PjePanel = (function () {
     // "expanded" são mutuamente exclusivas. A preferência persiste em
     // chrome.storage.local (tela cheia é transitória: persiste "expandido").
     // -------------------------------------------------------------------------
+    // O GATILHO DO MENU MOSTRA O MODO ATUAL, e a engrenagem que estava aqui foi
+    // um erro de convenção com preço medido: o próprio autor do projeto contou
+    // que "procurou muito o botão para expandir até adivinhar que era nessa
+    // tela, que na prática significa configurações". Engrenagem quer dizer
+    // CONFIGURAÇÕES em toda interface — e a v0.60 ainda pôs uma aba chamada
+    // "Configurações" a 40px dela, então o mesmo símbolo apontava para dois
+    // destinos diferentes na mesma barra.
+    // Um seletor que exibe o valor escolhido mais um chevron é a convenção de
+    // ESCOLHA: ele responde "onde estou" (o ícone é o do modo em uso) e "o que
+    // posso fazer" (o chevron abre a lista) sem exigir leitura, que é
+    // exatamente o que o menu rotulado entrega depois do clique.
+    const IC_MODO = { flutuante: "sideL", lateral: "side", livre: "free", expandido: "expand", cheia: "fs" };
+    const NOME_MODO = { flutuante: "Flutuante", lateral: "Lateral", livre: "Janela livre", expandido: "Largo", cheia: "Tela cheia" };
+    function pintarBotaoExib() {
+      const b = $(".exibicao");
+      if (!b) return;
+      const m = modoAtual();
+      const ic = b.querySelector(".ex-ic");
+      if (ic) ic.innerHTML = SVG[IC_MODO[m]] || SVG.sideL;
+      b.title = "Tamanho da janela: " + (NOME_MODO[m] || "") + " — clique para trocar";
+    }
     function modoAtual() {
       if (wrap.classList.contains("livre")) return "livre";
       if (wrap.classList.contains("full")) return "cheia";
@@ -1938,6 +1984,10 @@ var PjePanel = (function () {
       // numa janela estreita têm os mesmos 420px), e é ele quem chama o
       // ajustarPlaceholderBusca.
       atualizarLargura();
+      // O gatilho do menu EXIBE o modo, então é repintado aqui — no FIM, e não
+      // no topo: `modoAtual()` lê as CLASSES, e no topo elas ainda são as do
+      // modo anterior. Este é o ponto único de transição de layout.
+      pintarBotaoExib();
       flipJanela(antes);
       try {
         chrome.storage.local.set({ layoutModo: modo === "cheia" ? "expandido" : modo });
@@ -2268,6 +2318,10 @@ var PjePanel = (function () {
           wrap.classList.add("livre");
           aplicarGeoLivre();
         }
+        // A restauração põe a classe direto (não passa por `aplicarModo`, para
+        // não animar no boot), então o gatilho precisa ser repintado aqui —
+        // senão ele anunciaria "Flutuante" num painel que abriu lateral.
+        pintarBotaoExib();
       });
     } catch {
       /* sem storage (harness de teste): fica no flutuante */
@@ -2295,29 +2349,35 @@ var PjePanel = (function () {
         limparGeoLivre();
       }, MS_SAIDA);
     });
-    expandBtn.addEventListener("click", () =>
-      aplicarModo(modoAtual() === "expandido" ? "flutuante" : "expandido")
-    );
-    // Tela cheia: entrar implica o layout expandido; sair volta ao expandido.
+    // OS CINCO MODOS SÃO UMA ESCOLHA, NÃO CINCO ALTERNADORES — e isto é
+    // correção de um defeito que a v0.60 introduziu ao mudá-los de lugar.
+    // Enquanto eram ícones soltos no cabeçalho, alternar era o certo: o mesmo
+    // botão ligava e desligava o modo. Dentro de um menu `menuitemradio` com
+    // um ✓ ao lado do item ativo, alternar mente duas vezes — clicar em "Largo"
+    // estando largo devolvia ao flutuante (o oposto do que o ✓ afirma), e o
+    // "Flutuante", que só existe desde a v0.60, não tinha handler nenhum:
+    // clicar nele não fazia NADA. Selecionar é idempotente por construção, e é
+    // o que um menu promete.
+    expandBtn.addEventListener("click", () => aplicarModo("expandido"));
+    const flutBtn = $(".exib-i.flutuante");
+    if (flutBtn) flutBtn.addEventListener("click", () => aplicarModo("flutuante"));
+    // Tela cheia implica o layout expandido — quem trata disso é o aplicarModo.
     const fsBtn = $(".fs");
-    fsBtn.addEventListener("click", () =>
-      aplicarModo(modoAtual() === "cheia" ? "expandido" : "cheia")
-    );
+    fsBtn.addEventListener("click", () => aplicarModo("cheia"));
     const sideBtn = $(".side");
     sideBtn.addEventListener("click", () =>
-      aplicarModo(modoAtual() === "lateral" ? "flutuante" : "lateral")
+      aplicarModo("lateral")
     );
     const freeBtn = $(".free");
-    freeBtn.addEventListener("click", () =>
-      aplicarModo(modoAtual() === "livre" ? "flutuante" : "livre")
-    );
+    freeBtn.addEventListener("click", () => aplicarModo("livre"));
     backdrop.addEventListener("click", () => aplicarModo("flutuante"));
 
     // ---- BARRA SUPERIOR v0.60 -------------------------------------------
     // O POPOVER DE EXIBIÇÃO. Ele não reimplementa nada: os botões `.expand`,
     // `.side`, `.free`, `.fs`, `.docsvis` e `.dl` são os MESMOS elementos de
-    // antes, com os MESMOS handlers — só mudaram de lugar e ganharam rótulo.
-    // Por isso não há um único `aplicarModo` novo aqui.
+    // antes — só mudaram de lugar e ganharam rótulo. O que a mudança de lugar
+    // OBRIGOU a rever foi o gesto: num menu de rádio os quatro modos passaram
+    // de alternadores a SELEÇÃO (ver acima), e nasceu o quinto item.
     const exibBtn = $(".exibicao");
     const exibBox = $(".exibbox");
     function fecharExib() {
@@ -2470,7 +2530,16 @@ var PjePanel = (function () {
       docsVisBtn.classList.toggle("on", on);
       docsVisBtn.setAttribute("aria-pressed", String(!!on));
       // o ícone acompanha a ação disponível: chevron ← recolhe, → traz de volta
-      docsVisBtn.innerHTML = on ? SVG.docsshow : SVG.docshide;
+      // TROCA SÓ O <svg>, NUNCA o innerHTML: desde a v0.60 este botão vive no
+      // menu Exibição e carrega também o rótulo "Ocultar as peças" e a marca
+      // de estado. Reescrever o innerHTML apagava os dois — e como
+      // `setDocsOcultas` roda no boot (restaurando a preferência), o item do
+      // menu nascia sem rótulo, um ícone mudo no meio de uma lista rotulada.
+      // Mesmo eixo do `textContent` que apaga o <svg>, ao contrário.
+      const icAtual = docsVisBtn.querySelector("svg");
+      const icNovo = document.createElement("span");
+      icNovo.innerHTML = on ? SVG.docsshow : SVG.docshide;
+      if (icAtual && icNovo.firstElementChild) icAtual.replaceWith(icNovo.firstElementChild);
       docsVisBtn.title = on
         ? "Exibir a lista de peças"
         : "Ocultar a lista de peças (mais espaço para o chat)";
@@ -3670,10 +3739,12 @@ var PjePanel = (function () {
       ctxbar.innerHTML = "";
       if (!sel.length) {
         ctxbar.hidden = true;
+        syncCcCtx();
         prevChipIds = new Set();
         return;
       }
       ctxbar.hidden = false;
+      syncCcCtx();
       const lab = document.createElement("span");
       lab.className = "ctxlab";
       lab.textContent = "Peças no contexto (" + sel.length + ")";
@@ -4654,7 +4725,6 @@ var PjePanel = (function () {
     let movItens = [];
     let movCab = "";
     let movExplica = "";
-    const viewTempo = $(".view-tempo");
     const vtCab = $(".vt-cab");
     const vtLista = $(".vt-lista");
 
@@ -5530,6 +5600,7 @@ var PjePanel = (function () {
       if (!anexosbar) return;
       anexosbar.innerHTML = "";
       anexosbar.hidden = !anexosAtuais.length;
+      syncCcCtx();
       inrowEl.classList.toggle("com-anexo", !!anexosAtuais.length);
       if (!anexosAtuais.length) return;
       for (const a of anexosAtuais) {

@@ -122,6 +122,14 @@ const PARES = [
   ["--text-3", ["--accent-bg", "--surface-painel"], 4.5, "chip de exemplo"],
   ["--pje", ["--surface-painel"], 3.0, "acento sobre a janela"],
   ["--on-acao", ["--btn-de"], 4.5, "rótulo do botão Enviar"],
+  // A BOLHA DO USUÁRIO É UMA SUPERFÍCIE ESCURA DENTRO DA CONVERSA, e o par
+  // dela faltava aqui. Foi por isso que este teste deu 106/106 numa versão em
+  // que o chip da peça anexada saía slate-600 sobre indigo: o usuário relatou
+  // como "esse roxo está escondendo o nome das peças". A causa foi a família
+  // `--on-hd-*` (tinta da CHROME) usada dentro de um componente que não está
+  // na chrome — e a chrome inverteu de polaridade na v0.60.
+  ["--on-bolha", ["--pje-2"], 4.5, "texto da bolha do usuário"],
+  ["--on-acao", ["--ink"], 4.5, "bloco de código na resposta"],
   // O MODO SIGILOSO derivado do tema. Ele é o recurso mais sensível do produto
   // — o que ele sinaliza é que os autos NÃO estão saindo em claro —, e cada
   // tema redefine a própria família `--sig-*`. Um carimbo ilegível num tema é

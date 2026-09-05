@@ -98,16 +98,16 @@
       // Os botões são ALTERNADORES, então primeiro se volta ao flutuante.
       window.__modo = (m) => {
         const sr = document.getElementById("pje-ia-host").shadowRoot;
-        const wrap = sr.querySelector(".wrap");
         const clicar = (s) => sr.querySelector(s).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        if (wrap.classList.contains("full")) clicar(".fs");
-        if (wrap.classList.contains("expanded")) clicar(".expand");
-        if (wrap.classList.contains("lateral")) clicar(".side");
-        if (wrap.classList.contains("livre")) clicar(".free");
+        // Desde a v0.60.1 os itens do menu Exibicao SELECIONAM o modo (sao
+        // `menuitemradio`), em vez de alternar: um clique so basta, e voltar
+        // ao flutuante tem item proprio. O arnes deixou de precisar do
+        // "clicar no modo ativo para desliga-lo", que era a leitura antiga.
         if (m === "expanded") clicar(".expand");
         else if (m === "lateral") clicar(".side");
         else if (m === "livre") clicar(".free");
         else if (m === "full") clicar(".fs");
+        else clicar(".exib-i.flutuante");
       };
       // Troca a VIEW do workspace clicando na aba real (nunca pondo o
       // data-view na mao): so o clique passa pelo `trocarView`, que e quem
@@ -117,6 +117,10 @@
         const b = sr.querySelector('.hn-i[data-view="' + v + '"]');
         if (b) b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       };
+      // A INSTANCIA fica exposta para o diagnostico poder pilotar o painel
+      // pela API real (startPrep, setContexto, addMessage) em vez de mexer no
+      // DOM na mao — que e o que faz uma captura mentir sobre o produto.
+      window.__painel = painel;
       window.__pronto = () => {
         const raiz = document.getElementById("pje-ia-host");
         if (!raiz || !raiz.shadowRoot) return false;

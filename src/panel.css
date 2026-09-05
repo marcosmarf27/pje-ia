@@ -1,6 +1,18 @@
 /* Painel de chat — escopado no Shadow DOM. Paleta alinhada ao PJe (azul-petróleo). */
 :host { all: initial; }
 * { box-sizing: border-box; }
+/* CONTROLE DE FORMULARIO NAO HERDA FONTE, e sem esta linha o painel roda com
+   DUAS tipografias. `:host { all: initial }` corta a heranca da pagina, e o
+   navegador entao aplica a sua propria (`font: 400 13.333px Arial`) a todo
+   <button>, <input>, <textarea> e <select>, enquanto o resto do painel usa a
+   familia do produto. Medido em 05/09/2026, no expandido: 206 nos fora da
+   familia, entre eles TODA a faixa de ferramentas do compositor.
+   E defeito antigo, anterior ao redesign, e ele aparece como uma barra de
+   botoes que "nao combina" com o que esta em volta sem que se saiba dizer por
+   que — que e o efeito de misturar duas familias.
+   `inherit` e nao `var(--ff-sans)`: assim o mono e o display continuam valendo
+   onde forem declarados acima na arvore (o CNJ, os `kbd`, os numerais). */
+button, input, textarea, select { font-family: inherit; }
 /* O atributo hidden do HTML perde para qualquer display definido por regra de
    autor (.gauge/.ctxbar/.alertbar usam display:flex) — sem isto, os elementos
    "escondidos" ficam visíveis como faixas vazias. Vale para todo o painel. */
@@ -158,6 +170,13 @@
   /* TINTA sobre superfície de AÇÃO (botão primário, launcher, toggle aceso).
      Não muda por tema — o botão continua saturado em todos. */
   --on-acao: #ffffff;
+  /* TINTA SOBRE A BOLHA DO USUÁRIO. Ela era `--on-acao`, e os dois papéis
+     divergem no primeiro tema que os separa: no Noite o botão primário é
+     CLARO (logo `--on-acao` é escuro) enquanto a bolha continua sendo o azul
+     médio de `--pje-2` — o texto da própria pergunta saía a 2,38:1, medido.
+     Mesmo eixo do `--pje-2`, que já era tinta num lugar e fundo noutro: quando
+     um token faz dois trabalhos, o tema seguinte escolhe o errado. */
+  --on-bolha: #ffffff;
 
   /* ---------- VÉUS ----------
      ESCUROS, pela mesma razão da tinta: uma película branca sobre uma chrome
@@ -226,6 +245,14 @@
   --sh-pop: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.1);
   --sh-erguido: 0 2px 6px rgba(15, 23, 42, 0.1), 0 34px 80px -20px rgba(15, 23, 42, 0.3);
   --sh-panel: 0 1px 2px rgba(15, 23, 42, 0.06), 0 24px 60px -18px rgba(15, 23, 42, 0.22);
+  /* O LAUNCHER TEM SOMBRA E HALO PRÓPRIOS, e eles eram os últimos literais da
+     paleta ANTIGA no arquivo: `rgba(5,48,68,.32)` e `rgba(20,96,126,.55)` —
+     petróleo — sob um botão que virou indigo na v0.60. Sombra colorida não
+     entra no `t-temas-contraste` (ele mede tinta sobre fundo), então nada
+     acusava: só se via como um botão cuja sombra "não combina" com ele.
+     Como token, o halo acompanha o tema em vez de ficar preso a uma paleta. */
+  --sh-launcher: 0 8px 24px -4px rgba(67, 56, 202, 0.38), 0 2px 6px rgba(15, 23, 42, 0.14);
+  --halo-launcher: 79, 70, 229;
 
   /* ---------- ESCALA TIPOGRÁFICA ----------
      Oito degraus inteiros. --fs-hero subiu de 26 para 30px: no desenho novo o
@@ -669,6 +696,10 @@
   /* Tinta ESCURA sobre a ação clara: sobre um ciano luminoso o branco dá 4,3:1
      e reprova. Inverter a tinta é o que mantém o botão saturado e legível. */
   --on-acao: #05202c;
+  /* O botão primário deste tema é CLARO, então `--on-acao` é escuro — mas a
+     bolha do usuário continua sendo o `--pje-2` azul-médio, e sobre ele a
+     tinta tem de ser clara. É a razão de `--on-bolha` existir. */
+  --on-bolha: #eaf6fb;
 
   /* Estados: MATIZ intacto, `-bg`/`-line`/`-ink` reancorados no escuro. */
   --ok: #43bd8b;
@@ -1198,35 +1229,61 @@ button > svg { flex: none; }
   gap: 8px;
   background: linear-gradient(180deg, var(--pje), var(--pje-2));
   color: var(--on-acao);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--r-pill);
-  padding: 11px 18px;
+  padding: 9px 16px 9px 9px;
   font-size: var(--fs-body);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32);
+  box-shadow: var(--sh-launcher), inset 0 1px 0 var(--veu-luz);
   /* O botão é a OUTRA METADE da mesma animação: ele encolhe enquanto a janela
      cresce do lugar dele, e volta crescendo quando ela se recolhe. Um dos dois
      sumindo de estalo desfaz a conexão espacial que o resto do efeito constrói. */
   transition:
     opacity var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out),
     display var(--dur-2) allow-discrete;
 }
 @starting-style {
   .wrap:not(.open) .launcher { opacity: 0; transform: scale(0.5); }
 }
-/* o emoji da balança; --fs-lg é o degrau da escala mais próximo do 16px que
-   estava aqui — literal fora da escala era a única violação restante */
-.launcher .sc { font-size: var(--fs-lg); }
-.launcher:hover { filter: brightness(1.08); }
+/* O LAUNCHER LEVA A MARCA DO PRODUTO, e não um ícone genérico de faíscas.
+   Ele é a primeira coisa que o usuário vê da extensão na página do tribunal —
+   antes do painel, antes de qualquer tela — e um ✦ solto não diz de QUEM é o
+   botão. Com o mesmo selo do cabeçalho, o botão e a janela que ele abre são
+   visivelmente a mesma coisa: o clique deixa de ser uma aposta.
+   As faíscas continuam, à direita e discretas, como o sinal de "isto é IA" —
+   é o papel delas em todo produto do gênero, e ali elas não disputam com a
+   identidade. */
+.launcher .lc-mark {
+  width: 26px; height: 26px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-tight);
+  /* O MESMO SELO DO CABEÇALHO (`--mark-*`), e não um véu claro: o ícone do
+     produto é um PNG de fundo ESCURO, então sobre película clara ele aparece
+     como um quadrado escuro dentro de um quadrado claro — duas molduras onde
+     deveria haver uma. Com o gradiente slate ele se funde, exatamente como no
+     `.hd .mark`, e o botão passa a ser reconhecível como a mesma coisa que a
+     janela que ele abre. */
+  background: linear-gradient(180deg, var(--mark-de), var(--mark-para));
+  box-shadow: inset 0 1px 0 var(--veu-luz);
+}
+.launcher .lc-mark img { width: 17px; height: 17px; display: block; }
+.launcher .lc-t { letter-spacing: 0.01em; }
+.launcher .lc-sp { display: flex; opacity: 0.7; margin-left: -2px; }
+.launcher:hover {
+  background: linear-gradient(180deg, var(--pje-2), var(--pje-3));
+  transform: translateY(-1px);
+}
+.launcher:active { transform: translateY(0) scale(0.985); }
 /* Quem JÁ usou o painel: três halos no boot e silêncio. Localiza o botão para
    quem sabe que ele existe, sem virar ruído permanente no canto da tela. */
 .wrap.pulse .launcher { animation: pulse 1.8s ease-out 3; }
 @keyframes pulse {
-  0% { box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 0 rgba(20, 96, 126, 0.55); }
-  70% { box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 14px rgba(20, 96, 126, 0); }
-  100% { box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 0 rgba(20, 96, 126, 0); }
+  0% { box-shadow: var(--sh-launcher), 0 0 0 0 rgba(var(--halo-launcher), 0.55); }
+  70% { box-shadow: var(--sh-launcher), 0 0 0 14px rgba(var(--halo-launcher), 0); }
+  100% { box-shadow: var(--sh-launcher), 0 0 0 0 rgba(var(--halo-launcher), 0); }
 }
 /* Quem NUNCA abriu o painel: o chamado VOLTA, em rajadas.
    Os três halos acima já existiam e ainda assim havia quem não achasse o botão
@@ -1243,9 +1300,9 @@ button > svg { flex: none; }
    o que faz o usuário aprender a ignorar aquele pedaço da tela. */
 .wrap.chamando .launcher { animation: chamando 1.9s ease-out infinite; }
 @keyframes chamando {
-  0%   { transform: scale(1);     box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 0 rgba(20, 96, 126, 0.6); }
+  0%   { transform: scale(1);     box-shadow: var(--sh-launcher), 0 0 0 0 rgba(var(--halo-launcher), 0.6); }
   14%  { transform: scale(1.05); }
-  75%  { transform: scale(1);     box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 20px rgba(20, 96, 126, 0); }
+  75%  { transform: scale(1);     box-shadow: var(--sh-launcher), 0 0 0 20px rgba(var(--halo-launcher), 0); }
   /* Repouso com spread ZERO: é o que faz o anel sumir em vez de encolher de
      volta ao botão, e o que torna o salto para o pulso seguinte invisível
      (a opacidade sobe, mas sobre um anel de tamanho nenhum).
@@ -1254,7 +1311,7 @@ button > svg { flex: none; }
      pretendido: quem olha para o botão vê um halo, espera, não vê mais nada, e
      conclui que ele piscou uma vez e parou. Um chamado que precisa de paciência
      para ser percebido não é um chamado. */
-  76%, 100% { transform: scale(1); box-shadow: 0 6px 20px rgba(5, 48, 68, 0.32), 0 0 0 0 rgba(20, 96, 126, 0); }
+  76%, 100% { transform: scale(1); box-shadow: var(--sh-launcher), 0 0 0 0 rgba(var(--halo-launcher), 0); }
 }
 /* Movimento reduzido: a escala e o halo saem, mas o chamado NÃO pode sumir —
    quem pediu menos animação é justamente quem mais precisa que o botão se
@@ -1724,6 +1781,17 @@ button > svg { flex: none; }
   transition: background 0.14s ease, color 0.14s ease;
 }
 .hd button:hover { background: var(--veu-2); color: var(--on-hd-forte); }
+/* O GATILHO DO MENU EXIBE O MODO ATUAL + um chevron, e por isso ele é o único
+   botão do cabeçalho mais largo que 30px. Como `.hd button` (0,1,1) impõe
+   `width: 30px`, aqui não basta declarar o que se quer: é preciso DESFAZER —
+   `width: auto` antes de mais nada. Mesma armadilha que já venceu o `.sigselo`
+   na v0.57 e as abas na primeira versão desta barra. */
+.hd .exibicao {
+  width: auto; gap: 1px; padding: 0 var(--sp-1) 0 var(--sp-2);
+}
+.hd .exibicao .ex-ic { display: flex; }
+.hd .exibicao .ex-cr { display: flex; color: var(--on-hd-2); opacity: 0.75; }
+.hd .exibicao[aria-expanded="true"] { background: var(--veu-2); color: var(--on-hd-forte); }
 /* ATENÇÃO — ESTA REGRA TEM ESPECIFICIDADE 0,1,1 E GOVERNA TODO BOTAO DO
    CABEÇALHO. Qualquer controle novo aqui dentro (as abas, o copiar da pill)
    precisa de um seletor `.hd .x` E de DESFAZER o que ela impos: `width: auto`
@@ -2064,12 +2132,38 @@ button > svg { flex: none; }
    botão solto delas era uma segunda porta para o mesmo destino, ocupando a
    coluna. Ficam só no menu, e o botão dele deixa de ser um caret colado no
    .zip para virar um "mais ações" de verdade. */
+/* `white-space: nowrap` e o que impede "Escolher com IA" de virar duas linhas
+   DENTRO do botao — a coluna tem 300px uteis e o flex encolhe o item ate o
+   conteudo se re-quebrar, que le como defeito. Quebrar a FILEIRA e aceitavel
+   aqui (o rodape e vertical); quebrar o rotulo nao. */
 .docs-tip .tip-ia .lbl,
-.docs-tip .tip-load .lbl { display: inline; }
+.docs-tip .tip-load .lbl { display: inline; white-space: nowrap; }
+.docs-tip .tip-ia,
+.docs-tip .tip-load { overflow: visible; }
 .docs-tip .tip-txt-ocr,
 .docs-tip .tip-zip { display: none; }
+/* `flex: none` E NÃO `0 1 auto`: com o auto, o `.tip-load` (que carrega
+   `min-width: 0` + ellipsis para caber na faixa antiga) encolhia até virar
+   "Ca..." em vez de descer para a linha seguinte. Numa coluna de 328px os dois
+   rótulos inteiros não cabem lado a lado com o menu e o aviso; quebrar a
+   FILEIRA é a degradação legível, truncar o rótulo não é. */
 .docs-tip .tip-ia,
-.docs-tip .tip-load { flex: 0 1 auto; }
+.docs-tip .tip-load { flex: none; min-width: 0; }
+/* NA COLUNA DE 328px OS DOIS ROTULOS NAO CABEM, e quem cede e o "Carregar
+   tudo". A regra da fileira unica (ver "A faixa e SEMPRE de uma fileira")
+   dizia que quem cede e o rotulo dele, por ellipsis — e ate a v0.59 isso
+   bastava, porque ele era o UNICO botao com rotulo ali. Com o "Escolher com
+   IA" ao lado, o ellipsis passou a entregar "Ca...", que nao e um rotulo: e um
+   botao sem nome com reticencias. Ceder o rotulo INTEIRO deixa o icone, que
+   diz mais que tres letras, e o `title` continua respondendo ao hover.
+   Cede o Carregar, e nao o Escolher, porque a hierarquia ja estava decidida:
+   o Escolher com IA e a acao de maior valor e a menos descoberta do produto.
+   Nos modos em que a lista e FAIXA (flutuante, lateral, estreito) ha 374px e
+   os dois rotulos cabem — a regra e so das colunas. */
+.wrap.expanded:not(.full) .docs-tip .tip-load .lbl,
+.wrap.livre-wide .docs-tip .tip-load .lbl { display: none; }
+.wrap.expanded:not(.full) .docs-tip .tip-load,
+.wrap.livre-wide .docs-tip .tip-load { padding: 0 var(--sp-2b); }
 .docs-tip .zipwrap { flex: none; }
 /* Sem o .tip-zip ao lado, o botão do menu recupera os cantos e o separador
    vertical que o transformavam em metade de um split button. */
@@ -2960,7 +3054,7 @@ button > svg { flex: none; }
    que diz onde o documento está. */
 .mapacard-hint { font-size: var(--fs-meta); color: var(--muted); margin-top: 4px; }
 .wrap.expanded .msg { font-size: var(--fs-lg); max-width: 82%; }
-.msg.user { background: var(--pje-2); color: var(--on-acao); align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg.user { background: var(--pje-2); color: var(--on-bolha); align-self: flex-end; border-bottom-right-radius: 4px; }
 /* NOME REIDENTIFICADO NA TELA (modo sigiloso). A IA recebeu `[PESSOA_1]`; o
    nome é restaurado aqui, pela tabela deste computador. A marca diz que o
    trecho passou por isso (fundo de confirmação suave + traço pontilhado, e o
@@ -2980,14 +3074,19 @@ button > svg { flex: none; }
   margin-top: 8px; padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.18);
 }
+/* O CHIP DA PEÇA ANEXADA VIVE DENTRO DA BOLHA DO USUÁRIO, que é ESCURA
+   (`--pje-2`) em todos os temas — por isso os véus são brancos e a tinta é
+   `--on-acao`. NUNCA `--on-hd-*` aqui: aquela é a tinta da CHROME, e ela
+   inverteu de polaridade na v0.60 (a chrome ficou clara). Foi assim que o
+   nome da peça ficou slate-600 sobre indigo, ilegível, sem nenhum erro. */
 .chip-mini {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: var(--fs-micro); font-weight: 600;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.35);
-  color: var(--on-hd-3); padding: 2px 9px; border-radius: var(--r-pill); max-width: 100%;
+  color: var(--on-bolha); padding: 2px 9px; border-radius: var(--r-pill); max-width: 100%;
 }
-.chip-mini svg { color: var(--on-hd-2); flex: none; }
+.chip-mini svg { color: var(--on-bolha); opacity: 0.8; flex: none; }
 .chip-mini span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
 
 /* indicador "digitando" enquanto o modelo não responde */
@@ -3161,7 +3260,7 @@ button > svg { flex: none; }
 .msg.assistant hr { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
 .msg.assistant code { background: var(--line-2); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; font-family: var(--ff-mono); }
 .msg.assistant pre {
-  background: var(--ink); color: var(--on-hd); border-radius: 8px;
+  background: var(--ink); color: var(--on-acao); border-radius: 8px;
   padding: 10px 12px; overflow-x: auto; margin: 8px 0; font-size: 0.88em;
 }
 .msg.assistant pre code { background: transparent; padding: 0; color: inherit; }
@@ -3444,11 +3543,17 @@ button > svg { flex: none; }
   padding: var(--sp-2) 0; margin: 0;
   border-top: 1px dashed var(--line);
 }
-.ctxbar { border-top: none; padding-top: 2px; }
+.ctxbar { border-top: none; padding-top: 2px; align-items: center; }
+/* O RÓTULO DOS CHIPS É UMA ETIQUETA, NÃO UMA COLUNA. Ele tinha 106px fixos e
+   `align-items: flex-start`, herdados de quando a faixa vivia solta no rodapé:
+   dentro do cartão isso vira um bloco de duas linhas ao lado dos chips,
+   competindo com eles justamente na linha em que a informação são os chips.
+   Agora ele acompanha a primeira linha e encolhe, e o `nowrap` impede que
+   "PEÇAS NO CONTEXTO (4)" se parta no meio. */
 .ctxlab {
-  flex: 0 0 106px; padding-top: 4px; line-height: 1.3;
-  font-size: var(--fs-nano); font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--muted-2);
+  flex: none; align-self: center; line-height: 1.3; white-space: nowrap;
+  font-size: var(--fs-nano); font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted-3);
 }
 .chips, .tools {
   flex: 1; min-width: 0;
@@ -3976,6 +4081,15 @@ button > svg { flex: none; }
    livre larga a coluna de peças come 320px e sobram ~420px de chat — lá a forma
    curta é a que cabe. */
 .g-short { display: none; }
+/* O CUSTO USA A FORMA CURTA TAMBEM NO EXPANDIDO, e a longa fica so na tela
+   cheia. Medido no expandido (metarow de 762px): custo 279 + linha do tempo
+   229 + modelo 188 + atalhos 144 = 840px, e a linha quebrava — os atalhos
+   desciam sozinhos para uma segunda fileira, alinhados a direita, lendo como
+   um pedaco solto embaixo do rodape. Com a forma curta o custo cai para 63px e
+   o total para ~624px, que cabe. A forma longa distingue "nesta resposta" de
+   "na conversa"; a curta traz os dois numeros e o tooltip traz o resto. */
+.wrap:not(.full) .custo .g-full { display: none; }
+.wrap:not(.full) .custo .g-short { display: inline; }
 .wrap:not(.expanded) .g-full { display: none; }
 .wrap:not(.expanded) .g-short { display: inline; }
 
@@ -4479,17 +4593,30 @@ button > svg { flex: none; }
    Ícone SVG + rótulo, nunca emoji (DESIGN.md §5). O ícone é colorido por
    FUNÇÃO — a cor é a da categoria de peça que a ação produz ou consome — e o
    rótulo fica em --text-2, para a cor sinalizar sem gritar. */
-.tgl-search, .tgl-sigilo,
+/* FANTASMA EM REPOUSO, e isto é correção de peso visual, não gosto. Com borda
+   e fundo branco, sete botões dentro de uma caixa branca liam-se como sete
+   CARTÕES numa faixa que é secundária à mensagem — e o cartão que importa ali
+   é a própria caixa de escrever. Sem borda nem fundo, o que resta é o par
+   ícone+rótulo, que é a informação; o ícone segue colorido por função e ainda
+   torna cada botão localizável de relance.
+   O ESTADO continua tendo peso: os toggles acesos ganham fundo tingido (e o
+   sigiloso, a cor dele), então "ligado" é a única coisa que aparece como
+   superfície nessa linha — que é exatamente o que ela precisa dizer. */
+.tgl-mention, .tgl-search, .tgl-sigilo,
 .btn-minuta, .btn-plib, .btn-mapa, .btn-mlib {
   display: inline-flex; align-items: center; gap: var(--sp-2);
-  height: 30px; padding: 0 var(--sp-3b);
-  border: 1px solid var(--line); background: var(--surface); color: var(--text-2);
+  height: 30px; padding: 0 var(--sp-3);
+  border: 1px solid transparent; background: transparent; color: var(--muted);
   border-radius: var(--r-md); font-size: var(--fs-meta); font-weight: 500;
   cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
-.tgl-search svg, .tgl-sigilo svg,
+.tgl-mention svg, .tgl-search svg, .tgl-sigilo svg,
 .btn-minuta svg, .btn-plib svg, .btn-mapa svg, .btn-mlib svg { flex: none; }
 .tgl-search svg { color: var(--pje); }
+/* O @ alcança QUALQUER peça, então ele não recebe cor de categoria: pintá-lo
+   de `--cat-peticao` afirmaria que serve só a um tipo. Fica na cor da marca,
+   como o Jurisprudência — as duas são ações sobre o processo inteiro. */
+.tgl-mention svg { color: var(--pje); }
 /* O ícone é colorido por FUNÇÃO (a convenção acima). A função aqui é proteger,
    e a cor da proteção neste produto é a família `--ok` — a mesma da tarja e do
    selo, para o modo inteiro falar UMA cor. */
@@ -4498,9 +4625,9 @@ button > svg { flex: none; }
 .btn-mapa svg   { color: var(--cat-prova); }
 .btn-plib svg   { color: var(--cat-decisao); }
 .btn-mlib svg   { color: var(--cat-audiencia); }
-.tgl-search:hover, .tgl-sigilo:not(.on):hover,
+.tgl-mention:hover, .tgl-search:hover, .tgl-sigilo:not(.on):hover,
 .btn-minuta:hover, .btn-plib:hover, .btn-mapa:hover, .btn-mlib:not(:disabled):hover {
-  border-color: var(--line-focus); background: var(--hover-2); color: var(--pje-2);
+  background: var(--hover); color: var(--text);
 }
 /* Ligado: o fundo tingido carrega o estado — o ícone mantém a cor da função,
    que é o que diz QUAL modo está ligado quando há dois botões acesos. */
@@ -4549,7 +4676,7 @@ button > svg { flex: none; }
    Faixa entre as ferramentas e o campo: explica que Enviar virou "Gerar". */
 .minutabar, .mapabar {
   display: flex; align-items: center; gap: 8px;
-  background: var(--hover-2); border: 1px solid rgba(20, 96, 126, 0.35);
+  background: var(--hover-2); border: 1px solid var(--line-strong);
   border-left: 3px solid var(--pje);
   border-radius: 0 8px 8px 0; padding: 6px 10px; margin: 7px 0 5px;
   font-size: var(--fs-meta); color: var(--text-3); animation: chip-in 0.18s ease-out;
@@ -4578,7 +4705,7 @@ button > svg { flex: none; }
 .minuta-ato .ma-lab { flex: none; font-weight: 600; color: var(--pje-2); }
 .minuta-ato-sel {
   flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
-  border: 1px solid rgba(20, 96, 126, 0.35); border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
   padding: 4px 8px; background: var(--surface); cursor: pointer;
 }
 .minuta-ato-sel:focus {
@@ -4664,11 +4791,11 @@ button > svg { flex: none; }
 .minuta-modelo .mm-lab { flex: none; font-weight: 600; color: var(--pje-2); }
 .minuta-modelo-sel {
   flex: 1; min-width: 0; font: inherit; font-size: var(--fs-meta); color: var(--text);
-  border: 1px solid rgba(20, 96, 126, 0.35); border-radius: 7px;
+  border: 1px solid var(--line-strong); border-radius: 7px;
   padding: 4px 8px; background: var(--surface); cursor: pointer;
 }
 .minuta-modelo-sel:focus {
-  outline: none; border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  outline: none; border-color: var(--pje); box-shadow: var(--ring);
 }
 .minuta-modelo-sel[hidden] { display: none; }
 /* Estado VAZIO da biblioteca: a linha não some, explica. Tom informativo
@@ -4704,7 +4831,7 @@ button > svg { flex: none; }
 .wrap.estreito .mm-vazio { font-size: var(--fs-micro); }
 /* o botão Enviar vira "✍️ Gerar minuta" / "🧠 Gerar mapa" — halo azul para
    marcar a mudança (a classe .docx é histórica; vale para os dois modos) */
-.send.docx { box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.28); }
+.send.docx { box-shadow: var(--ring); }
 
 /* ---------- Card do mapa mental gerado (dentro da bolha do assistant) ----------
    O markdown de um mapa é longo e repetitivo: a bolha mostra as ações e
@@ -4883,7 +5010,7 @@ button > svg { flex: none; }
   outline: none; background: var(--surface);
 }
 .plib-form input:focus, .plib-form textarea:focus {
-  border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  border-color: var(--pje); box-shadow: var(--ring);
 }
 .plib-form textarea { min-height: 130px; resize: vertical; }
 .plib-cnt { font-size: var(--fs-micro); color: var(--muted); text-align: right; }
@@ -4908,7 +5035,7 @@ button > svg { flex: none; }
   outline: none; background: var(--surface); cursor: pointer;
 }
 .mlib-form select:focus {
-  border-color: var(--pje); box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  border-color: var(--pje); box-shadow: var(--ring);
 }
 /* etiqueta da categoria na linha do modelo */
 .mlib-cat {
@@ -5148,20 +5275,21 @@ button > svg { flex: none; }
 /* ----- 3. Toolbar em UMA fileira -----
    Jurisprudência tem ESTADO e o estado é o próprio rótulo ("ligada"), então ela
    nunca vira ícone mudo. Minutar é a ação primária da barra. O resto é ícone. */
-.wrap.estreito .btn-mapa .lbl,
-.wrap.estreito .btn-plib .lbl,
-.wrap.estreito .btn-mlib .lbl,
-/* Sigiloso TAMBÉM vira ícone em 420px, apesar de ter estado. A exceção do
-   Jurisprudência ("o estado é o próprio rótulo") não se aplica aqui porque
-   este estado tem um SEGUNDO indicador, mais forte: o selo da `.metarow`, que
-   só existe quando o modo está ligado e diz quantos valores foram mascarados.
-   Com seis botões na barra, manter três rótulos quebraria a fileira — e a
-   regra 3 existe porque duas fileiras em 420px viram bagunça. */
-.wrap.estreito .tgl-sigilo .lbl { display: none; }
-.wrap.estreito .btn-mapa,
-.wrap.estreito .btn-plib,
-.wrap.estreito .btn-mlib,
-.wrap.estreito .tgl-sigilo { padding: 0 var(--sp-2b); }
+/* A REGRA DIZ QUEM PERDE O ROTULO POR FAMILIA, nunca por nome de botao — e
+   essa inversao e correcao de um defeito, nao estilo. Enquanto ela listava
+   `.btn-mapa, .btn-plib, .btn-mlib, .tgl-sigilo`, o botao seguinte nascia
+   FORA dela: o `@ Peca` da v0.60 entrou com rotulo, a fileira estourou e o
+   painel flutuante — que e o modo PADRAO — apareceu com sete botoes em duas
+   linhas, metade com rotulo e metade sem. Com o `:not()` sobre a familia, um
+   botao novo ja nasce no comportamento que cabe, e quem quiser manter rotulo
+   precisa dizer isso aqui, de proposito.
+   Em 420px cabem ~360px de barra: sete rotulos custariam ~600px, e ate um so
+   ("Jurisprudencia", 123px) aperta a fileira contra o Enviar. Todos viram
+   icone, e o `title` de cada um continua sendo a resposta ao hover. O ESTADO
+   nao depende do rotulo: os dois toggles acendem com FUNDO tingido, e o
+   sigiloso ainda muda a chrome inteira e o carimbo do cabecalho. */
+.wrap.estreito .cc-acts .tools > button .lbl { display: none; }
+.wrap.estreito .cc-acts .tools > button { padding: 0 var(--sp-2b); }
 .wrap.estreito .tools { gap: var(--sp-1); }
 
 /* O cabeçalho do card de modelos passou a dividir a linha com TRÊS botões

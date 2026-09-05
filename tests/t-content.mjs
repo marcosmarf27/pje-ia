@@ -244,6 +244,20 @@ async function cenarioEnvio(nome, cfg) {
   const cb = sr.querySelector('.docrow input[type="checkbox"]');
   cb.checked = true;
   cb.dispatchEvent(new w.Event("change", { bubbles: true }));
+
+  // O CHIP DA PEÇA PRECISA ESTAR VISÍVEL, e a asserção olha os ANCESTRAIS —
+  // não basta a `.ctxbar` ter perdido o próprio `hidden`. Na v0.60 o wrapper
+  // `.cc-ctx` nasceu escondido no template e ninguém o desescondia: a barra
+  // ficava "visível" dentro de um pai `[hidden]`, e com
+  // `[hidden]{display:none!important}` os chips de contexto e os de anexo
+  // simplesmente não existiam. Sumia com eles o ✕ que tira do contexto uma
+  // peça cuja row está lazy — o único caminho que ela tem na tela.
+  // Um teste que só olhasse `.ctxbar.hidden` passaria com os chips invisíveis.
+  const cbar = sr.querySelector(".ctxbar");
+  t(!!cbar && !cbar.hidden, nome + ": a barra de contexto sai do hidden ao marcar peça");
+  t(!!cbar && !cbar.closest("[hidden]"), nome + ": nenhum ancestral escondido sobre a barra de contexto");
+  t(!!cbar && cbar.querySelectorAll(".chip").length > 0, nome + ": a peça marcada virou chip");
+
   const ta = sr.querySelector("textarea.in");
   ta.value = "resuma o processo";
   ta.dispatchEvent(new w.Event("input", { bubbles: true }));
