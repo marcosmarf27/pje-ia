@@ -3579,6 +3579,21 @@ button > svg { flex: none; }
     transition-duration: 1ms;
   }
   .panel, .wrap.open .panel { transform: none; }
+  /* MAS `transform: none` VENCE O TRANSFORM DE LAYOUT, e isso era um defeito
+     de acessibilidade em produção. A declaração acima existe para tirar o
+     DESLOCAMENTO de entrada (`translateY(20px) scale(0.72)`); por vir depois no
+     arquivo, ela também apagava o `translate(-50%, -50%)` que CENTRA a janela no
+     modo expandido. Medido em captura: quem pede menos movimento recebia o
+     painel expandido com o canto superior esquerdo no MEIO da tela — metade
+     dele fora da janela, sem ✕, sem Enviar e sem a coluna de peças alcançáveis.
+     Nada no console, e `getComputedStyle` reportava as duas regras vivas e
+     corretas: só a captura mostra.
+
+     A lição, que vale para toda a folha: `transform` de LAYOUT e `transform` de
+     ANIMAÇÃO são a MESMA propriedade. Desligar a segunda apaga a primeira, e
+     quem pediu menos movimento não pediu menos INTERFACE. */
+  .wrap.expanded .panel,
+  .wrap.expanded.open .panel { transform: translate(-50%, -50%); }
   .wrap.livre .panel.movendo { transform: none; }
 }
 

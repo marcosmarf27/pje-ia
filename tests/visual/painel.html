@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Laboratório — o carimbo do modo sigiloso</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #e9eef3; }
+    </style>
+  </head>
+  <body>
+    <script>
+      (() => {
+        const dados = {};
+        const area = {
+          get(chaves, cb) {
+            let out = {};
+            if (Array.isArray(chaves)) {
+              for (const k of chaves) if (k in dados) out[k] = dados[k];
+            } else if (typeof chaves === "object" && chaves) {
+              out = Object.assign({}, chaves);
+              for (const k of Object.keys(chaves)) if (k in dados) out[k] = dados[k];
+            } else if (typeof chaves === "string" && chaves in dados) {
+              out[chaves] = dados[chaves];
+            }
+            if (cb) cb(out);
+            return Promise.resolve(out);
+          },
+          set(obj, cb) { Object.assign(dados, obj || {}); if (cb) cb(); return Promise.resolve(); },
+          remove(chaves, cb) { for (const k of [].concat(chaves || [])) delete dados[k]; if (cb) cb(); return Promise.resolve(); },
+        };
+        window.chrome = {
+          runtime: { getURL: (p) => location.origin + "/" + p, openOptionsPage() {} },
+          storage: { local: area, sync: area, onChanged: { addListener() {} } },
+        };
+        window.open = () => null;
+      })();
+    </script>
+    <script src="/src/prompts.js"></script>
+    <script src="/src/panel.js"></script>
+    <script>
+      const painel = PjePanel.mount();
+      painel.setConfigured(true);
+      painel.setProcesso && painel.setProcesso("0000860-39.2017.8.06.0203");
+      painel.setDocs([
+        { id: "101", titulo: "101 - Petição inicial" },
+        { id: "102", titulo: "102 - Contestação" },
+        { id: "103", titulo: "103 - Sentença" },
+        { id: "104", titulo: "104 - Laudo pericial" },
+      ]);
+      painel.addMessage("user", "Houve prescrição neste processo?");
+      painel.addMessage("assistant", "Não. O prazo foi interrompido pela citação válida em 12/03/2021, e desde então correram apenas 3 anos.");
+      painel.open();
+
+      // O harness expõe os três momentos do carimbo para a captura headless.
+      // Nada aqui toca no estado real: é o painel de verdade, pilotado pela API.
+      window.__cena = (nome) => {
+        const wrap = document.getElementById("pje-ia-host").shadowRoot.querySelector(".wrap");
+        const selo = wrap.querySelector(".sigselo");
+        if (nome === "off") { painel.setSigiloso(false); return; }
+        if (nome === "anuncio") {
+          painel.setSigiloso(false);
+          painel.setSigiloso(true, 0);
+          return;
+        }
+        if (nome === "trabalhando") {
+          painel.setSigiloso(true, 6);
+          selo.classList.remove("anunciando");
+          painel.setSigiloProgresso({ feitas: 3, total: 12, detalhe: "fl. 1" });
+          return;
+        }
+        if (nome === "repouso") {
+          painel.setSigiloso(true, 47);
+          selo.classList.remove("anunciando");
+          painel.setSigiloProgresso(null);
+          return;
+        }
+      };
+      window.__tema = (t) => {
+        const wrap = document.getElementById("pje-ia-host").shadowRoot.querySelector(".wrap");
+        if (t) wrap.setAttribute("data-tema", t);
+        else wrap.removeAttribute("data-tema");
+      };
+      window.__caixaTema = () => {
+        const sr = document.getElementById("pje-ia-host").shadowRoot;
+        sr.querySelector(".hd .tema").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      };
+      // O MODO É TROCADO CLICANDO NO BOTÃO REAL, nunca pondo a classe na mão.
+      // Pôr a classe pula o `aplicarModo()`, que é quem centra a janela, limpa
+      // a geometria inline do modo livre e faz o FLIP — e a captura sai com o
+      // painel no canto, parecendo defeito de layout onde não há nenhum.
+      // Os botões são ALTERNADORES, então primeiro se volta ao flutuante.
+      window.__modo = (m) => {
+        const sr = document.getElementById("pje-ia-host").shadowRoot;
+        const wrap = sr.querySelector(".wrap");
+        const clicar = (s) => sr.querySelector(s).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        if (wrap.classList.contains("full")) clicar(".fs");
+        if (wrap.classList.contains("expanded")) clicar(".expand");
+        if (wrap.classList.contains("lateral")) clicar(".side");
+        if (wrap.classList.contains("livre")) clicar(".free");
+        if (m === "expanded") clicar(".expand");
+        else if (m === "lateral") clicar(".side");
+        else if (m === "livre") clicar(".free");
+        else if (m === "full") clicar(".fs");
+      };
+      window.__pronto = () => {
+        const raiz = document.getElementById("pje-ia-host");
+        if (!raiz || !raiz.shadowRoot) return false;
+        // O panel.css chega por FETCH ASSÍNCRONO. Medir antes dele mede uma
+        // árvore sem estilo, em que um <button> é inline-block e o painel cai
+        // no fluxo normal — a armadilha nº 1 da medição em headless.
+        const st = raiz.shadowRoot.querySelector("style");
+        return !!(st && st.textContent && st.textContent.length > 5000);
+      };
+
+      // ---- ESTADO RICO ----------------------------------------------------
+      // A impressão digital só protege o que ela FOTOGRAFA. Sem estes setters,
+      // o rodapé de meta (medidor, custo, selo do modelo, linha do tempo) fica
+      // `hidden` e sai de toda comparação — justamente a região que a v0.60
+      // reconstrói. Os valores são fictícios; o que importa é o elemento existir
+      // pintado.
+      painel.setContexto({
+        tokens: 412000, ctxTokens: 1000000,
+        paginas: 120, maxPaginas: 600,
+        pecas: 15, pendentes: 0,
+      });
+      painel.setCusto({ turnoUsd: 0.0123, conversaUsd: 0.0456 });
+      painel.setModelo({
+        model: "gpt-5.6-luna", nome: "GPT-5.6 Luna",
+        effort: "medium", comEffort: true,
+      });
+      painel.setLinhaDoTempo({
+        n: 26, total: 30, fonte: "oficial", cortou: 4, cortouChave: false,
+        truncada: false, parcial: false, de: "12/03/2019", ate: "16/07/2026",
+        itens: [
+          { data: "12/03/2019", evento: "DISTRIBUICAO", texto: "por sorteio", pecas: ["185463738"] },
+          { data: "16/07/2026", evento: "DECURSO DE PRAZO", texto: "Decorrido prazo em 16/07/2026 23:59", pecas: [] },
+        ],
+      });
+
+      // O ESTADO VAZIO é a região com mais componentes novos na v0.60 (selo,
+      // hero, dois grids de cartões) e ficava fora da medição porque a página
+      // já nascia com duas mensagens. Agora é uma cena.
+      const _msgs = [
+        ["user", "Houve prescricao neste processo?"],
+        ["assistant", "Nao. O prazo foi interrompido pela citacao valida em 12/03/2021, e desde entao correram apenas 3 anos."],
+      ];
+      window.__vazio = (sim) => {
+        painel.clearMessages();
+        if (!sim) for (const [p, t] of _msgs) painel.addMessage(p, t);
+      };
+    </script>
+  </body>
+</html>

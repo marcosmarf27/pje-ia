@@ -7,7 +7,19 @@ node correr.mjs      # a suíte inteira (~75 s)
 node correr.mjs --rapido   # só os de unidade (~10 s)
 ```
 
-Linha de base em 04/09/2026, na v0.58.3: **33 verdes, 0 vermelhos, 74 s.**
+Linha de base em 05/09/2026, na v0.59.0: **35 verdes, 0 vermelhos, 102 s.**
+
+## `visual/` — a rede que os .mjs não cobrem
+
+`node correr.mjs` não roda navegador: ele prova lógica. O que ele **não** vê é a
+tela. Em `visual/` moram duas ferramentas headless — a impressão digital de
+36.718 propriedades de cor e a captura de pixel dos temas — com o `README.md`
+próprio. Elas não entram no `correr.mjs` porque dependem do Chrome instalado e
+levam ~30 s cada; são rodadas à mão em toda mudança de frontend.
+
+No dia em que nasceram acharam um defeito de acessibilidade que estava em
+produção: o painel expandido ficava **descentrado** para quem pede menos
+movimento. Ver `visual/achados/`.
 
 ## Por que esta pasta existe
 
