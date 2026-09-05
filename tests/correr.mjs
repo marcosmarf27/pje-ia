@@ -30,6 +30,7 @@ const CATALOGO = [
   { t: "t-openrouter" },
   { t: "t-curadoria" },
   { t: "t-temas" },
+  { t: "t-template-crase" },
   { t: "t-temas-coerencia" },
   { t: "t-temas-contraste" },
   // --- com fixture no argv ---

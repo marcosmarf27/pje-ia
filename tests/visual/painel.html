@@ -109,6 +109,14 @@
         else if (m === "livre") clicar(".free");
         else if (m === "full") clicar(".fs");
       };
+      // Troca a VIEW do workspace clicando na aba real (nunca pondo o
+      // data-view na mao): so o clique passa pelo `trocarView`, que e quem
+      // marca o aria-selected das quatro abas.
+      window.__view = (v) => {
+        const sr = document.getElementById("pje-ia-host").shadowRoot;
+        const b = sr.querySelector('.hn-i[data-view="' + v + '"]');
+        if (b) b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      };
       window.__pronto = () => {
         const raiz = document.getElementById("pje-ia-host");
         if (!raiz || !raiz.shadowRoot) return false;

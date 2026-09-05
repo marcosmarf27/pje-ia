@@ -1017,8 +1017,22 @@ var PjePanel = (function () {
             </div>
             </div>
           </div>
-          <div class="main">
+          <div class="main" data-view="chat">
             <div class="msgs"></div>
+            <!-- A VIEW DA LINHA DO TEMPO. Irmã de .msgs, e não um wrapper em
+                 volta dela: .msgs carrega flex, rolagem e dezenas de regras
+                 que um container novo deslocaria. Quem alterna é o
+                 atributo data-view do .main, no CSS.
+                 SEM CRASE NESTE COMENTÁRIO: ele vive dentro de um template
+                 literal, e uma crase aqui ENCERRA a string. Ver o teste
+                 t-template-crase, que existe porque isto já aconteceu. -->
+            <div class="view-tempo" role="region" aria-label="Linha do tempo do processo">
+              <div class="vt-hd">
+                <span class="vt-cab"></span>
+                <button type="button" class="vt-volta">Voltar ao chat</button>
+              </div>
+              <div class="vt-lista"></div>
+            </div>
             <div class="ft">
               <!-- O QUE PRECEDE A CAIXA. Estes blocos mudam o que o Enviar FAZ
                    (modo minuta, modo mapa, prompt ativo) ou impedem de enviar
@@ -4619,63 +4633,44 @@ var PjePanel = (function () {
       setTimeout(() => verTimelineCb(id), 50);
     }
     // -------------------------------------------------------------------------
-    // LINHA DO TEMPO DO PROCESSO — a lista LEGÍVEL por trás do selo.
+    // LINHA DO TEMPO DO PROCESSO — uma VIEW, não mais um popover.
     //
     // O selo (v0.45.2) dizia quantos movimentos foram ao modelo; as datas em si
     // não apareciam em lugar nenhum — para lê-las era preciso que o modelo as
     // citasse na resposta. Quem confere prazo precisa do REGISTRO, não do
-    // resumo: é ele que diz se a resposta bate com os autos. O selo virou a
-    // porta para ele.
+    // resumo. A v0.45.3 deu a ele uma caixa flutuante de 420x375 ancorada no
+    // selo; a v0.60 promove a caixa a VIEW do workspace, porque é isso que uma
+    // aba promete — acender, abrir um popover e apagar não é comportamento de
+    // aba, e a lista respira melhor na coluna inteira.
     //
-    // Criado sob demanda e `position: fixed`, como o `.selmenu` e a
-    // `.confirmbox`: o `.wrap` é um container de tamanho ZERO (quem tem dimensão
-    // é o `.panel`), então posicionar por dentro dele joga o elemento para fora
-    // da tela.
+    // O que SAIU junto: `position: fixed` ancorado no selo, o cálculo de
+    // acima/abaixo, o clique-fora por `composedPath()` no document, o Esc em
+    // cascata e o listener de resize. Um destino fixo não precisa de nada
+    // disso — é simplificação, não perda.
+    //
+    // O SELO CONTINUA, e passa a ATIVAR a aba: um destino, duas entradas. É a
+    // única entrada no painel estreito, onde as abas não cabem.
     // -------------------------------------------------------------------------
     let movItens = [];
     let movCab = "";
     let movExplica = "";
-    let movbox = null;
-    function fecharMov() {
-      if (!movbox) return;
-      movbox.remove();
-      movbox = null;
-      ltEl.setAttribute("aria-expanded", "false");
-    }
-    function abrirMov() {
-      fecharMov();
-      const box = document.createElement("div");
-      box.className = "movbox";
-      box.setAttribute("role", "dialog");
-      box.setAttribute("aria-label", "Linha do tempo do processo");
-      const hd = document.createElement("div");
-      hd.className = "mv-hd";
-      const t = document.createElement("span");
-      t.className = "mv-t";
-      t.textContent = movCab;
-      const x = document.createElement("button");
-      x.type = "button";
-      x.className = "mv-x";
-      x.title = "Fechar (Esc)";
-      x.innerHTML = SVG.x; // ícone do próprio pacote, não conteúdo externo
-      x.addEventListener("click", fecharMov);
-      hd.appendChild(t);
-      hd.appendChild(x);
-      box.appendChild(hd);
-      const lista = document.createElement("div");
-      lista.className = "mv-list";
+    const viewTempo = $(".view-tempo");
+    const vtCab = $(".vt-cab");
+    const vtLista = $(".vt-lista");
+
+    function pintarTempo() {
+      if (!vtLista) return;
+      vtCab.textContent = movCab || "Linha do tempo do processo";
+      vtLista.innerHTML = "";
       // CONJUNTO VAZIO SE EXPLICA (a regra da `.sel-nota` e do estado vazio da
-      // biblioteca). Antes, sem movimento nenhum, `abrirMov` saía na primeira
-      // linha: o selo âmbar ficava com `cursor: pointer` prometendo um clique que
-      // não fazia NADA — o mesmo "botão mudo" que o botão de copiar o PIX já
-      // custou uma correção. E é justo aqui que a pergunta "por que não há
-      // datas?" nasce, então é aqui que ela tem de ser respondida (o tooltip
-      // responde, mas some no toque e passa despercebido num chip pequeno).
+      // biblioteca). É justo aqui que a pergunta "por que não há datas?" nasce,
+      // então é aqui que ela tem de ser respondida.
       if (!movItens.length) {
         const v = document.createElement("div");
         v.className = "mv-vazio";
-        v.textContent = movExplica;
-        lista.appendChild(v);
+        v.textContent = movExplica || "Nenhum movimento processual foi lido neste processo.";
+        vtLista.appendChild(v);
+        return;
       }
       for (const it of movItens) {
         // Marca do corte: a lista salta de uma data para outra bem distante, e
@@ -4684,7 +4679,7 @@ var PjePanel = (function () {
           const g = document.createElement("div");
           g.className = "mv-gap";
           g.textContent = "… " + it.lacuna + " …";
-          lista.appendChild(g);
+          vtLista.appendChild(g);
           continue;
         }
         const row = document.createElement("div");
@@ -4720,90 +4715,25 @@ var PjePanel = (function () {
         }
         row.appendChild(d);
         row.appendChild(b);
-        lista.appendChild(row);
+        vtLista.appendChild(row);
       }
-      box.appendChild(lista);
+    }
+    if (vtLista) {
       // Delegado: uma lista de 140 movimentos não precisa de 140 listeners.
-      lista.addEventListener("click", (e) => {
+      vtLista.addEventListener("click", (e) => {
         const p = e.target.closest(".mv-p");
         if (!p) return;
-        fecharMov();
+        // Volta para o chat antes de rolar: `irParaPeca` troca para o modo
+        // lateral e destaca a peça na página do tribunal, e ficar na view de
+        // tempo esconderia a conversa de onde a pergunta partiu.
+        trocarView("chat");
         irParaPeca(p.dataset.id);
       });
-      wrap.appendChild(movbox = box);
-      ltEl.setAttribute("aria-expanded", "true");
-      posicionarMov();
     }
-    function posicionarMov() {
-      if (!movbox) return;
-      const p = panelEl.getBoundingClientRect();
-      const r = ltEl.getBoundingClientRect();
-      // A caixa é DO PAINEL, não da página, e é isso que a medição nos modos
-      // mostrou: ancorada só no selo e clampada pela viewport, ela vazava para
-      // fora do painel no LATERAL (420px colado à direita) e ia parar sobre a
-      // tela do tribunal, encostando na borda da janela — parecia acidente, não
-      // desenho. Agora as bordas do painel são o limite, com 8px de recuo: onde
-      // o painel é estreito a caixa fica visivelmente DENTRO dele.
-      const larg = Math.max(240, Math.min(420, p.width - 16));
-      movbox.style.width = larg + "px";
-      // A altura também respeita o painel — uma caixa mais alta que ele
-      // flutuaria por cima do cabeçalho e da página ao mesmo tempo.
-      const lista = movbox.querySelector(".mv-list");
-      if (lista) lista.style.maxHeight = Math.max(140, Math.min(460, p.height - 96)) + "px";
-      const alt = movbox.offsetHeight;
-      // Alinhada à DIREITA do selo (que vive no canto direito do rodapé), porque
-      // é dele que a caixa sai — mas sem passar da borda do painel.
-      const dir = Math.min(r.right, p.right - 8);
-      movbox.style.left =
-        Math.max(p.left + 8, Math.min(dir - larg, window.innerWidth - larg - 6)) + "px";
-      // ACIMA do selo, que é onde há espaço; abaixo só quando não cabe em cima.
-      if (r.top - alt - 8 >= 6) movbox.style.top = r.top - alt - 8 + "px";
-      else movbox.style.top = Math.max(6, Math.min(r.bottom + 8, window.innerHeight - alt - 6)) + "px";
-    }
-    ltEl.addEventListener("click", () => (movbox ? fecharMov() : abrirMov()));
-    // Fecha em clique fora e no Esc. O `stopPropagation` no Esc é obrigatório:
-    // sem ele a cascata do painel (`/` → `@` → modal → modo minuta) cancelaria
-    // outra coisa junto — mesma regra do Esc do preview.
-    //
-    // O listener vive no `document`, e não no `wrap` como o do `.selmenu`: o
-    // `wrap` só enxerga o que acontece DENTRO do Shadow DOM, e nos modos
-    // lateral, livre e flutuante a página do tribunal fica visível e CLICÁVEL ao
-    // lado — com a caixa em `position: fixed` por cima dela. Ancorado no `wrap`,
-    // clicar nos autos não fechava nada: a lista ficava aberta sobre o processo
-    // enquanto o usuário trabalhava, e só o Esc a tirava. (O `.selmenu` tem o
-    // mesmo desenho, mas ele ainda fecha em todo `setDocs`; esta caixa não.)
-    //
-    // A decisão é por `composedPath()`, NUNCA por `e.target`: no `document` o
-    // alvo de dentro do Shadow DOM chega RETARGETADO para o host, então
-    // `e.target.closest(".movbox")` daria `null` e o clique dentro da própria
-    // caixa a fecharia — inclusive o clique no botão "peça N", que morreria
-    // antes do `click`. `composedPath` atravessa a fronteira e devolve os nós
-    // reais.
-    //
-    // `capture: true` para o fechamento não depender de ninguém deixar o evento
-    // subir, e a guarda `!movbox` na primeira linha para que, fora deste estado,
-    // o listener não custe nada.
-    document.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (!movbox) return;
-        const caminho = e.composedPath ? e.composedPath() : [];
-        if (caminho.indexOf(movbox) >= 0 || caminho.indexOf(ltEl) >= 0) return;
-        fecharMov();
-      },
-      true
-    );
-    window.addEventListener(
-      "keydown",
-      (e) => {
-        if (e.key === "Escape" && movbox) {
-          e.stopPropagation();
-          fecharMov();
-        }
-      },
-      true
-    );
-    window.addEventListener("resize", posicionarMov);
+    // O selo é a ENTRADA da aba, e a única no painel estreito.
+    ltEl.addEventListener("click", () => trocarView("tempo"));
+    const vtVolta = $(".vt-volta");
+    if (vtVolta) vtVolta.addEventListener("click", () => trocarView("chat"));
 
     doclist.addEventListener("click", (e) => {
       const btn = e.target.closest(".d-ver");
@@ -7236,6 +7166,11 @@ var PjePanel = (function () {
       // do modo sigiloso, que oferece a conversa nova como saída que preserva
       // o nome. Passa pelo mesmo callback; não há segundo caminho de reset.
       novaConversa() {
+        // Volta ao chat: "Nova conversa" promete uma tela limpa, e uma view
+        // presa na linha do tempo entregaria a lista de movimentos no lugar
+        // dela. O SELO não é zerado (ele descreve o PROCESSO, não a conversa);
+        // o que volta é a view.
+        trocarView("chat");
         if (resetCb) resetCb();
       },
       onReset(cb) {
@@ -7401,6 +7336,7 @@ var PjePanel = (function () {
       // próprio texto, e o renderMd os converte em <sup> como no primeiro
       // desenho.
       restaurarConversa(itens) {
+        trocarView("chat"); // retomada da memória de caso: a tela volta ao chat
         if (!Array.isArray(itens) || !itens.length) return 0;
         clearEmptyHint();
         let n = 0;
@@ -8810,10 +8746,11 @@ var PjePanel = (function () {
       // info: {n, total, fonte:"oficial"|"tela", cortou, cortouChave, truncada,
       //        parcial, de, ate}. null esconde.
       setLinhaDoTempo(info) {
-        // A lista legível vive por trás do selo; ela é substituída junto com ele
-        // para nunca mostrar movimentos de um retrato anterior.
+        // A lista legível é REPINTADA junto com o selo, para nunca mostrar
+        // movimentos de um retrato anterior. Repintar e não fechar: a view pode
+        // estar aberta na tela, e fechá-la tiraria o usuário de onde ele está.
         movItens = (info && info.itens) || [];
-        fecharMov();
+        pintarTempo();
         if (!info) {
           ltEl.hidden = true;
           ltFull.textContent = "";

@@ -170,6 +170,25 @@ for (const [modo, rot] of [["expanded", "largo"], ["", "estreito"]]) {
   n++;
 }
 
+// A VIEW DA LINHA DO TEMPO. Ela e o unico lugar do painel onde a lista de
+// movimentos aparece legivel, e o que ela mostra tem de ser o que FOI ao
+// modelo — inclusive a marca do corte. Retrato proprio, nos dois tamanhos.
+await cmd("Emulation.setEmulatedMedia", {
+  features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+});
+for (const [modo, rot] of [["expanded", "largo"], ["", "estreito"]]) {
+  await js("window.__tema('')");
+  await js("window.__vazio(false)");
+  await js("window.__modo(" + JSON.stringify(modo) + ")");
+  await js('window.__cena("off")');
+  await js('window.__view("tempo")');
+  await new Promise((r) => setTimeout(r, 500));
+  const png = (await cmd("Page.captureScreenshot", { format: "png" })).result?.data;
+  writeFileSync(join(RAIZ, SAIDA, "padrao-tempo-" + rot + ".png"), Buffer.from(png, "base64"));
+  n++;
+}
+await js('window.__view("chat")');
+
 console.log(n + " capturas em " + SAIDA);
 ws.close(); chrome.kill(); srv.close();
 process.exit(0);

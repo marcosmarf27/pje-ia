@@ -285,6 +285,105 @@
   font-family: var(--ff-sans);
 }
 
+
+/* ---------- A VIEW DA LINHA DO TEMPO (v0.60) ----------
+   Quem alterna é o data-view do .main. As duas views são IRMÃS de nível, e o
+   compositor fica visível nas duas: ele é a barra do aplicativo, não a do chat
+   — dá para perguntar sobre um movimento olhando para ele, e o envio devolve
+   ao chat sozinho.
+
+   Até a v0.59 isto era uma caixa flutuante de 420px ancorada no selo do rodapé.
+   O que saiu junto com a promoção a view: o position fixed, o cálculo de
+   acima/abaixo, o clique-fora por composedPath no document, o Esc em cascata e
+   o listener de resize. Um destino fixo não precisa de nada disso. */
+.main[data-view="chat"] .view-tempo { display: none; }
+.main[data-view="tempo"] .msgs { display: none; }
+.view-tempo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-5) var(--sp-4) var(--sp-3);
+}
+.vt-hd {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  width: 100%; max-width: var(--w-leitura); margin: 0 auto var(--sp-3);
+  padding-bottom: var(--sp-2b);
+  border-bottom: 1px solid var(--line);
+}
+.vt-cab {
+  font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--eyebrow);
+}
+/* "Como volto?" é pergunta que a navegação responde, e no painel estreito não
+   há aba para responder por ela. */
+.vt-volta {
+  margin-left: auto;
+  border: 0; background: transparent; cursor: pointer;
+  font-family: var(--ff-sans); font-size: var(--fs-meta); font-weight: 500;
+  color: var(--pje); padding: 2px 6px; border-radius: var(--r-xs);
+}
+.vt-volta:hover { background: var(--accent-bg); }
+.vt-lista {
+  width: 100%; max-width: var(--w-leitura); margin: 0 auto;
+  display: flex; flex-direction: column;
+}
+/* A LISTA É A MESMA que foi ao modelo, já cortada — inclusive a marca do corte.
+   Uma view que mostrasse MAIS que o request faria o usuário conferir a resposta
+   contra um registro que a IA não viu. */
+.vt-lista .mv-row {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: var(--sp-3b);
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--line-2);
+}
+.vt-lista .mv-row:hover { background: var(--hover-2); }
+.vt-lista .mv-d {
+  font-family: var(--ff-mono); font-size: var(--fs-micro); font-weight: 500;
+  color: var(--muted-2); letter-spacing: 0.01em; padding-top: 1px;
+  white-space: nowrap;
+}
+.vt-lista .mv-b { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vt-lista .mv-b b {
+  font-size: var(--fs-ui); font-weight: 600; color: var(--ink); line-height: 1.35;
+}
+/* O COMPLEMENTO é o que fecha a conta do prazo ("Decorrido prazo de … em
+   16/07/2026 23:59") — é ele que se lê, não o nome do evento. */
+.vt-lista .mv-c { font-size: var(--fs-meta); line-height: 1.5; color: var(--muted); }
+.vt-lista .mv-p {
+  align-self: flex-start; margin-top: 2px;
+  border: 1px solid var(--line); border-radius: var(--r-xs);
+  background: var(--surface); cursor: pointer;
+  font-family: var(--ff-mono); font-size: var(--fs-nano); font-weight: 500;
+  color: var(--pje); padding: 2px 7px;
+}
+.vt-lista .mv-p:hover { background: var(--accent-bg); border-color: var(--pje-soft); }
+/* A MARCA DO CORTE. Sem ela a lista salta de 2020 para 2026 e o salto passa por
+   continuidade — pior que dizer que faltou pedaço. Ela VIAJA no payload, montada
+   a partir do mesmo conjunto que produz as linhas do request. */
+.vt-lista .mv-gap {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--warn-line);
+  border-radius: var(--r-md);
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-size: var(--fs-micro);
+  text-align: center;
+}
+/* Conjunto vazio se EXPLICA (a regra da .sel-nota): é aqui que a pergunta "por
+   que não há datas?" nasce, então é aqui que ela é respondida. */
+.vt-lista .mv-vazio {
+  padding: var(--sp-5) var(--sp-3);
+  text-align: center; font-size: var(--fs-meta); line-height: 1.55;
+  color: var(--muted);
+}
+.wrap.estreito .view-tempo { padding: var(--sp-3b) var(--sp-3) var(--sp-2); }
+.wrap.estreito .vt-lista .mv-row { grid-template-columns: 1fr; gap: 2px; }
+
 /* =========================================================================
    TEMAS DO PAINEL
    =========================================================================
@@ -1958,10 +2057,28 @@ button > svg { flex: none; }
   flex-wrap: wrap;
   padding: 0; margin: 0; border: 0; background: none; min-height: 0;
 }
-.docs-tip .tip-txt-ocr .lbl,
-.docs-tip .tip-zip .lbl { display: none; }
+/* DUAS AÇÕES COM NOME, O RESTO NO MENU. "Escolher com IA" é a de maior valor e
+   a menos descoberta do produto; "Carregar tudo" é a que resolve "a peça não
+   está na lista". As outras três — extrair texto, .zip e o pacote de
+   precatória — JÁ EXISTIAM dentro do menu do split button, item por item: o
+   botão solto delas era uma segunda porta para o mesmo destino, ocupando a
+   coluna. Ficam só no menu, e o botão dele deixa de ser um caret colado no
+   .zip para virar um "mais ações" de verdade. */
+.docs-tip .tip-ia .lbl,
+.docs-tip .tip-load .lbl { display: inline; }
+.docs-tip .tip-txt-ocr,
+.docs-tip .tip-zip { display: none; }
 .docs-tip .tip-ia,
 .docs-tip .tip-load { flex: 0 1 auto; }
+.docs-tip .zipwrap { flex: none; }
+/* Sem o .tip-zip ao lado, o botão do menu recupera os cantos e o separador
+   vertical que o transformavam em metade de um split button. */
+.docs-tip .tip-zip-mais {
+  border-radius: var(--r-md);
+  width: 30px;
+  border-left: 1px solid var(--line-strong);
+}
+.docs-tip .tip-zip-mais::before { content: none; }
 /* A PROCEDÊNCIA da lista fica à direita, onde o desenho de referência põe o
    estado da sincronização — e aqui ela diz o fato: de onde a lista veio e
    quando foi lida. Um "sincronizado" sem data afirmaria atualidade que a
@@ -2302,10 +2419,15 @@ button > svg { flex: none; }
    que a lista é uma faixa de até 712px. Ali os três rótulos cabem com folga, e
    escondê-los seria perder informação sem motivo. */
 .wrap:is(.estreito, .expanded, .livre-wide) .docs-tip { gap: var(--sp-2); }
-.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-txt-ocr, .tip-zip) .lbl {
+/* A v0.60 REDUZIU a fileira a duas ações e um menu, e com isso "Escolher com
+   IA" recuperou o rótulo em todo modo: ele era o que essa regra escondia, e é
+   justamente a ação de maior valor e menos descoberta do produto. Um ícone de
+   varinha mudo não se descobre. Os outros dois saíram da fileira (vivem no
+   menu), então a regra ficaria sem objeto — fica só o registro do porquê. */
+.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-txt-ocr, .tip-zip) .lbl {
   display: none;
 }
-.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-ia, .tip-txt-ocr, .tip-zip) {
+.wrap:is(.estreito, .expanded, .livre-wide) :is(.tip-txt-ocr, .tip-zip) {
   padding: 0 var(--sp-2b);
 }
 
@@ -4325,71 +4447,14 @@ button > svg { flex: none; }
 .aud-baixar { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .aud-baixar svg { flex: none; }
 
-.movbox {
-  position: fixed; z-index: 2147483646;
-  /* A largura REAL é calculada em `posicionarMov` contra a caixa do painel (nunca
-     ultrapassá-la); este valor é só o ponto de partida antes da medição. Os 420px
-     não são arbitrários: é a largura PRESCRITIVA do modo lateral (§ Larguras), e
-     é ela que o complemento do movimento precisa para não ser cortado. */
-  width: min(420px, calc(100vw - 24px));
-  background: var(--surface); border: 1px solid var(--line-card);
-  border-radius: var(--r-md); box-shadow: var(--sh-pop);
-  display: flex; flex-direction: column; overflow: hidden;
-  animation: rise 0.12s ease-out;
-}
-.mv-hd {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line-card);
-  background: var(--surface-2);
-}
-.mv-t {
-  font-size: var(--fs-nano); font-weight: 600; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mv-x {
-  border: none; background: transparent; cursor: pointer; flex: none;
-  color: var(--muted-3); width: 24px; height: 24px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; padding: 0;
-}
-.mv-x:hover { background: var(--hover); color: var(--ink); }
 /* `min-height: 0` no filho flex é o que permite o overflow funcionar dentro de
    uma coluna flex (a mesma armadilha do `.doclist` na faixa `.docs`). */
-.mv-list { overflow-y: auto; min-height: 0; max-height: min(52vh, 460px); padding: 4px 0; }
-.mv-row {
-  display: flex; gap: 10px; align-items: baseline;
-  padding: 6px 12px; font-size: var(--fs-meta); line-height: 1.45;
-}
-.mv-row + .mv-row { border-top: 1px solid var(--line-2); }
 /* Data em coluna FIXA e tabular: é por ela que o olho desce a lista procurando
    uma data, e largura variável destruiria essa varredura. */
-.mv-d {
-  flex: 0 0 104px; color: var(--text-3); font-size: var(--fs-micro);
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.mv-b { min-width: 0; color: var(--text-2); }
-.mv-b b { color: var(--ink); font-weight: 600; }
-.mv-c { display: block; color: var(--muted); font-size: var(--fs-micro); }
-.mv-p {
-  display: inline-block; margin-top: 3px; padding: 1px 7px;
-  border: 1px solid var(--line); border-radius: var(--r-pill);
-  background: var(--accent-bg); color: var(--pje-2);
-  font: inherit; font-size: var(--fs-nano); cursor: pointer;
-}
-.mv-p:hover { border-color: var(--pje); background: var(--hover); }
 /* Estado vazio da caixa: o selo âmbar diz "sem linha do tempo", e é ao clicá-lo
    que a pergunta "por quê?" nasce. Antes o clique não fazia nada. */
-.mv-vazio {
-  padding: 14px 14px 16px; font-size: var(--fs-meta); line-height: 1.5;
-  color: var(--text-2);
-}
 /* Marca do corte: tokens de aviso SUAVE, como a `.sel-nota` — falta pedaço, mas
    nada está impedido. Sem esta linha o salto de datas passaria por continuidade. */
-.mv-gap {
-  padding: 7px 12px; font-size: var(--fs-micro); text-align: center;
-  color: var(--warn-ink); background: var(--warn-bg);
-  border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2);
-}
 
 /* ---------- Medidor de contexto da conversa ---------- */
 .gauge { display: flex; align-items: center; gap: var(--sp-2); margin: 0; cursor: help; min-width: 0; }
