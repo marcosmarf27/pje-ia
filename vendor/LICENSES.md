@@ -53,14 +53,24 @@ Google Fonts e servido **localmente** — nunca de CDN, porque o painel roda na 
 tribunal e um `<link>` externo seria barrado pela CSP de vários deles e vazaria uma
 requisição a partir da tela dos autos. Declaradas em `src/fontes.css`; ver DESIGN.md §3.
 
+> **Por que oito arquivos e não quatro.** A v0.60 trocou a tipografia da
+> interface (Geist + Inter + JetBrains Mono), e Newsreader e IBM Plex **ficam
+> enquanto houver consumidor** — apagar um `.woff2` com consumidor vivo degrada
+> para o fallback do sistema **em silêncio**, que é o pior tipo de regressão
+> visual. São 121 KB somados, todos subset `latin`.
+
 | Arquivo | Família | Tipo | Licença |
 |---|---|---|---|
+| `fontes/geist.woff2` | [Geist](https://github.com/vercel/geist-font) | variable, 300–700 | SIL OFL 1.1 — © Vercel |
+| `fontes/inter.woff2` | [Inter](https://fonts.google.com/specimen/Inter) | variable, 300–700 | SIL OFL 1.1 — © Rasmus Andersson |
+| `fontes/jetbrainsmono-400.woff2` / `-500.woff2` | [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) | estática | SIL OFL 1.1 — © JetBrains |
 | `fontes/newsreader.woff2` | [Newsreader](https://fonts.google.com/specimen/Newsreader) | variable, 400–600 | SIL OFL 1.1 — © Production Type |
 | `fontes/newsreader-italic.woff2` | Newsreader | itálico 400 | SIL OFL 1.1 |
 | `fontes/plexsans.woff2` | [IBM Plex Sans](https://fonts.google.com/specimen/IBM+Plex+Sans) | variable, 400–600 | SIL OFL 1.1 — © IBM |
 | `fontes/plexmono-400.woff2` / `-500.woff2` | [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) | estática | SIL OFL 1.1 — © IBM |
 
-Newsreader e Plex Sans são **variable fonts**: um arquivo cobre 400, 500 e 600, e é por
+**Geist, Inter, Newsreader e Plex Sans são variable fonts**: um arquivo cobre toda a
+faixa de peso, e é por
 isso que há um `.woff2` só para os três pesos (a API do Google devolve o mesmo arquivo
 para cada peso pedido). Plex Mono é estática, daí os dois arquivos. Total ~264 KB, dos
 quais ~188 KB no caminho comum — o itálico e o mono 500 só baixam quando usados.

@@ -4256,7 +4256,7 @@ button > svg { flex: none; }
    ao azul ao digitar, e o resultado era uma janela verde com um campo azul —
    lido como "a cor e a borda estão horríveis". Foco é um halo mais forte da
    MESMA cor. */
-.wrap.sigiloso .inrow { border: 1.5px solid var(--ok); background: #fbfdfc; }
+.wrap.sigiloso .comp-card { border-color: var(--ok); background: var(--ok-bg); }
 .wrap.sigiloso .inrow:focus-within {
   border-color: var(--ok-ink); box-shadow: 0 0 0 3px var(--sig-halo);
 }
@@ -5085,7 +5085,7 @@ button > svg { flex: none; }
   border-radius: var(--r-tight); border: 1px solid var(--warn-line);
   background: var(--surface); color: var(--warn-ink); cursor: pointer;
 }
-.imp-res-b:hover { background: #fff6e6; }
+.imp-res-b:hover { background: var(--warn-bg); }
 
 /* ---------- Raciocínio (thinking) colapsável ---------- */
 .msg .think {

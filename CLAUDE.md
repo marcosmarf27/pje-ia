@@ -2680,10 +2680,96 @@ em `content.js`.
   seguinte leva 400. "Nova conversa" resolve. Se for tratar: os bytes do anexo estão
   sempre em memória, basta re-subir e reescrever o `file_id` no bloco — sem download.
 
+## O redesign da v0.60 — o que mudou de ANATOMIA (`panel.js` + `panel.css`)
+
+> **Isto não foi troca de paleta.** O markup do painel foi reconstruído. O
+> `DESIGN.md` §5 tem a anatomia das seis regiões com o diagrama; aqui ficam só as
+> invariantes que quebram se alguém mexer sem saber.
+
+- **A CHROME PASSOU A SER CLARA, e isso obriga TRÊS inversões — nenhuma é
+  opcional.** `--on-hd-*` viram tinta ESCURA, `--veu-*` viram véus ESCUROS e
+  `--sig-hd` acompanha a polaridade (verde CLARO, como o tema Papel já fazia).
+  Tinta clara sobre chrome clara é texto invisível; película branca sobre chrome
+  branca não revela nada. Foi o que sumiu o nome do produto do topo do popup
+  quando a família `--on-hd-*` ficou de fora do `ui.css`.
+- **A TINTA DA CHROME É UMA FAMÍLIA PRÓPRIA** (`--on-hd`, `-2`, `-3`,
+  `-forte`), e usar `--muted`/`--text` no cabeçalho **só falha no tema que
+  inverte a polaridade**. As abas nasceram com `color: var(--muted)`: certo no
+  padrão claro, ilegível no `institucional`, cuja chrome é petróleo. Um erro de
+  token só se revela no tema oposto — é por isso que a captura dos SETE temas
+  vale mais que a inspeção do padrão.
+- **`.hd button` tem especificidade 0,1,1 e governa TODO botão do cabeçalho**
+  (`transparent`, `30×30`, `--r-sm`). Controle novo ali precisa de `.hd .x` **e**
+  de DESFAZER o que ela impôs — `width: auto` antes de mais nada. Ela venceu o
+  `.sigselo` na v0.57 e as abas na primeira versão desta barra, que saíram com
+  30px e empilharam texto por cima do vizinho.
+- **NENHUMA CRASE dentro de `wrap.innerHTML`.** O markup é um template literal, e
+  uma crase num comentário HTML ali ENCERRA a string. O sintoma nunca aponta para
+  lá: numa forma o `node --check` PASSA e o erro nasce em runtime
+  (`ReferenceError: rail is not defined`); na outra é um `SyntaxError` numa linha
+  que é um COMENTÁRIO. No navegador o painel simplesmente não monta. A convenção
+  deste projeto é comentar muito citando seletores com crase, então a regra não
+  pode depender de disciplina: `tests/t-template-crase.mjs` varre as ~365 linhas
+  do template e cobra zero.
+- **O medidor de contexto MIGROU** da `.metarow` para o rodapé da coluna de
+  peças (`.docs-ft .gauge`) — é ali que a pergunta dele ("cabe mais peça?") tem
+  resposta. Com a lista colapsada ele iria junto, e por isso a **`.docs-rail`
+  passou a carregar a porcentagem**: um medidor que some não mede. As regras de
+  largura que ele tinha para caber na `.metarow` (`flex: 0 0 64px`, e o
+  `flex-basis: 90px` do expandido) **foram removidas**: num container em COLUNA
+  o `flex-basis` é a ALTURA, e era ele que transformava a barra de 5px num blob
+  de 90px.
+- **`.hint-key` FOI APOSENTADA, e com ela o defeito do 📎 — por construção.** Ela
+  era revelada pelo foco do textarea e mudava a ALTURA do rodapé: o
+  `pointerdown` num botão da linha lhe dava foco, a faixa expandia, a `.inrow`
+  subia 20px e o botão saía de baixo do cursor. Os atalhos se dissolveram no
+  **placeholder** e numa linha FIXA do `.comp-meta`. Nada no rodapé cresce ou
+  encolhe com o foco. A regra geral fica valendo: **faixa que muda de altura não
+  pode ser disparada pelo foco de uma linha que contém botões.**
+- **A `.movbox` SE APOSENTOU: a linha do tempo virou VIEW** (`.main[data-view]`
+  + `.view-tempo`). Some junto toda a maquinaria de popover ancorado —
+  `position: fixed` no selo, cálculo de acima/abaixo, clique-fora por
+  `composedPath()` no `document`, Esc em cascata, listener de `resize`. Duas
+  invariantes: a view mostra **o que foi ao modelo** (os `itens` e a marca do
+  corte VIAJAM no payload de `setLinhaDoTempo`, montados do mesmo array que
+  produz as linhas do request — não há segundo cálculo para divergir); e **sair
+  dela é obrigação de dois caminhos** (`novaConversa` e `restaurarConversa`),
+  senão a view fica presa mostrando a linha do tempo de um processo com a
+  conversa de outro.
+- **UM ÚNICO MÉTODO PÚBLICO NASCEU**: `panel.setSessao("viva"|"expirou")`,
+  chamada de `marcarTelaMorta`. O dot da pill do processo precisa de um canal —
+  `telaMorta` é estado do `content.js`. A alternativa (dot sempre verde) seria
+  pior que não ter dot: um sinal que nunca muda afirma um estado que ninguém
+  conferiu. Os outros 81 métodos seguem intactos.
+- **O popover Exibição não reimplementa nada.** Os botões `.expand`, `.side`,
+  `.free`, `.fs`, `.docsvis` e `.dl` são os MESMOS elementos, com as mesmas
+  classes e handlers — mudaram de lugar e ganharam rótulo. Por isso não há um
+  `aplicarModo` novo. O estado marcado é calculado NA ABERTURA (`marcarExib`), e
+  não a cada troca de modo: assim a caixa não precisa ser notificada de nada e
+  nunca fica dessincronizada.
+- **`--cat-peticao` foi para o CIANO, e não para o indigo do desenho de
+  referência.** Indigo virou a cor de AÇÃO, e uma categoria da cor dos botões
+  recria a confusão que tirou petições do azul na v0.24. A regra que sobrevive
+  às duas rodadas: os quatro matizes ficam a ≥ 100° um do outro e nenhum a menos
+  de 50° da cor de ação.
+- **Três afirmações do desenho de referência NÃO foram implementadas, e o motivo
+  é o mesmo**: elas não são verdade nesta extensão.
+  - *"Citação Verificada Página a Página"* — só existe com `citacoesNativas`
+    (modelos Claude); nos outros três provedores a citação é textual.
+  - *"Zero Alucinação Normativa"* — anunciar infalibilidade é regra proibida
+    aqui, e pela razão registrada no ponteiro do TecJustiça Sigilo: produz
+    confiança onde deveria produzir revisão.
+  - *`fls. 132–158`* na linha da peça — a extensão **não conhece o intervalo de
+    folhas**, só o total de páginas e só depois do download. Um intervalo
+    inventado é plausível, verificável só nos autos, e errado.
+
 ## Temas do painel e o carimbo do modo sigiloso (`panel.css` + `panel.js`)
 
-Seis paletas (**Azul TecJustiça** = padrão, **Noite**, **Papel**, **Vidro**,
-**Toga**, **Rosa**) e a substituição da faixa do modo sigiloso por um **carimbo** na linha
+Sete paletas (**Padrão** = indigo sobre slate com chrome clara, **Noite**,
+**Papel**, **Vidro**, **Toga**, **Rosa**, **Institucional** = o visual da v0.24
+à v0.59, com os 126 tokens daquela versão VERBATIM — ele é a rede de
+não-regressão do redesign, e `tests/visual/impressao.mjs` o fotografa para
+comparar com a baseline) e a substituição da faixa do modo sigiloso por um **carimbo** na linha
 do CNJ. O visual e o porquê de cada escolha estão no `DESIGN.md` ("Temas" no §2
 e "Modo sigiloso: o carimbo" no §5). Aqui ficam as invariantes.
 
@@ -5061,6 +5147,38 @@ arquivo NÃO carrega:
 
 ## Desenvolvimento e teste
 
+- **A SUÍTE VIVE EM `tests/`** (`cd tests && node correr.mjs`, ~95 s): 36
+  verdes na v0.60. `--rapido` roda só os de unidade.
+- **E HÁ UMA REDE VISUAL, em `tests/visual/`, que o `correr.mjs` NÃO roda**
+  (depende do Chrome instalado). São três ferramentas que medem coisas
+  diferentes, e nenhuma substitui a outra:
+  - **`impressao.mjs`** — para CADA elemento da árvore sombra, 11 propriedades
+    de cor computadas, em oito retratos. Responde *"alguma cor mudou onde não
+    devia?"*. É ela que torna verificável a promessa do tema `institucional`.
+  - **`capturar.mjs`** — um PNG por tema × estado do sigilo, mais o vazio, a
+    view de tempo e o movimento reduzido. Responde *"a tela está certa?"*, que é
+    outra pergunta: sombra `inset` pintada abaixo dos filhos, caixa 0×0 que não
+    desenha `box-shadow`, item numa terceira linha do cabeçalho — `getComputedStyle`
+    reporta tudo vivo e correto em todos esses casos.
+  - **`telas.mjs`** — as seis satélites (popup, opções, ajuda, editor, modelos,
+    novidades). Painel e satélites compartilham a paleta por `ui.css`, e
+    divergir cria DUAS identidades no mesmo produto sem nenhum teste acusar.
+- **ARMADILHAS DO ARNÊS, todas medidas** (e documentadas em
+  `tests/visual/README.md`):
+  1. O domínio CDP é **`Emulation`**, não `Emulator` — com o nome errado o
+     comando é ignorado em silêncio e a captura sai cortada.
+  2. **`--force-prefers-reduced-motion` NÃO funciona** neste Chrome: medido,
+     `matchMedia(...).matches` continua `true` com a flag. Quem manda é
+     `Emulation.setEmulatedMedia`. Sem isso mede-se sempre o ramo reduzido, que
+     é **outro layout** — foi assim que se descobriu que o painel expandido
+     ficava DESCENTRADO para quem pede menos movimento, um defeito de
+     acessibilidade que estava em produção.
+  3. O modo é trocado **clicando no botão real**, nunca pondo a classe na mão:
+     pôr a classe pula o `aplicarModo()`, que centra a janela e faz o FLIP.
+  4. O arnês **relata exceções da página**. Sem isso, um `ReferenceError` no
+     `panel.js` chega como *"panel.css nao chegou"* — apontando para a folha de
+     estilo, que está perfeita.
+
 - **ARMADILHA DA ZONA MORTA TEMPORAL no `content.js`** (já derrubou o painel
   inteiro uma vez): o arquivo é um IIFE gigante que REGISTRA callbacks no painel
   centenas de linhas antes de declarar o estado que eles leem, e chama
@@ -5235,7 +5353,13 @@ expandido.
   (`.hint-key`) aparecem com o campo em foco ou enquanto a conversa está vazia
   (classe `.novato` no `.ft`, posta por `showEmptyHint`), com revelação
   `grid-template-rows: 0fr→1fr` (anima sem reservar espaço morto).
-- **Quem revela o `.hint-key` é a classe `.hint-on` (foco do TEXTAREA), NUNCA um
+- **A faixa `.hint-key` NÃO EXISTE MAIS (v0.60), e a regra que ela ensinou
+  continua valendo.** Os atalhos viraram o placeholder do campo mais uma linha
+  FIXA no `.comp-meta` — dois lugares que não medem altura. A regra: **faixa que
+  muda de altura não pode ser disparada pelo foco de uma linha que contém
+  botões.** O texto abaixo é o registro do defeito que ela causava, mantido
+  porque a armadilha vale para qualquer faixa nova.
+- **[HISTÓRICO] Quem revelava o `.hint-key` era a classe `.hint-on` (foco do TEXTAREA), NUNCA um
   `.inrow:focus-within` no CSS** — e a diferença custou o 📎 e o Enviar. Como
   `.msgs` é `flex:1`, expandir essa faixa faz o rodapé crescer e a `.inrow`
   **subir 20px** (medido no Chrome, contra um 📎 de 32px); o `pointerdown` num

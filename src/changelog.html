@@ -103,7 +103,66 @@
 
       <div class="card destaque">
         <p class="eyebrow" style="color: rgba(255,255,255,0.7)">A novidade mais recente</p>
-        <h2><span class="v novo">v0.59.0</span> Três correções que ninguém via — e a minuta a partir de um arquivo anexado</h2>
+        <h2><span class="v novo">v0.60.0</span> A extensão tem cara nova — e não é só a cor</h2>
+        <p>
+          <strong>O painel foi redesenhado por inteiro.</strong> Não é uma troca de paleta: a
+          barra de cima passou de uma faixa apertada com nove ícones para <strong>quatro
+          zonas</strong> — a marca, o processo, a navegação e as ações. O número do processo saiu
+          de segunda linha do título e virou uma <strong>plaqueta própria</strong>, com o
+          tribunal, um botão de copiar e um ponto que fica âmbar quando a tela do PJe expira
+          (antes esse aviso passava rápido e sumia).
+        </p>
+        <p>
+          <strong>Os cinco ícones de tamanho de janela viraram um menu com NOME.</strong>
+          Flutuante, Lateral, Janela livre, Largo, Tela cheia — escrito, não adivinhado. Junto
+          com eles foram "ocultar as peças" e "baixar a conversa". São os mesmos comandos de
+          sempre; o que mudou é que agora dá para ler o que cada um faz antes de clicar.
+        </p>
+        <p>
+          <strong>Nasceram abas: Chat, Linha do tempo, Minutas e Configurações.</strong> A da
+          linha do tempo é a novidade que mais muda o trabalho — a lista de movimentos do
+          processo, que antes cabia numa caixinha flutuante, agora ocupa a tela: data, o ato em
+          negrito, o complemento embaixo (é onde está o <em>"decorrido prazo em…"</em>, que é o
+          que fecha a conta) e a peça como botão. Você pode perguntar sobre um movimento
+          olhando para ele: o campo de escrever continua ali, e enviar devolve ao chat.
+        </p>
+        <p>
+          <strong>A lista de peças ganhou rodapé próprio, com o medidor de contexto.</strong>
+          Ele vivia do outro lado da tela, junto do custo e do nome do modelo; agora fica ao
+          lado das peças, que é onde a pergunta dele — <em>"cabe mais alguma?"</em> — tem
+          resposta. E cada peça virou um cartão de duas linhas: o nome em cima, o id e o
+          <strong>tipo oficial do PJe</strong> embaixo (aquele que só aparecia ao passar o
+          mouse).
+        </p>
+        <p>
+          <strong>O rodapé do chat era uma pilha de doze faixas e virou uma caixa só.</strong>
+          As peças do contexto em cima, o que você escreve no meio, as ferramentas embaixo e o
+          Enviar como um botão redondo escuro — o elemento de maior contraste da tela, que é o
+          que a ação principal precisa ser. Entrou também um botão <strong>@ Peça</strong>:
+          até agora o <code>@</code> só existia se você soubesse digitá-lo.
+        </p>
+        <p>
+          <strong>E o visual antigo não foi apagado.</strong> Ele virou o tema
+          <strong>Institucional</strong>, escolhível no botão de aparência — o mesmo azul
+          petróleo, byte a byte. Quem preferir a cara que já conhecia, troca em dois cliques.
+          A extensão passou a ter sete temas.
+        </p>
+        <p class="nota">
+          <strong>Uma correção de acessibilidade veio junto, e ela estava em produção.</strong>
+          Quem tem "reduzir animações" ligado no Windows ou no macOS abria o painel largo e
+          recebia metade dele fora da tela — sem o botão de fechar, sem o Enviar e sem a coluna
+          de peças alcançáveis. Uma regra escrita para tirar o deslocamento de entrada apagava
+          junto o que centrava a janela. Corrigido.
+        </p>
+        <p class="nota">
+          Três coisas do desenho de referência ficaram de fora <strong>de propósito</strong>,
+          porque não seriam verdade: o selo que prometia "citação verificada página a página"
+          (isso só existe nos modelos Claude — nos outros a citação vem no próprio texto), o
+          que anunciava "zero alucinação" (esta extensão não promete infalibilidade, promete
+          origem conferível) e o intervalo de folhas em cada peça, que a extensão simplesmente
+          não tem como saber.
+        </p>
+        <h2><span class="v">v0.59.0</span> Três correções que ninguém via — e a minuta a partir de um arquivo anexado</h2>
         <p>
           <strong>Se você abre o mesmo processo em duas abas com o modo sigiloso ligado</strong>,
           esta versão conserta algo sério e silencioso. Cada aba mantinha sua própria tabela de
@@ -2128,6 +2187,7 @@
             <tr><th>Versão</th><th>Data</th><th>O que mudou</th></tr>
           </thead>
           <tbody>
+            <tr class="marco"><td><span class="v">0.60.0</span></td><td>05/09/2026</td><td><span class="dot-marco"></span><strong>Redesenho completo do painel.</strong> A barra de cima passou de uma faixa com nove icones para <strong>quatro zonas</strong> (marca, processo, navegacao, acoes); o numero do processo virou plaqueta propria com tribunal, botao de copiar e um ponto que avisa quando a tela do PJe expira. Os cinco icones de tamanho de janela viraram um <strong>menu com nome</strong>. Nasceram abas — e a de <strong>Linha do tempo</strong> deixou de ser uma caixinha flutuante para ocupar a tela, com data, ato, complemento e a peca como botao. A lista de pecas ganhou <strong>rodape proprio com o medidor de contexto</strong>, e cada peca virou cartao de duas linhas com o tipo oficial do PJe. O rodape do chat, que eram doze faixas empilhadas, virou <strong>uma caixa so</strong>, com o Enviar redondo e um botao @ Peca. Paleta indigo sobre slate, cabecalho claro, Geist + Inter + JetBrains Mono. <strong>O visual antigo virou o tema Institucional</strong>, byte a byte. E veio uma correcao de acessibilidade que estava em producao: com "reduzir animacoes" ligado, o painel largo aparecia descentrado, com metade fora da tela</td></tr>
             <tr class="marco"><td><span class="v">0.59.0</span></td><td>04/09/2026</td><td><span class="dot-marco"></span><strong>Três correções silenciosas e a minuta a partir de um anexo.</strong> Com o modo sigiloso ligado, <strong>duas abas no mesmo processo</strong> mantinham tabelas de apelidos independentes e davam o mesmo número a pessoas diferentes — a segunda gravação apagava a primeira, e uma minuta gerada antes passava a devolver o nome errado ao restaurar os nomes; agora as tabelas são fundidas e quem chegou primeiro mantém o número. <strong>Peça que aparece na lista mas não na linha do tempo</strong> voltou a baixar: desde que a lista passou a vir da rota oficial ela traz mais peças do que a tela mostra, e o PJe só libera o download depois de a peça ser aberta ali — o resultado era uma peça faltando na análise e a IA dizendo “não consta” sobre documento que existe. E <strong>minuta e mapa mental passaram a aceitar arquivo anexado sem peça marcada</strong>, avisando o modelo de que o processo aberto na tela é contexto e não o objeto: sem isso o ato sairia com as partes do processo errado. Os testes da extensão saíram da pasta temporária e passaram a viver no repositório</td></tr>
             <tr><td><span class="v">0.58.3</span></td><td>03/09/2026</td><td><strong>O Vidro virou vidro.</strong> A placa fumê escura foi trocada por uma placa BRANCA translúcida, tingida de azul e com um risco de luz na diagonal — e ficou mais transparente que a anterior, não menos. O que destravou foi a cor do texto: com tinta escura o fundo difícil deixa de ser a folha branca e passa a ser a barra azul do tribunal, onde uma placa clara vence com folga. A medição de contraste passou a cobrir também o CABEÇALHO sobre os três fundos — nos modos lateral e tela cheia é ele que encosta na barra. E um defeito publicado: em cinco das seis aparências, ligar o modo sigiloso NÃO pintava o cabeçalho de verde (o token virou gradiente na v0.58.0 e o consumidor só aceitava cor), de modo que o sinal de que os autos não estão saindo em claro não aparecia fora do tema padrão</td></tr>
             <tr><td><span class="v">0.58.2</span></td><td>03/09/2026</td><td><strong>Contraste do modo sigiloso em todos os temas.</strong> O botão Enviar com o modo ligado estava em 3,87:1 — abaixo do mínimo de leitura, e desde antes da rodada de temas — e o carimbo do sigilo ficava fraco sobre a placa do tema Vidro. Os dois passaram a ser medidos junto com o resto do painel</td></tr>

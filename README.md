@@ -65,6 +65,33 @@ investigação aberta, um agente com MCP é o caminho — o próprio painel suge
 
 ## ✨ Recursos
 
+### A cara nova (v0.60)
+
+O painel foi **redesenhado por inteiro** — e não foi uma troca de cor.
+
+- **Barra superior em quatro zonas** — a marca, o **processo** (uma plaqueta com
+  o número, o tribunal, um botão de copiar e um ponto que fica âmbar quando a
+  tela do PJe expira), a **navegação** e as ações.
+- **Abas: Chat · Linha do tempo · Minutas · Configurações.** A da linha do tempo
+  é a que mais muda o trabalho: a lista de movimentos do processo, que antes
+  cabia numa caixinha flutuante, agora ocupa a tela — data, o ato em negrito, o
+  complemento embaixo (é onde está o *"decorrido prazo em…"*, que é o que fecha
+  a conta) e a peça como botão. E dá para perguntar sobre um movimento olhando
+  para ele: o campo continua ali, e enviar devolve ao chat.
+- **Os cinco ícones de tamanho de janela viraram um menu com NOME** — Flutuante,
+  Lateral, Janela livre, Largo, Tela cheia. Escrito, não adivinhado.
+- **A lista de peças ganhou rodapé próprio, com o medidor de contexto** ao lado
+  das peças, que é onde a pergunta dele ("cabe mais alguma?") tem resposta. Cada
+  peça virou um cartão de duas linhas, com o **tipo oficial do PJe** que antes só
+  aparecia ao passar o mouse.
+- **O rodapé do chat, que eram doze faixas empilhadas, virou uma caixa só** — as
+  peças do contexto em cima, o que você escreve no meio, as ferramentas embaixo,
+  e o Enviar como um botão redondo escuro. Entrou também um botão **@ Peça**:
+  até agora o `@` só existia se você soubesse digitá-lo.
+- **Sete aparências.** A nova é indigo sobre slate com cabeçalho claro; **o
+  visual antigo virou o tema "Institucional"**, byte a byte, para quem preferir a
+  cara que já conhecia.
+
 ### Conversa e modelos
 
 - **Chat sobre os autos** — converse com o modelo sobre as peças selecionadas, com histórico multi-turno e streaming em tempo real (raciocínio do modelo em bloco colapsável).

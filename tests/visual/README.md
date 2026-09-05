@@ -91,6 +91,19 @@ Ele carrega `prompts.js` e `panel.js`, e **não** carrega `modelos.js` — o
 `panel.js` trata o `MLIB` como opcional, então o botão "Modelos" não aparece nas
 capturas. É fiel ao contrato, não um defeito.
 
+## As duas referências CONGELADAS
+
+| pasta | o que é |
+|---|---|
+| `base-v0.59-png/` | o **antes**: o painel como ele saiu na v0.59.0, nos seis temas |
+| `base-v0.59.json` | a impressão digital daquela versão — 3.338 elementos × 11 propriedades |
+| `v0.60-png/` | o **depois**: os sete temas, o estado vazio, a view de tempo, o movimento reduzido e as seis telas satélites |
+
+`capturas/` e `capturas-telas/` são a SAÍDA DE TRABALHO — regravadas a cada
+ajuste de CSS e ignoradas pelo git. As congeladas ficam versionadas porque são
+o "antes" e o "depois" contra os quais a próxima rodada se compara, e uma
+referência que a próxima sessão não encontra não referencia nada.
+
 ## `achados/`
 
 O primeiro achado da pasta, no dia em que ela nasceu:

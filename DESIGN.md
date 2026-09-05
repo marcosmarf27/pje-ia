@@ -11,12 +11,19 @@
 e implementado a partir do handoff. O protótipo é a referência visual; o código aqui
 é a implementação real, não uma cópia da estrutura do protótipo.
 
-A versão vigente é o **refinamento institucional** (v0.24): paleta petróleo
-dessaturada, Newsreader + IBM Plex, ícones SVG e peso máximo 600. Ele **reverteu
-duas decisões** do sistema anterior — o gradiente 96deg do cabeçalho (§2) e a
-inversão de superfície entre lista e conversa (§2) —, ambas anotadas no ponto em
-que aparecem. Ao encontrar código que ainda siga o desenho antigo, é código a
+A versão vigente é a **v0.60 — "Cognitive Precision"**: indigo sobre slate,
+CHROME CLARA, Geist + Inter + JetBrains Mono, superfícies em CAMADAS com cartões
+brancos elevados. Ela substituiu o *refinamento institucional* (v0.24 → v0.59:
+petróleo dessaturado, Newsreader + IBM Plex, cabeçalho escuro), que **não foi
+apagado** — vive como o tema `institucional`, com os 126 tokens daquela versão
+verbatim. Ao encontrar código que ainda siga o desenho antigo, é código a
 migrar, não um desvio a preservar.
+
+**E a v0.60 não foi uma troca de paleta.** O markup do painel foi reconstruído:
+a barra superior passou de uma zona para quatro (com navegação por abas), a
+coluna de peças ganhou rodapé próprio, o rodapé do chat deixou de ser doze
+faixas irmãs e virou um cartão, e a linha do tempo deixou de ser um popover para
+virar uma view. A anatomia das seis regiões está no §5.
 
 ---
 
@@ -45,70 +52,120 @@ mas os **valores** têm de bater. Ao mudar um token, mude nos dois.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--pje` | `#14607e` | Primária: links, foco, badges, ícones de ação, dots ativos |
-| `--pje-2` | `#0e4459` | Hover da primária, texto de link sobre branco |
-| `--pje-3` | `#0e4e69` | Hover de link, estados pressionados |
-| `--hd` | `#0e4459` | Fundo do cabeçalho — **chapado** |
-| `--mark-de` / `--mark-para` | `#2e7e9c` → `#175d79` | Quadrado da marca, **180deg** |
-| `--btn-de` / `--btn-para` | `#1c6c8b` → `#125a78` | Botão primário (Enviar, Salvar), **180deg** |
-| `--btn-de-h` / `--btn-para-h` | `#22789a` → `#0e4e69` | Hover do botão primário |
-| `--line-focus` | `#6fa5b9` | Borda do campo em foco |
-| `--ring` | `0 0 0 3px rgba(46,126,156,.13)` | Halo de foco, sempre junto de `--line-focus` |
+| `--pje` | `#4f46e5` | **Acento**: links, foco, estado ativo, ícone de ação, dot de peça marcada |
+| `--pje-2` | `#4338ca` | Hover do acento — **e o fundo da bolha do usuário** |
+| `--pje-3` | `#3730a3` | Hover de link, estados pressionados |
+| `--pje-soft` | `#a5b4fc` | Borda de hover em cartão, medidores |
+| `--hd` | `linear-gradient(180deg,#ffffff,#f8fafc)` | Fundo da chrome — **CLARA** |
+| `--mark-de` / `--mark-para` | `#334155` → `#0f172a` | Quadrado da marca, **180deg** |
+| `--btn-de` / `--btn-para` | `#1e293b` → `#0f172a` | Botão primário, **180deg** |
+| `--btn-de-h` / `--btn-para-h` | `#4f46e5` → `#4338ca` | Hover do primário — **vira indigo** |
+| `--line-focus` | `#818cf8` | Borda do campo em foco |
+| `--ring` | `0 0 0 3px rgba(79,70,229,.14)` | Halo de foco, sempre junto de `--line-focus` |
 
-> **A assinatura migrou do fundo para a marca.** Até a v0.23 o cabeçalho usava um
-> gradiente diagonal de 96deg, e este documento proibia trocá-lo por cor chapada. O
-> refinamento institucional inverteu a decisão: o cabeçalho é `--hd` **chapado**, e
-> quem capta luz é o quadrado de 32px da marca (`--mark-de` → `--mark-para` em
-> 180deg, com `inset 0 1px 0 rgba(255,255,255,.22)`). O motivo é posicional, não
-> estético — o painel abre logo abaixo da barra do próprio PJe, que também é um azul
-> largo; dois gradientes da mesma família empilhados liam como uma faixa só. Um
-> realce de 32px não tem esse problema, e o botão primário passa a herdar o mesmo
-> gradiente vertical, dando coerência a um elemento que antes era chapado.
+> **O acento e a AÇÃO são coisas diferentes, e essa separação é nova.** Até a
+> v0.59 o botão primário era o mesmo azul dos links: quando a chrome, o acento e
+> a ação compartilham a família, nada se destaca de nada. Aqui o primário é
+> **slate-900**, o valor mais escuro do sistema, e o indigo aparece só no HOVER.
+> Sobre um canvas slate claro, quase-preto é o único valor que ninguém confunde
+> com decoração — é o que faz a ação principal estar evidente sem competir com
+> o acento, que está espalhado por toda a tela.
+
+> **A CHROME É CLARA, e é a mudança com mais consequência da v0.60.** Ela
+> obriga, e não sugere, três inversões: `--on-hd-*` viram tinta ESCURA,
+> `--veu-*` viram véus ESCUROS e `--sig-hd` acompanha a polaridade (verde
+> CLARO). Nenhuma delas é opcional — tinta clara sobre chrome clara é texto
+> invisível, e película branca sobre chrome branca não revela nada. O tema
+> `papel` já tinha resolvido as três em v0.58; a v0.60 apenas promoveu a solução
+> dele a padrão.
 
 ### Texto
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--ink` | `#0e323f` | Títulos serifados, nome de peça em destaque |
-| `--text` | `#0e323f` | Corpo de texto |
-| `--text-2` | `#3e5561` | Itens de lista, rótulo de botão secundário |
-| `--text-3` | `#234e5e` | Chip de exemplo, texto sobre superfície tingida |
-| `--muted` | `#6b7c85` | Texto de apoio, descrições |
-| `--muted-2` | `#74858e` | Meta-informação, contadores |
-| `--muted-3` | `#93a3ac` | Placeholders, ícones inativos |
-| `--eyebrow` | `#a0aeb6` | Eyebrow mono uppercase (ver §3) |
+| `--ink` | `#0f172a` | Títulos, nome de peça em destaque |
+| `--text` | `#0f172a` | Corpo de texto |
+| `--text-2` | `#334155` | Itens de lista, rótulo de botão secundário |
+| `--text-3` | `#475569` | Texto sobre superfície tingida |
+| `--muted` | `#475569` | Texto de apoio, descrições |
+| `--muted-2` | `#64748b` | Meta-informação, contadores |
+| `--muted-3` | `#94a3b8` | Placeholders, ícones inativos |
+| `--eyebrow` | `#64748b` | Eyebrow mono uppercase (ver §3) |
 
-### Superfícies
+### Tinta sobre a chrome
+
+Família **própria**, e confundi-la com a do corpo é o erro que a v0.60 cometeu
+duas vezes. A chrome muda de polaridade por tema; o corpo, não.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--surface` | `#ffffff` | Painel, cartões, campos |
-| `--surface-2` | `#fafcfc` | **Coluna de peças**, rodapé de entrada |
-| `--surface-3` | `#ffffff` | **Área de conversa** |
-| `--surface-card` | `#fcfdfd` | Cartão de passo, acordeão de chave |
-| `--surface-list-ft` | `#f4f8f9` | Rodapé da lista de peças (`.docs-tip`) |
-| `--hover` | `#eff4f6` | Hover de linha da lista |
-| `--hover-2` | `#f5fafc` | Hover de chip/ação |
-| `--accent-bg` | `#dfeaee` | Badge e pill de contagem |
-| `--accent-bg-2` | `#e4edf0` | Número dos passos |
-| `--canvas` | `#e9eef3` | Fundo atrás de páginas (editor, modelos) |
+| `--on-hd` | `#334155` | Texto/ícone principal sobre a chrome |
+| `--on-hd-2` | `#64748b` | Ícone secundário, aba inativa, estado desligado |
+| `--on-hd-3` | `#475569` | Texto de chip sobre a chrome |
+| `--on-hd-forte` | `#0f172a` | Título, ícones e o ✕ |
+| `--on-acao` | `#ffffff` | Tinta sobre superfície de AÇÃO — **não muda por tema** |
 
-> **A conversa é branca e a lista é que fica tingida** — até a v0.23 era o inverso
-> (`--surface-3` valia `#f5f9fc` e a lista era branca). Inverter põe o peso visual
-> onde está o trabalho, que é o texto da resposta, e tira a coluna de navegação da
-> disputa por atenção com a leitura. Como os dois tokens trocaram de papel e não só
-> de valor, conferir cada uso de `--surface-2`/`--surface-3` ao migrar.
+> **`--on-hd-*` vale para as CINCO folhas, não só para o painel.** A primeira
+> versão da v0.60 deixou a família fora do `ui.css` alegando que tela satélite
+> não tem cabeçalho tematizado — e a `.brand` do popup e o `.topo` do editor
+> pintam `var(--hd)` desde sempre. Com a chrome virando clara, o `color: #fff`
+> deles virou branco sobre branco e o nome do produto sumiu do topo. **Antes de
+> declarar um token "só do painel", procure quem consome o token IRMÃO nas
+> outras folhas.**
+
+### Superfícies: agora são CAMADAS
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--surface-painel` | `#f8fafc` | **O canvas** — o fundo da janela. `.msgs`, `.main` e `.content` herdam dele |
+| `--surface` | `#ffffff` | Cartão, bolha, campo, popover |
+| `--surface-2` | `#ffffff` | Coluna de peças |
+| `--surface-3` | `#f8fafc` | Área de conversa (o canvas; a bolha é que é branca) |
+| `--surface-card` | `#ffffff` | Cartão de passo, cartão de ação |
+| `--surface-list-ft` | `#ffffff` | Rodapé da lista de peças |
+| `--hover` | `#f1f5f9` | Hover de linha |
+| `--hover-2` | `#f8fafc` | Hover de chip/ação |
+| `--accent-bg` | `#eef2ff` | Badge, pill de contagem (indigo-50) |
+| `--accent-bg-2` | `#e0e7ff` | Borda de badge, selo de passo (indigo-100) |
+| `--canvas` | `#eef2f6` | Fundo atrás de páginas (editor, modelos) |
+
+> **A regra do §2 não mudou; o MECANISMO mudou.** "O peso visual fica no texto
+> da resposta" continua valendo. Até a v0.59 isso era obtido invertendo dois
+> painéis — a conversa branca, a lista tingida. Agora o painel inteiro assenta
+> sobre um canvas slate e quem SOBE são os cartões brancos: a bolha, a linha de
+> peça, o cartão de passo e a caixa de escrever. **Elevação no lugar de
+> inversão.** Ao migrar, conferir cada uso de `--surface-2`/`--surface-3`: os
+> dois trocaram de papel outra vez.
 
 ### Linhas
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--line` | `#e2eaee` | Divisórias, bordas de rodapé |
-| `--line-2` | `#edf1f3` | Divisória suave dentro de blocos |
-| `--line-card` | `#e4ebee` | Borda de cartão |
-| `--line-input` | `#dae3e8` | Borda de campo |
-| `--line-strong` | `#d8e2e6` | Borda de botão com contorno |
-| `--line-check` | `#c3cfd5` | Checkbox |
+| `--line` | `#e2e8f0` | Divisórias, bordas de rodapé, borda de cartão |
+| `--line-2` | `#f1f5f9` | Divisória suave dentro de blocos |
+| `--line-card` | `#e2e8f0` | Borda de cartão |
+| `--line-input` | `#e2e8f0` | Borda de campo |
+| `--line-strong` | `#cbd5e1` | Borda de botão com contorno |
+| `--line-check` | `#cbd5e1` | Checkbox |
+
+A hierarquia do sistema novo vem de **superfície + hairline de 1px**, quase
+nunca de sombra — é por isso que as sombras encolheram (§4).
+
+### Véus da chrome
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--veu-1` | `rgba(15,23,42,.04)` | Fundo do cluster de abas, da pill do processo |
+| `--veu-2` | `rgba(15,23,42,.07)` | Hover na chrome |
+| `--veu-3` | `rgba(15,23,42,.10)` | Botão ativo na chrome |
+| `--veu-borda` | `rgba(15,23,42,.14)` | Contorno do ativo, separador |
+| `--veu-luz` | `rgba(255,255,255,.22)` | O brilho no topo da marca — **continua branco** |
+| `--veu-pega` | `rgba(15,23,42,.16)` | A pega de arrastar do modo livre |
+
+> **Os véus se invertem junto com a chrome, e `--veu-luz` é a exceção.** Ele
+> brilha sobre o quadrado SATURADO da marca, que não clareou. Os outros cinco
+> são escuros agora: película branca sobre chrome branca não revela nada — a
+> mesma regra que o tema Vidro custou quatro versões para aprender.
 
 ### Categorias de peça
 
@@ -117,16 +174,18 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 
 | Token | Valor | Espécie |
 |---|---|---|
-| `--cat-decisao` | `#de8b2c` | Decisões, sentenças, despachos |
-| `--cat-audiencia` | `#2f9268` | Atas e audiências |
-| `--cat-peticao` | `#6a62c0` | Petições das partes |
-| `--cat-prova` | `#c1508a` | Laudos, perícias, provas |
-| `--cat-outro` | `#b7c4cb` | Demais documentos (neutro) |
+| `--cat-decisao` | `#d97706` | Decisões, sentenças, despachos |
+| `--cat-audiencia` | `#059669` | Atas e audiências |
+| `--cat-peticao` | `#0891b2` | Petições das partes |
+| `--cat-prova` | `#e11d48` | Laudos, perícias, provas |
+| `--cat-outro` | `#94a3b8` | Demais documentos (neutro) |
 
-> **Por que petições deixou de ser azul**: azul é a cor de *ação* do sistema
-> (`--pje`). Uma categoria azul na lista competia com botões e links, e o usuário
-> não conseguia dizer se o azul significava "petição" ou "clicável". Petições
-> passou a roxo e provas a magenta, mantendo dourado/verde onde já estavam.
+> **Petições saiu do roxo e NÃO foi para o indigo do desenho de referência.** O
+> handoff da v0.60 pinta petições de indigo, e indigo passou a ser a cor de
+> AÇÃO — é exatamente a confusão que tirou petições do azul na v0.24 ("isto quer
+> dizer petição ou clicável?"). A regra que sobrevive às duas rodadas: **os
+> quatro matizes ficam a ≥ 100° um do outro e nenhum a menos de 50° da cor de
+> ação.** Com indigo em ~243°, isso empurrou petições para o ciano.
 
 ### Estados
 
@@ -168,7 +227,7 @@ no popup `@` e no mapa mental. Não reutilizar para outros fins.
 
 ### Temas
 
-Cinco paletas, escolhidas pelo botão de aparência no cabeçalho do painel ou pelo
+**Sete** paletas, escolhidas pelo botão de aparência no cabeçalho do painel ou pelo
 campo em Configurações. **Um tema é um bloco de OVERRIDES de token sobre o
 `.wrap` — nenhuma regra de componente muda, nenhum seletor novo nasce.** É o
 mesmo gesto que `.wrap.sigiloso` já fazia desde a v0.55 trocando
@@ -177,7 +236,8 @@ que fez os temas custarem um bloco de tokens em vez de uma arquitetura.
 
 | Tema | `data-tema` | Chrome | O que ele é |
 |---|---|---|---|
-| Azul TecJustiça | *(ausente)* | `#0e4459` | O padrão. **Byte a byte o de sempre** |
+| Padrão | *(ausente)* | `#ffffff → #f8fafc` | Indigo sobre slate, chrome **clara**. O da v0.60 |
+| Institucional | `institucional` | `#0e4459` | O visual da v0.24 à v0.59, **byte a byte**. É a rede de não-regressão da rodada: a impressão digital de `tests/visual/` o fotografa e compara com a baseline |
 | Noite | `noite` | `#0a141b → #122734` | Escuro tinta-petróleo com acento **ciano** (`#56c2e8`): sobre fundo escuro o azul institucional some, e tema escuro sem acento visível é tema pela metade |
 | Papel | `papel` | `#f4eee2 → #ebe3d4` | Creme QUENTE com tinta quase preta — a temperatura de um documento impresso. Um tema claro só se distingue do padrão pela temperatura |
 | Vidro | `vidro` | `rgba(226,241,251,.9) → rgba(170,207,232,.84)` | Placa **branca translúcida e tingida de azul**, com risco de luz: a página do tribunal atravessa desfocada em TODOS os modos. Herda a paleta do padrão — bolhas opacas |
@@ -349,25 +409,41 @@ tema padrão de hoje**: é dívida anterior, não regressão dos temas.
 ---
 
 ## 3. Tipografia
-
 ```css
---ff-sans:  "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
---ff-serif: "Newsreader", Georgia, "Times New Roman", serif;
---ff-mono:  "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+--ff-display: "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
+--ff-sans:    "Inter", "Segoe UI", system-ui, sans-serif;
+--ff-mono:    "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+/* apelido de --ff-display, para os consumidores antigos de --ff-serif */
+--ff-serif:   "Geist", "Inter", "Segoe UI", system-ui, sans-serif;
 ```
 
-- **Sans** para interface. Plex Sans e Plex Mono são a mesma superfamília, então
-  rótulo e numeral compartilham construção e não brigam lado a lado.
-- **Serif** para títulos — "Peças do processo", "Como posso ajudar?", nomes de
-  página, chips de exemplo. É o que dá o tom forense sem recorrer a ornamento.
-- **Mono** para **numerais que o usuário compara ou copia** (o id da peça) e para
-  **eyebrows** uppercase. Tabular, alinha na vertical, não se confunde com o nome.
+- **Display (Geist)** para títulos — "Peças do processo", "Como posso ajudar?",
+  nome do painel, nome de página. Geométrica e neutra: dá hierarquia estrutural
+  sem ornamento.
+- **Sans (Inter)** para interface. x-height alto, figuras tabulares e pontuação
+  inequívoca — desenhada para densidade, que é o que uma lista de duzentas peças
+  exige.
+- **Mono (JetBrains Mono)** para **numerais que o usuário compara ou copia** (o
+  id da peça, o número CNJ), para **teclas** (`<kbd>`) e para **eyebrows**
+  uppercase.
+
+> **A SERIF SAIU DA INTERFACE, e isso reverte uma decisão do §3 anterior.** O
+> refinamento institucional usava Newsreader nos títulos "para dar o tom forense
+> sem recorrer a ornamento". A v0.60 conclui que o tom forense vem da ESTRUTURA
+> e do MONO — do id da peça alinhado em coluna, da data em tabular, do rótulo
+> uppercase —, e que uma serif de display num painel de 420px lê como enfeite,
+> não como autoridade. `--ff-serif` continua declarado como **apelido** de
+> `--ff-display`: os ~12 consumidores antigos migraram sem uma linha de mudança.
+>
+> **A única serif que fica é a que não é interface:** a folha A4 do editor
+> (`.jodit-wysiwyg`, `"Times New Roman"` 12**pt**), que é literal de propósito
+> porque precisa bater com o `editor-docx.js` — é o que se imprime.
 
 > **As fontes são vendorizadas, nunca carregadas de CDN.** Um `<link>` para
 > `fonts.googleapis.com` seria barrado pela CSP de vários tribunais e, pior, faria
 > uma requisição a servidor externo a partir da tela dos autos — vazamento que a
-> extensão não pode causar. Os `.woff2` (todos SIL OFL) vivem em `vendor/fontes/`,
-> declarados num arquivo único: **`src/fontes.css`**.
+> extensão não pode causar. Os `.woff2` (todos SIL OFL, subset `latin`) vivem em
+> `vendor/fontes/`, declarados num arquivo único: **`src/fontes.css`**.
 >
 > **O painel não pode declarar `@font-face` no próprio CSS**, por duas razões
 > independentes e ambas fatais em silêncio:
@@ -386,7 +462,7 @@ tema padrão de hoje**: é dívida anterior, não regressão dos temas.
 >
 > As fontes estão em `web_accessible_resources`. A stack de fallback continua
 > declarada: se algum tribunal barrar `font-src chrome-extension:`, o painel
-> degrada para Segoe UI/Georgia sem quebrar layout.
+> degrada para Segoe UI sem quebrar layout.
 
 ### Peso
 
@@ -444,72 +520,239 @@ empate sobe (16 → `--fs-lead`).
 
 --r-xs: 4px;    /* checkbox */
 --r-tight: 6px; /* botão de 24px, segmento dentro de segmented */
---r-sm: 7px;    /* botão do cabeçalho, cluster interno */
---r-md: 8px;    /* botão, item de lista, segmented externo */
---r-ctrl: 9px;  /* campo de busca, marca, cluster do cabeçalho, Enviar */
+--r-sm: 8px;    /* botão do cabeçalho, marca, cluster interno */
+--r-md: 8px;    /* botão, item de menu, segmented externo, pill do processo */
+--r-ctrl: 10px; /* campo de busca, cluster do cabeçalho */
 --r-box: 10px;  /* cartão de chave, botão de 44px, cartão de provedor */
---r-lg: 11px;   /* cartão de passo */
---r-xl: 12px;   /* caixa de entrada */
---r-2xl: 14px;  /* moldura externa do painel */
+--r-lg: 12px;   /* cartão de passo, cartão de ação, popover */
+--r-xl: 12px;   /* linha de peça */
+--r-2xl: 16px;  /* a caixa de escrever e a moldura externa do painel */
 --r-pill: 20px; /* chip, badge, selo do modelo — NÃO 999px */
+--r-round: 9999px; /* a cápsula VERDADEIRA: só o Enviar circular e os dots */
 
---sh-card:  0 1px 2px rgba(14, 50, 63, 0.04);
---sh-seg:   0 1px 2px rgba(14, 50, 63, 0.10);  /* pill ativo do segmented */
---sh-btn:   0 1px 2px rgba(14, 50, 63, 0.22), inset 0 1px 0 rgba(255,255,255,0.18);
---sh-pop:   0 1px 2px rgba(14, 50, 63, 0.10), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
---sh-bar:   0 -10px 14px -10px rgba(14, 50, 63, 0.22);  /* faixa de ação grudada (popup) */
---sh-panel: 0 1px 2px rgba(14, 50, 63, 0.10), 0 24px 60px -18px rgba(14, 50, 63, 0.34);
+--w-leitura: 900px; /* a coluna de leitura do workspace */
+
+--sh-card:    0 1px 2px rgba(15, 23, 42, 0.04);
+--sh-seg:     0 1px 2px rgba(15, 23, 42, 0.08);  /* pill ativo do segmented */
+--sh-btn:     0 1px 2px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255,255,255,0.14);
+--sh-pop:     0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.10);
+--sh-erguido: 0 2px 6px rgba(15, 23, 42, 0.10), 0 34px 80px -20px rgba(15, 23, 42, 0.30);
+--sh-panel:   0 1px 2px rgba(15, 23, 42, 0.06), 0 24px 60px -18px rgba(15, 23, 42, 0.22);
+--sh-bar:     0 -10px 14px -10px rgba(15, 23, 42, 0.14);  /* faixa de ação grudada */
 ```
 
-**`--r-pill` é 20px, não `999px`.** Num chip de 26px de altura a diferença é
-invisível; num selo de 30px o `999px` arredonda até virar cápsula, e a cápsula
-destoa dos raios de 8–12px de tudo em volta. 20px mantém a família.
+**Os raios subiram, e o handoff da v0.60 discorda de si mesmo aqui.** A prosa do
+sistema pede 4px em tudo ("tight, technical corners"); o `code.html` e a tela
+aprovada usam 8/12/16. **Vale o que foi aprovado**: um cartão de 4px não lê como
+cartão, e o sistema novo separa por CARTÃO. A escala foi para 8 (controle), 12
+(cartão) e 16 (a caixa de escrever e a moldura do painel).
+
+**`--r-pill` continua 20px, e `--r-round` é a exceção nomeada.** A cápsula
+verdadeira tem exatamente dois usos — o botão circular de Enviar e os dots de
+6px. Fora deles, `999px` num selo de 30px arredonda até virar cápsula, e a
+cápsula destoa dos raios de 8–16px de tudo em volta.
+
+**As sombras ENCOLHERAM porque a hierarquia mudou de mecanismo.** No sistema
+antigo ela vinha de sombra; aqui vem de **superfície + hairline de 1px**. Sombra
+funda sobre canvas claro vira sujeira. Só o que FLUTUA de verdade — popover,
+modal, a caixa de escrever — recebe `--sh-pop`.
 
 O `--sh-btn` do botão primário tem **duas camadas**: a sombra projetada e um
 `inset` branco no topo. É o inset que faz o gradiente vertical parecer uma
 superfície iluminada em vez de um degradê chapado — não removê-lo ao ajustar.
 
-Transições: `140ms ease` para cor/borda/fundo; `120ms ease` para hover de lista.
-Nunca animar `width`/`height` de container com conteúdo (reflow visível).
+Transições: ver "Movimento" no §5 — quatro durações e três curvas, e nada fora
+delas. Nunca animar `width`/`height` de container com conteúdo (reflow visível).
 
 ---
 
 ## 5. Componentes
 
-### Cabeçalho do painel
-Altura **60px** (64px nos modos largos), fundo `--hd` **chapado**, texto branco. À
-esquerda: marca 32×32 com `--r-ctrl`, gradiente `--mark-de`→`--mark-para` (180deg) e
-`inset 0 1px 0 rgba(255,255,255,0.22)`, seguida de **duas linhas** — nome do produto
-em `--ff-serif` (`--fs-lead`, peso 500) e, abaixo, o **número CNJ** em `--ff-mono`,
-`--fs-nano`, `letter-spacing: .03em`, cor `#93bacA`. Nos modos largos o CNJ ganha
-uma segunda informação ao lado (classe e órgão julgador), separada por barra
-vertical de 1px `rgba(255,255,255,0.22)`.
+### A anatomia da v0.60, em seis regiões
 
-À direita, os botões vivem em **clusters** — não soltos: cada grupo é um
-`background: rgba(255,255,255,0.07)`, `--r-ctrl`, `padding: 3px`, `gap: 2px`. São
-três: `[baixar · conversas guardadas · nova conversa]`, `[modos de layout]` e `[✕]`
-isolado. Botões 30×30 (32 nos largos), `--r-sm`, transparentes, hover
-`rgba(255,255,255,0.16)`; o modo ativo fica com esse mesmo fundo fixo. O ✕ tem
-hover `--erro-hd`.
+O painel deixou de ser "cabeçalho + duas colunas". A ordem abaixo é a de leitura,
+e cada região responde a uma pergunta diferente.
 
-> **A única exceção ao botão quadrado é o de conversas guardadas** (`.convs`):
-> `width: auto` com o **contador** ao lado do ícone (`--ff-mono`, `--fs-nano`,
-> num `<span>` próprio — `textContent` no botão apagaria o `<svg>`). O motivo é
-> um relato de uso: listar e criar conversa eram dois desenhos de balão vizinhos
-> e, a 15px, ninguém adivinhava qual era qual. Duas correções juntas — o ícone
-> de **nova conversa** ganhou a CRUZ dentro do balão (o sinal universal de
-> criar) e o de **lista** ganhou o número, que diz o que o desenho não conseguia
-> dizer ("há 3 conversas aqui dentro"). Ícone só não basta quando dois ícones
-> vizinhos pertencem à mesma família visual.
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ R1 ▣ marca │ (● CNJ [TJCE] ⧉) │ [Chat|Tempo|Minutas↗|Config↗] │ 🔒 │ ＋ 🕘 ⚙ ✕
+├───────────────────────┬──────────────────────────────────────────┤
+│ R2 📁 Peças  [15/34]  │ R3  workspace, coluna de leitura 900px    │
+│    busca      ⌘K      │     ├ view chat  ── R4 estado vazio       │
+│    chave|princ|todas  │     └ view tempo ── a linha do tempo      │
+│    ● ● ● ● legenda    │                                            │
+│    ┌────────────────┐ │                                            │
+│    │☑ ● Réplica     │ │                                            │
+│    │  224081605  Pet│ │                                            │
+│    └────────────────┘ │                                            │
+│    ───────────────────│───────────────────────────────────────────│
+│    Contexto    41%    │ R5  ┌ pre: alerta · minuta · mapa · prompt │
+│    ████████░░░░░░     │     ├ CAIXA: contexto / texto / ações      │
+│    [✨ IA][⟳ tudo][⋯] │     └ meta: custo · tempo · modelo · ↵     │
+└───────────────────────┴──────────────────────────────────────────┘
+```
 
-> **O cluster substituiu o separador de 1px** que ficava antes do ✕. Sete botões
-> lado a lado exigiam um separador justamente porque não se lia onde um grupo
-> terminava; agrupando por função, o agrupamento faz esse trabalho e ainda diz
-> *quais* botões são parentes entre si — que o separador não dizia.
+| Região | Pergunta que ela responde |
+|---|---|
+| **R1** barra superior | Que ferramenta é esta · que processo é este · onde estou · o que eu faço |
+| **R2** coluna de peças | O que a IA vai ler, e quanto disso já cabe |
+| **R3** workspace | O que a IA respondeu (ou o que os autos registram) |
+| **R4** estado vazio | Por onde eu começo |
+| **R5** compositor | O que eu mando, e o que a extensão me conta sobre isso |
+| **R6** bolhas e popovers | De onde veio cada afirmação |
 
-> Mostrar o CNJ no cabeçalho não é decoração: o usuário costuma ter vários
-> processos abertos em abas, e era impossível saber a qual deles o painel se
-> referia sem olhar a página atrás.
+---
+
+### Cabeçalho do painel — R1, quatro zonas
+
+Altura **56px** (52px no `.estreito`), fundo `--hd` (chrome **clara**), tinta
+`--on-hd-forte`, hairline `--line` embaixo.
+
+| Zona | Conteúdo |
+|---|---|
+| `.hd-marca` | Quadrado de 30px (`--mark-*`, 180deg, `inset` de `--veu-luz`) + "Assistente dos Autos" em `--ff-display` 600 |
+| `.hd-processo` | Pill: dot de estado + CNJ em mono + sigla do tribunal + botão copiar |
+| `.hd-nav` | `Chat` · `Linha do tempo` · `Minutas ↗` · `Configurações ↗` |
+| `.hd-acoes` | Carimbo de sigilo · ＋ nova conversa · 🕘 conversas · ⚙ Exibição · ✕ |
+
+> **O CNJ deixou de ser a segunda linha do título.** Ali ele era lido como
+> legenda da marca; ele não é isso — é a identidade do OBJETO em análise, e a
+> pill o separa. O dot diz se a sessão do PJe ainda responde (verde) ou se a view
+> JSF expirou (âmbar), que é um estado que antes só aparecia no `.status`,
+> transitório. O botão de copiar resolve o que exigia selecionar dezoito
+> caracteres com o mouse.
+
+> **As abas respondem "onde estou / o que existe aqui / como volto".** `Chat` e
+> `Linha do tempo` são **views** do centro; `Minutas` e `Configurações` **saem da
+> página**, e por isso levam `↗`: "como volto?" é pergunta que a navegação
+> responde ANTES do clique, não depois. Nenhuma delas é capacidade nova — cada
+> uma aciona o caminho que já existia.
+
+> **Os cinco ícones de layout viraram um menu ROTULADO, e isso é ganho.** Nove
+> botões-ícone à direita viraram quatro. Dentro do popover **Exibição** estão os
+> cinco modos com NOME (Flutuante · Lateral · Janela livre · Largo · Tela cheia),
+> "Ocultar as peças" e "Baixar a conversa". São os MESMOS elementos, com as
+> mesmas classes e os mesmos handlers — mudaram de lugar. Cinco glifos sem rótulo
+> (`⊞ ▭ ⧉ ⛶ ▤`) são exatamente o atrito que um sistema não deve cobrar: um menu
+> que diz "Lateral" é mais descobrível que um ícone que insinua, e ainda cabe
+> numa barra que passou a ter navegação.
+
+> ⚠️ **`.hd button` tem especificidade 0,1,1 e governa TODO botão do cabeçalho**
+> (`transparent`, `30×30`, `--r-sm`). Todo controle novo ali precisa de um
+> seletor `.hd .x` **e** de desfazer o que a regra genérica impôs — `width: auto`
+> antes de mais nada. Ela já venceu o `.sigselo` na v0.57 e as abas na primeira
+> versão desta barra, que saíram com 30px e empilharam texto por cima do vizinho.
+
+### Rodapé da coluna de peças — R2
+
+A coluna passou a ter **três zonas**: cabeçalho (identidade + busca + degraus +
+legenda), lista, e um rodapé próprio.
+
+```
+Contexto                    41% · 15 peças
+████████░░░░░░░░░░░░░░░░
+[✨ Escolher com IA] [⟳ Carregar tudo] [⋯]   lista oficial · 12/08
+```
+
+> **O medidor de contexto migrou do rodapé do chat para cá.** É aqui que a
+> pergunta dele — "cabe mais peça?" — tem resposta, ao lado do gesto que a
+> resolve. Ele vira DUAS linhas (rótulo + número em cima, barra embaixo) porque
+> aqui tem a coluna inteira; na `.metarow` ele disputava a linha com o custo, o
+> modelo e a linha do tempo, e a barra cabia em 64px.
+
+> **Com a lista colapsada ele iria junto, e por isso a `.docs-rail` passou a
+> carregar a porcentagem.** Um medidor que some não mede. O bloqueio acima de 90%
+> continua na `.alertbar`, que vive no chat e não colapsa.
+
+> **Duas ações com NOME, o resto no menu.** "Escolher com IA" é a de maior valor
+> e a menos descoberta do produto; "Carregar tudo" é a que resolve "a peça não
+> está na lista". As outras três — extrair texto, `.zip` e o pacote de
+> precatória — **já existiam dentro do menu** do split button, item por item: o
+> botão solto delas era uma segunda porta para o mesmo destino, ocupando uma
+> coluna de 328px.
+
+### A linha da peça — um cartão de duas linhas
+
+```
+┌──────────────────────────────────────┐
+│ ☑ ● Réplica                       ↗ │  linha 1: dot + nome (trunca)
+│   224081605              Petição     │  linha 2: id mono · tipo oficial
+└──────────────────────────────────────┘
+```
+
+O id apenas **desceu de linha** (já estava ali); o tipo é o `d.tipo` da
+grid/REST, que antes só aparecia no `title`, e ele descreve a peça melhor que o
+título — que costuma ser o nome do arquivo que alguém subiu. **Só entra quando
+ACRESCENTA**: se for igual ao título, some.
+
+> **Sem badge de folhas, ao contrário do desenho de referência.** O handoff
+> mostra `fls. 132–158` em cada linha. A extensão **não conhece o intervalo de
+> folhas** de uma peça — só o total de páginas, e só depois do download. Um
+> intervalo inventado seria o pior tipo de dado: plausível, verificável só nos
+> autos, e errado.
+
+### O compositor — R5
+
+Doze faixas irmãs viraram **três planos**.
+
+| Plano | O que vive nele |
+|---|---|
+| `.comp-pre` | `.status` · `.alertbar` · `.minutabar` · `.mapabar` · `.promptbar` — tudo que muda o que o Enviar FAZ, ou impede de enviar |
+| `.comp-card` | Linha 1 `.cc-ctx` (chips de contexto + anexos) · linha 2 `.inrow` (📎 + textarea) · linha 3 `.cc-acts` (ferramentas + Enviar) |
+| `.comp-meta` | Custo · linha do tempo · selo de sigilo · selo do modelo · `ⓘ` · os atalhos |
+
+A caixa é `--r-2xl`, branca, `--sh-pop`, e a borda acende no `:focus-within` —
+**o cartão inteiro**, não o campo: quem está escrevendo está usando a caixa
+toda, e o 📎, as ferramentas e o Enviar fazem parte do mesmo gesto.
+
+> **O Enviar é um círculo slate-900**, o maior contraste da tela. A ação
+> principal precisa estar evidente sem depender de leitura. O rótulo continua no
+> DOM (leitores de tela; e o modo minuta o reescreve para "Gerar minuta"); o que
+> some é a exibição — e volta, com o botão virando pílula, quando o modo de ato
+> está ligado, porque ali o rótulo é a única coisa que diz que o Enviar deixou de
+> mandar uma pergunta.
+
+> **A faixa `.hint-key` foi APOSENTADA, e com ela um defeito inteiro — por
+> construção, não por conserto.** Ela era revelada pelo foco do textarea e mudava
+> a ALTURA do rodapé: o `pointerdown` num botão da linha lhe dava foco, a faixa
+> expandia, a `.inrow` subia 20px e o botão saía de baixo do cursor. O `mouseup`
+> caía noutro elemento e o `click` ia para o ancestral comum — era o 📎 que "só
+> abria na terceira vez". Os atalhos se dissolveram em dois lugares que **não
+> medem altura**: o placeholder do campo (`@ cita uma peça · / insere um prompt`)
+> e uma linha FIXA no `.comp-meta` (`↵ envia · ⇧↵ quebra linha`).
+>
+> **A regra que fica: faixa que muda de altura não pode ser disparada pelo foco
+> de uma linha que contém botões.**
+
+> **`@ Peça` é botão novo.** Até a v0.59 o `@` só existia como gatilho digitado,
+> e quem não sabia não descobria. O botão abre o mesmo popup `.mention`.
+
+### A view da linha do tempo — R3
+
+A aba `Linha do tempo` troca o conteúdo do workspace: `data` em mono à esquerda,
+`evento` em negrito, o **complemento** abaixo (que é onde mora o *"Decorrido
+prazo em 16/07/2026 23:59"* — a linha que de fato fecha a conta) e a peça como
+botão, que reusa `irParaPeca`.
+
+> **Ela mostra o que FOI ao modelo, já cortado — e isso é garantia por
+> construção, não promessa.** `setLinhaDoTempo` recebe `itens` montados a partir
+> do MESMO array que produz as linhas do request, e a marca do corte (`lacuna`)
+> viaja no payload em vez de ser recalculada aqui. Uma view que mostrasse mais
+> que o request faria o usuário conferir a resposta contra um registro que a IA
+> não viu.
+
+> **Promover um popover a view REMOVE código.** Saíram junto: `position: fixed`
+> ancorado no selo, o cálculo de acima/abaixo, o clique-fora por
+> `composedPath()` no `document` com `capture:true`, o Esc em cascata e o
+> listener de `resize`. Tudo isso existia porque a caixa flutuava sobre uma
+> página que ela não controlava.
+
+> **O compositor fica visível nas duas views** — ele é a barra do aplicativo, não
+> a do chat. E **sair da view é obrigação de dois caminhos** ("Nova conversa" e a
+> retomada da memória de caso): uma view presa mostraria a linha do tempo de um
+> processo com a conversa de outro.
+
+---
 
 ### Lista de peças
 Fundo `--surface-2`. Cabeçalho com título serifado + badge de contagem (pill
@@ -1523,3 +1766,17 @@ que ele. Eram as únicas telas com o ícone chapado sobre o cabeçalho.
 - [ ] Testei o estado **vazio**, não só o preenchido.
 - [ ] Testei no painel estreito (420px), não só no expandido.
 - [ ] `[hidden]` continua funcionando nos blocos que criei.
+- [ ] **Nenhuma crase dentro de `wrap.innerHTML = \`…\``** — ela ENCERRA o
+      template literal, e o sintoma nunca aponta para lá (`node --check` chega a
+      passar). Coberto por `tests/t-template-crase.mjs`.
+- [ ] **Todo botão novo no `.hd` usa `.hd .x`** e desfaz o que `.hd button`
+      (0,1,1) impôs — `width: auto` antes de mais nada.
+- [ ] **Tinta sobre a chrome sai de `--on-hd-*`**, nunca de `--muted`/`--text`.
+      O erro só aparece no tema que inverte a polaridade.
+- [ ] Se mexi em token, rodei `node tests/visual/impressao.mjs` (a paleta não
+      mudou onde não devia) **e** `node tests/visual/capturar.mjs` (a tela está
+      certa). As duas medem coisas diferentes.
+- [ ] Se mexi em `ui.css`, rodei `node tests/visual/telas.mjs`: painel e
+      satélites compartilham a paleta, e divergir cria duas identidades no mesmo
+      produto sem nenhum teste acusar.
+- [ ] `node tests/t-temas-contraste.mjs` verde nos **sete** temas.
