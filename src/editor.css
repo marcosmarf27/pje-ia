@@ -46,7 +46,7 @@ body {
   padding: 9px 16px;
   background: var(--hd);
   color: var(--on-hd-forte);
-  box-shadow: 0 1px 4px rgba(5, 32, 46, 0.25);
+  box-shadow: var(--sh-card);
   flex: none;
   z-index: 3;
 }
@@ -86,12 +86,12 @@ body {
 }
 .topo .tit .t:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.7);
+  border-color: var(--line-focus);
   background: var(--veu-1);
 }
 .topo .tit .s {
   font-size: var(--fs-meta);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--on-hd-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -116,7 +116,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--veu-borda);
   background: var(--veu-1);
   color: var(--on-hd);
   border-radius: 7px;
@@ -129,7 +129,7 @@ body {
 }
 .acoes button svg { flex: none; opacity: 0.9; }
 .acoes button:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: var(--veu-2);
 }
 .acoes button:active {
   transform: translateY(1px);
@@ -137,7 +137,7 @@ body {
 .acoes button.ghost {
   border-color: transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--on-hd-3);
 }
 .acoes button.ghost:hover {
   background: var(--veu-2);
@@ -159,7 +159,7 @@ body {
   align-items: center;
   gap: 6px;
   font-size: var(--fs-micro);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--on-hd-2);
   letter-spacing: 0.2px;
   min-width: 9ch;
 }
@@ -168,7 +168,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--on-hd-3);
   flex: none;
 }
 .salvo:empty::before {
@@ -585,7 +585,7 @@ body {
   text-align: left;
 }
 .lista-aviso {
-  background: #fff6e5;
+  background: var(--warn-bg);
   border: 1px solid #f0d9a8;
   border-radius: 8px;
   padding: 10px 12px;

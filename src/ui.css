@@ -129,6 +129,18 @@
      v0.60, o `color: #fff` dela virou branco sobre branco: o nome do produto
      sumiu do topo do popup. Token sem consumidor e ruim; consumidor sem token e
      pior. */
+  /* VÉUS DA CHROME — espelham o `.wrap` do panel.css (DESIGN.md §2), e a
+     ausência deles aqui era um defeito SILENCIOSO: `editor.css` e
+     `modelos-page.css` já os consumiam (6 usos), e `var()` sem fallback
+     apontando para token inexistente torna a declaração INVÁLIDA — o
+     `background` caía para `transparent` e o `border-color` para
+     `currentColor`, sem erro nenhum no console. Sobre a chrome CLARA da v0.60
+     eles são véus ESCUROS, como no painel. */
+  --veu-1: rgba(15, 23, 42, 0.04);
+  --veu-2: rgba(15, 23, 42, 0.07);
+  --veu-3: rgba(15, 23, 42, 0.1);
+  --veu-borda: rgba(15, 23, 42, 0.14);
+  --veu-luz: rgba(255, 255, 255, 0.22);
   --on-hd: #334155;
   --on-hd-2: #64748b;
   --on-hd-3: #475569;

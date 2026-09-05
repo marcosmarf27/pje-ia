@@ -34,7 +34,7 @@ body {
   padding: 9px 16px;
   background: var(--hd);
   color: var(--on-hd-forte);
-  box-shadow: 0 1px 4px rgba(5, 32, 46, 0.25);
+  box-shadow: var(--sh-card);
   flex: none;
   z-index: 3;
 }
@@ -53,7 +53,7 @@ body {
 .topo .tit .t { font-size: var(--fs-lead); line-height: 1.2; color: var(--on-hd-forte); }
 .topo .tit .s {
   font-size: var(--fs-micro);
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--on-hd-2);
   letter-spacing: 0.2px;
 }
 .topo .acoes { display: flex; gap: 8px; flex: none; }
@@ -75,11 +75,11 @@ button {
 }
 .topo button {
   background: var(--veu-2);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--veu-borda);
   color: var(--on-hd);
   font-weight: 600;
 }
-.topo button:hover { background: rgba(255, 255, 255, 0.26); }
+.topo button:hover { background: var(--veu-2); }
 .primario {
   background: var(--hd);
   color: var(--on-acao);
@@ -602,7 +602,7 @@ body.editando .topo .acoes { visibility: hidden; }
 .imp-res-l > span { flex: 1; min-width: 0; }
 .imp-res-l b { color: #7c5310; }
 .imp-res-l button { flex: none; font-size: var(--fs-micro); padding: 4px 9px; background: var(--surface); border-color: var(--warn-line); color: var(--warn-ink); }
-.imp-res-l button:hover { background: #fff6e6; }
+.imp-res-l button:hover { background: var(--warn-bg); }
 
 /* ------------------------------------------------------------------ rodapé */
 .rodape-nota {
