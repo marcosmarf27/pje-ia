@@ -331,7 +331,7 @@ textarea { resize: vertical; min-height: 58px; }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--pje);
-  box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.18);
+  box-shadow: var(--ring);
 }
 
 .pw-row { position: relative; }

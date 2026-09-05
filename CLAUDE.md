@@ -2763,6 +2763,112 @@ em `content.js`.
     folhas**, só o total de páginas e só depois do download. Um intervalo
     inventado é plausível, verificável só nos autos, e errado.
 
+### O que o USO REAL corrigiu (v0.60.1)
+
+O redesign foi publicado com a suíte verde, contraste 106/106 e captura dos
+sete temas — e oito defeitos só apareceram quando o dono do projeto abriu um
+processo de verdade. Nenhum deles era invisível por acaso: cada um cai numa
+categoria que a rede de testes **não cobria**, e é isso que vale registrar.
+
+- **BOTÃO NOVO PRECISA SER INSCRITO NA FAMÍLIA — declarar a classe não basta.**
+  O `@ Peça` nasceu na v0.60 e ficou de fora da regra que veste
+  `.tgl-search, .tgl-sigilo, .btn-minuta…`: saiu com o estilo do NAVEGADOR
+  (fundo cinza, borda preta de 2px, Arial), no meio de seis irmãos vestidos.
+  É o espelho da armadilha do `.hd button`: lá era preciso DESFAZER o que a
+  regra genérica impôs; aqui, LEMBRAR de entrar nela. Quando o estilo de um
+  componente é uma lista de seletores, todo membro novo é uma edição em N
+  lugares — `svg`, `:hover`, `.on` e as regras do `.estreito`.
+- **CONTROLE DE FORMULÁRIO NÃO HERDA FONTE, e o painel rodava com DUAS.**
+  `:host { all: initial }` corta a herança da página, e o navegador aplica a
+  sua própria (`font: 400 13.333px Arial`) a `<button>`, `<input>`,
+  `<textarea>` e `<select>`. Medido no expandido: **206 nós fora da família**,
+  entre eles a faixa de ferramentas inteira. Defeito ANTIGO — anterior ao
+  redesign — e ele não aparece como "fonte errada": aparece como uma barra que
+  "não combina" com o que está em volta sem que se saiba dizer por quê. Uma
+  linha (`button, input, textarea, select { font-family: inherit }`) zerou.
+- **WRAPPER COM DOIS ESCRITORES: a visibilidade é DERIVADA, nunca de um deles.**
+  `.cc-ctx` (linha 1 do cartão) recebe os chips de PEÇA (`syncSelection`) e os
+  de ANEXO (`renderAnexos`). Ele nasceu `hidden` no template e nenhum dos dois
+  o desescondia — quem escondesse apagaria os chips do outro. Resultado: com
+  `[hidden]{display:none!important}`, os chips **não existiam** na v0.60, e
+  com eles se foi o ✕ que tira do contexto uma peça cuja row está lazy, que
+  não tem outro caminho na tela. `syncCcCtx()` deriva de `ctxbar.hidden &&
+  anexosbar.hidden` e é chamada pelos dois.
+  - **A asserção olha os ANCESTRAIS** (`closest("[hidden]")`), não o `hidden`
+    do próprio elemento: um teste que só olhasse `.ctxbar.hidden` passaria com
+    os chips invisíveis. Mesma família do stub que devolvia `null` e tornava
+    indemonstrável que o anexo chega ao request.
+- **MUDAR UM CONTROLE DE LUGAR MUDA O GESTO QUE ELE DEVE TER.** `.expand`,
+  `.side`, `.free` e `.fs` eram ALTERNADORES — certo como ícone solto no
+  cabeçalho, em que o mesmo botão liga e desliga. Dentro de um menu
+  `menuitemradio` com um ✓ ao lado do item ativo, alternar mente duas vezes:
+  clicar em "Largo" estando largo devolvia ao flutuante (o oposto do que o ✓
+  afirma), e "Flutuante", que só existe desde a v0.60, **não tinha handler
+  nenhum** — clicar não fazia nada. A nota do código dizia "os MESMOS
+  elementos, com os MESMOS handlers", e era exatamente o que estava errado.
+- **O `.exibbox` era o ÚNICO popover dentro do `.panel`, e por isso saía
+  cortado.** O painel carrega `transform` (o FLIP e a escala do arrasto), e
+  transform cria bloco de contenção para descendentes `position: fixed`: de
+  dentro dele a caixa deixa de ser fixa na viewport e é recortada pelo painel.
+  Todos os outros cinco (`.temabox`, `.selmenu`, `.audbox`, `.preview`,
+  `.zipmenu`) já eram `wrap.appendChild`. A regra estava escrita e o
+  componente novo nasceu fora dela.
+- **TROCAR ÍCONE POR `innerHTML` APAGA O RÓTULO.** `setDocsOcultas` reescrevia
+  o `innerHTML` do `.docsvis` para alternar o chevron — inofensivo enquanto o
+  botão era só ícone no cabeçalho, destrutivo desde que ele passou a carregar
+  `<span class="lbl">Ocultar as peças</span>` e a marca de estado. Como a
+  função roda no BOOT (restaurando a preferência), o item do menu nascia mudo.
+  Troca-se o `<svg>` (`replaceWith`), nunca o conteúdo do botão. É o inverso
+  exato do `textContent` que apaga o `<svg>`.
+- **TINTA DA CHROME FORA DA CHROME: `--on-hd-*` inverteu, e dois consumidores
+  não estavam no cabeçalho.** `.chip-mini` (dentro da bolha do usuário,
+  `--pje-2`) e `.msg.assistant pre` (dentro de `--ink`) são superfícies
+  ESCURAS em todos os temas e usavam a família da chrome, que virou tinta
+  escura na v0.60. O relato foi "esse roxo está escondendo o nome das peças".
+  O que se varreu no redesign foram os literais `#fff`; **faltou varrer os
+  consumidores dos tokens que MUDARAM DE POLARIDADE** — que é o conjunto mais
+  perigoso, porque eles seguem "corretos" no tema em que foram escritos.
+- **`--on-acao` TAMBÉM FAZIA DOIS TRABALHOS.** Ele é a tinta do botão primário
+  e era a tinta da bolha do usuário. No tema Noite o primário é CLARO (logo
+  `--on-acao` é escuro) enquanto a bolha continua sendo o azul-médio de
+  `--pje-2`: o texto da própria pergunta saía a **2,38:1**, e estava assim em
+  produção. Daí `--on-bolha`. É a terceira vez que a mesma pergunta rende
+  (`--pje-2`, `--surface-painel`, agora este): **ao acrescentar um tema, ou ao
+  inverter uma polaridade, perguntar quais tokens estão fazendo dois
+  trabalhos.**
+- **O TESTE DE CONTRASTE SÓ MEDE OS PARES QUE ALGUÉM ESCREVEU NELE.** Ele deu
+  106/106 numa versão em que o chip da peça estava ilegível — porque a bolha
+  do usuário não era um par da tabela. Ao criar uma superfície de cor própria,
+  o par dela entra no `t-temas-contraste` junto: sem isso o teste afirma sobre
+  um recorte e é lido como afirmação sobre a tela.
+- **LITERAL DE COR EM SOMBRA E HALO NÃO É MEDIDO POR NINGUÉM.** Sobreviveram
+  9 literais petróleo da paleta antiga — todos em `box-shadow` do launcher, dos
+  anéis de foco e de três bordas. O teste de contraste mede tinta sobre fundo;
+  o de literais varria hex e não `rgba()`. O sintoma era um botão indigo com
+  sombra petróleo, que se lê como "as cores não combinam" sem se saber onde.
+- **REGRA DE RESPONSIVIDADE DIZ QUEM PERDE, POR FAMÍLIA — nunca por nome.**
+  No `.estreito`, a regra listava `.btn-mapa, .btn-plib, .btn-mlib,
+  .tgl-sigilo` como quem perde o rótulo. O botão seguinte nasceu FORA dela, a
+  fileira estourou, e o painel flutuante — que é o modo PADRÃO — apareceu com
+  sete botões em duas linhas, metade com rótulo e metade sem. Com `:not()`
+  sobre a família, o botão novo já nasce no comportamento que cabe.
+- **ENGRENAGEM SIGNIFICA CONFIGURAÇÕES, e o menu de layout não pode usá-la.**
+  O relato veio do próprio autor do projeto: *"procurei muito o botão para
+  expandir o chat até adivinhar que era nessa tela, que na prática significa
+  configurações"*. Duas colisões ao mesmo tempo: com a convenção universal, e
+  com a aba **Configurações ↗** a 40px de distância — o mesmo símbolo
+  apontando para dois destinos na mesma barra. O gatilho passou a EXIBIR o
+  modo atual (o ícone do modo + chevron), que é a convenção de ESCOLHA:
+  responde "onde estou" e "o que posso fazer" antes do clique. Ele é o único
+  botão do cabeçalho mais largo que 30px, e por isso precisa de `width: auto`
+  para desfazer o `.hd button`.
+- **A FAIXA DE FERRAMENTAS FICOU FANTASMA** (sem borda e sem fundo em
+  repouso). Sete pílulas com borda dentro de uma caixa que já é um cartão
+  liam-se como sete cartões numa linha que é secundária à mensagem. O ESTADO
+  continua com peso: os toggles acesos ganham fundo tingido, então "ligado"
+  passou a ser a única coisa que aparece como superfície ali — que é
+  exatamente o que aquela linha precisa dizer.
+
 ## Temas do painel e o carimbo do modo sigiloso (`panel.css` + `panel.js`)
 
 Sete paletas (**Padrão** = indigo sobre slate com chrome clara, **Noite**,

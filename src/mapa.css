@@ -199,13 +199,13 @@ body {
   vertical-align: top;
 }
 #mapa .mm-tab th {
-  background: rgba(20, 96, 126, 0.1);
+  background: var(--accent-bg-2);
   font-weight: 600;
   font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-#mapa .mm-tab tr:nth-child(even) td { background: rgba(20, 96, 126, 0.04); }
+#mapa .mm-tab tr:nth-child(even) td { background: var(--hover-2); }
 
 /* ---------- Rodapé: legenda dos eixos + dica de uso ---------- */
 .rodape {

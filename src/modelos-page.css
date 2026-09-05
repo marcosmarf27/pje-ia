@@ -323,7 +323,7 @@ body.editando .topo .acoes { visibility: hidden; }
 .campo select:focus,
 .campo textarea:focus {
   border-color: var(--pje);
-  box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  box-shadow: var(--ring);
 }
 .campo .dica { display: block; font-size: var(--fs-meta); color: var(--muted); margin-top: 5px; }
 .campo .dica.estouro { color: var(--erro); font-weight: 600; }
@@ -468,7 +468,7 @@ body.editando .topo .acoes { visibility: hidden; }
 }
 .imp-tit:focus, .imp-cat:focus {
   border-color: var(--pje);
-  box-shadow: 0 0 0 3px rgba(20, 96, 126, 0.15);
+  box-shadow: var(--ring);
 }
 /* o selo diz "isto é um palpite" — some no primeiro toque no seletor, porque
    depois disso ele deixaria de ser verdade */

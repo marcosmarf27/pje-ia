@@ -104,6 +104,7 @@ duas vezes. A chrome muda de polaridade por tema; o corpo, não.
 | `--on-hd-3` | `#475569` | Texto de chip sobre a chrome |
 | `--on-hd-forte` | `#0f172a` | Título, ícones e o ✕ |
 | `--on-acao` | `#ffffff` | Tinta sobre superfície de AÇÃO — **não muda por tema** |
+| `--on-bolha` | `#ffffff` | Tinta sobre a BOLHA DO USUÁRIO. Separado de `--on-acao` na v0.60.1: no Noite o botão primário é claro (logo aquele é escuro) e a bolha continua sendo o `--pje-2` azul-médio — o texto da pergunta saía a 2,38:1 |
 
 > **`--on-hd-*` vale para as CINCO folhas, não só para o painel.** A primeira
 > versão da v0.60 deixou a família fora do `ui.css` alegando que tela satélite
@@ -632,10 +633,24 @@ Altura **56px** (52px no `.estreito`), fundo `--hd` (chrome **clara**), tinta
 > botões-ícone à direita viraram quatro. Dentro do popover **Exibição** estão os
 > cinco modos com NOME (Flutuante · Lateral · Janela livre · Largo · Tela cheia),
 > "Ocultar as peças" e "Baixar a conversa". São os MESMOS elementos, com as
-> mesmas classes e os mesmos handlers — mudaram de lugar. Cinco glifos sem rótulo
-> (`⊞ ▭ ⧉ ⛶ ▤`) são exatamente o atrito que um sistema não deve cobrar: um menu
-> que diz "Lateral" é mais descobrível que um ícone que insinua, e ainda cabe
-> numa barra que passou a ter navegação.
+> mesmas classes — mudaram de lugar. Cinco glifos sem rótulo (`⊞ ▭ ⧉ ⛶ ▤`) são
+> exatamente o atrito que um sistema não deve cobrar: um menu que diz "Lateral"
+> é mais descobrível que um ícone que insinua, e ainda cabe numa barra que
+> passou a ter navegação.
+
+> **O GATILHO EXIBE O MODO ATUAL, e a engrenagem que estava ali foi um erro de
+> convenção com preço medido.** O relato veio do próprio autor do projeto:
+> *"procurei muito o botão para expandir o chat até adivinhar que era nessa
+> tela, que na prática significa configurações"*. Duas colisões de uma vez —
+> com a convenção universal (engrenagem = configurações) e com a aba
+> **Configurações ↗** a 40px dali, o mesmo símbolo apontando para dois
+> destinos na mesma barra. Hoje o botão mostra o **ícone do modo em uso** mais
+> um chevron: é a convenção de ESCOLHA, e responde "onde estou" e "o que posso
+> fazer" antes do clique, que é o que o menu rotulado entrega depois dele.
+>
+> E o gesto mudou junto com o lugar: dentro de um `menuitemradio` com ✓, os
+> cinco modos **selecionam** em vez de alternar. Como alternadores, clicar em
+> "Largo" estando largo devolvia ao flutuante — o oposto do que o ✓ afirma.
 
 > ⚠️ **`.hd button` tem especificidade 0,1,1 e governa TODO botão do cabeçalho**
 > (`transparent`, `30×30`, `--r-sm`). Todo controle novo ali precisa de um
@@ -723,6 +738,29 @@ toda, e o 📎, as ferramentas e o Enviar fazem parte do mesmo gesto.
 >
 > **A regra que fica: faixa que muda de altura não pode ser disparada pelo foco
 > de uma linha que contém botões.**
+
+> **A FAIXA DE FERRAMENTAS É FANTASMA EM REPOUSO** — sem borda, sem fundo, só
+> ícone colorido por função e rótulo em `--muted`. Com borda e fundo branco,
+> sete botões dentro de uma caixa branca liam-se como sete CARTÕES numa linha
+> que é secundária à mensagem, e o cartão que importa ali é a própria caixa de
+> escrever. O ESTADO continua com peso: os toggles acesos ganham fundo tingido
+> (e o sigiloso, a cor dele), então "ligado" é a única coisa que aparece como
+> superfície nessa linha — que é exatamente o que ela precisa dizer.
+
+> **O LAUNCHER LEVA A MARCA, e não um ícone genérico de faíscas.** Ele é a
+> primeira coisa que se vê da extensão na página do tribunal — antes do painel,
+> antes de qualquer tela — e um ✦ solto não diz de QUEM é o botão. Com o mesmo
+> selo do cabeçalho (`--mark-*` e o ícone do produto), o botão e a janela que
+> ele abre são visivelmente a mesma coisa. As faíscas continuam à direita, em
+> 70% de opacidade, no papel que elas têm em todo produto do gênero: dizer
+> "isto é IA" sem disputar com a identidade.
+>
+> A sombra e o halo dele são tokens (`--sh-launcher`, `--halo-launcher`), e
+> essa é a correção de um ponto cego: eram os últimos literais da paleta
+> ANTIGA no arquivo — petróleo sob um botão que virou indigo. **Cor em sombra
+> e em halo não entra no `t-temas-contraste`**, que mede tinta sobre fundo, nem
+> na varredura de hex, que não olha `rgba()`. O sintoma é um botão cuja sombra
+> "não combina" com ele, e nada acusa.
 
 > **`@ Peça` é botão novo.** Até a v0.59 o `@` só existia como gatilho digitado,
 > e quem não sabia não descobria. O botão abre o mesmo popup `.mention`.

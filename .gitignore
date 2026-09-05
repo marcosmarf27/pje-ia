@@ -83,3 +83,6 @@ tests/espelho/
 #    e achados/) É versionada: ela é o "antes" contra o qual a v0.60 se prova, e
 #    um antes que a próxima sessão não encontra não prova nada.
 tests/visual/capturas/
+#  - tests/visual/capturas-telas/ — mesma coisa para o telas.mjs (as seis
+#    satélites). A referência congelada delas vive em v0.60-png/.
+tests/visual/capturas-telas/
