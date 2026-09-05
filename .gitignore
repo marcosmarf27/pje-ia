@@ -86,6 +86,9 @@ tests/visual/capturas/
 #  - tests/visual/capturas-telas/ — mesma coisa para o telas.mjs (as seis
 #    satélites). A referência congelada delas vive em v0.60-png/.
 tests/visual/capturas-telas/
+#  - tests/visual/capturas-minutabar/ — idem para o minutabar.mjs (os onze
+#    estados da barra do modo minuta).
+tests/visual/capturas-minutabar/
 
 # Material da Chrome Web Store (capturas, promo, icones de listagem): sao
 # artefatos de PUBLICACAO, gerados por store/gerar.py a partir do que ja esta

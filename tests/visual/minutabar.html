@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Laboratório — a barra de minuta</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #e9eef3; }
+    </style>
+  </head>
+  <body>
+    <script>
+      (() => {
+        // Semeia peças-modelo REAIS: o `MLIB.listar` exige `id` no valor, e a
+        // caixa só nasce quando existe modelo NAQUELA categoria. Com `?vazio=1`
+        // a biblioteca fica sem nada — é o estado da maioria dos usuários.
+        const agora = Date.now();
+        const dados = {};
+        if (!/\bvazio=1\b/.test(location.search)) {
+          const m = (id, titulo, categoria, idade) => {
+            dados["modelo:" + id] = {
+              id: id, titulo: titulo, categoria: categoria, descricao: "",
+              texto: "Vistos etc.", criadoEm: agora - idade, atualizadoEm: agora - idade,
+            };
+          };
+          m("s1", "Sentença — improcedência por prescrição", "sentenca", 3e6);
+          m("s2", "Sentença — procedência parcial em cobrança", "sentenca", 2e6);
+          m("s3", "Sentença — extinção sem mérito", "sentenca", 1e6);
+          m("d1", "Despacho — emenda à inicial", "despacho", 5e6);
+        }
+        const area = {
+          get(chaves, cb) {
+            let out = {};
+            if (chaves === null || chaves === undefined) out = Object.assign({}, dados);
+            else if (Array.isArray(chaves)) { for (const k of chaves) if (k in dados) out[k] = dados[k]; }
+            else if (typeof chaves === "object") { out = Object.assign({}, chaves); for (const k of Object.keys(chaves)) if (k in dados) out[k] = dados[k]; }
+            else if (typeof chaves === "string" && chaves in dados) out[chaves] = dados[chaves];
+            if (cb) cb(out);
+            return Promise.resolve(out);
+          },
+          set(obj, cb) { Object.assign(dados, obj || {}); if (cb) cb(); return Promise.resolve(); },
+          remove(chaves, cb) { for (const k of [].concat(chaves || [])) delete dados[k]; if (cb) cb(); return Promise.resolve(); },
+        };
+        window.chrome = {
+          runtime: { getURL: (p) => location.origin + "/" + p, openOptionsPage() {} },
+          storage: { local: area, sync: area, onChanged: { addListener() {} } },
+        };
+        window.open = () => null;
+      })();
+    </script>
+    <script src="/src/prompts.js"></script>
+    <script src="/src/modelos.js"></script>
+    <script src="/src/panel.js"></script>
+    <script>
+      const painel = PjePanel.mount();
+      painel.setConfigured(true);
+      painel.setProcesso && painel.setProcesso("0000860-39.2017.8.06.0203");
+      painel.setDocs([
+        { id: "185463738", titulo: "185463738 - Peticao inicial", tipo: "Peticao Inicial" },
+        { id: "212239678", titulo: "212239678 - Contestacao", tipo: "Contestacao" },
+        { id: "224081605", titulo: "224081605 - Replica", tipo: "Peticao" },
+      ]);
+      painel.open();
+      painel.setModelosHabilitado(true);
+      // Quem redige: o caso PADRÃO da extensão (chat no Luna, minuta no Terra).
+      painel.setModeloMinuta({ model: "gpt-5.6-terra", modelChat: "gpt-5.6-luna", trocado: true, fixado: false });
+
+      const sr = document.getElementById("pje-ia-host").shadowRoot;
+      window.__ligarMinuta = () => {
+        // O botao recusa sem material (`temMaterialParaAto`, v0.59.0): marcar
+        // uma peca faz parte do estado, nao e conveniencia do arnes.
+        const c = sr.querySelector(".doclist input[type=checkbox]");
+        if (c && !c.checked) { c.checked = true; c.dispatchEvent(new Event("change", { bubbles: true })); }
+        sr.querySelector(".btn-minuta").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      };
+      window.__especie = (v) => {
+        const s = sr.querySelector(".minuta-ato-sel");
+        s.value = v;
+        s.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      window.__tese = (t) => {
+        const a = sr.querySelector(".mt-txtarea");
+        a.value = t;
+        a.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      window.__modo = (m) => {
+        const b = { expanded: ".expand", lateral: ".side", livre: ".free", full: ".fs" }[m];
+        if (b) sr.querySelector(b).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      };
+      window.__medir = () => {
+        const q = (s) => sr.querySelector(s);
+        const vis = (s) => { const e = q(s); return !!e && !e.hidden && e.getBoundingClientRect().height > 0; };
+        const bar = q(".minutabar");
+        const ambar = [".mt-nota", ".mm-nota"].filter((s) => {
+          const e = q(s);
+          if (!e || e.hidden) return false;
+          const c = getComputedStyle(e);
+          return c.backgroundColor !== "rgba(0, 0, 0, 0)" && c.backgroundColor !== "transparent";
+        });
+        return JSON.stringify({
+          barH: Math.round(bar.getBoundingClientRect().height),
+          blocos: [...bar.children].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.className),
+          caixaModelos: vis(".minuta-modelo") ? q(".mm-txt").textContent : null,
+          marcada: q(".mm-chk") ? q(".mm-chk").checked : null,
+          cadastrar: vis(".mm-add") ? q(".mm-add .lbl").textContent : null,
+          notaTese: vis(".mt-nota") ? q(".mt-nota").textContent.trim() : null,
+          notaModelos: vis(".mm-nota") ? q(".mm-nota").textContent.trim() : null,
+          quemRedige: vis(".perfil-nota") ? q(".perfil-nota").textContent.trim() : null,
+          caixasAmbar: ambar,
+          gerarLigado: !q(".send").disabled,
+        });
+      };
+      window.__pronto = () => !!sr.querySelector(".minutabar");
+    </script>
+  </body>
+</html>

@@ -5459,6 +5459,12 @@ cada folha, `declarados(cadeia) ⊇ usados(folha)`. **A cadeia importa** —
     outra pergunta: sombra `inset` pintada abaixo dos filhos, caixa 0×0 que não
     desenha `box-shadow`, item numa terceira linha do cabeçalho — `getComputedStyle`
     reporta tudo vivo e correto em todos esses casos.
+  - **`minutabar.mjs`** — os **onze** estados da barra do modo minuta. Responde
+    às duas perguntas que decidiram a v0.61.0 e que nenhuma outra ferramenta
+    mede: *quanto ela tem de altura* e *quantas caixas âmbar aparecem*. A
+    página-arnês ao lado MARCA UMA PEÇA antes de ligar o modo — sem isso o
+    `.btn-minuta` recusa (`temMaterialParaAto`) e a barra mede **0px em todos os
+    estados**, uniformidade que parece resultado.
   - **`telas.mjs`** — as seis satélites (popup, opções, ajuda, editor, modelos,
     novidades). Painel e satélites compartilham a paleta por `ui.css`, e
     divergir cria DUAS identidades no mesmo produto sem nenhum teste acusar.

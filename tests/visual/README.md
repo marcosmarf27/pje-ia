@@ -39,6 +39,28 @@ devolve milhares de diferenças legítimas, e o hábito vira ignorar o resultado
 O arquivo antigo fica no repo porque é o retrato do visual da v0.59, que o tema
 `institucional` promete preservar; ele só não é mais um oráculo.
 
+## `minutabar.mjs` — os onze estados da barra de minuta
+
+```
+node tests/visual/minutabar.mjs 8983
+```
+
+É o único lugar que MEDE as duas afirmações da v0.61.0: a **altura da barra**
+(era ~260px, ficou 168px com a tese preenchida) e a **contagem de caixas
+âmbar** (eram três, são zero em todos os estados). Nenhuma das duas se confere
+por inspeção — `getComputedStyle` responde certo sobre uma barra alta demais, e
+"quantos avisos aparecem" depende de qual estado se olha.
+
+> **`__ligarMinuta` MARCA UMA PEÇA antes de clicar no botão.** Sem isso o
+> `.btn-minuta` recusa (`temMaterialParaAto`) e a barra mede **0px em todos os
+> estados** — foi como este arnês começou, e o número era tão uniforme que
+> parecia resultado.
+
+> **Regime novo, cena nova.** O `sentido` (despacho) tem texto próprio ("A
+> determinação é sua", "O que determinar") e ficou de fora dos oito retratos
+> originais: estado com texto próprio que ninguém fotografou é estado que
+> ninguém viu.
+
 ## `telas.mjs` — as satélites
 
 O `capturar.mjs` fotografa o PAINEL, que vive em Shadow DOM. As demais telas são
