@@ -1122,14 +1122,10 @@ var PjePanel = (function () {
             </div>
           </div>
         </div>
-        <!-- O POPOVER DE EXIBICAO. FILHO DO .wrap, NUNCA DO .panel: o painel
-             carrega transform (o FLIP da troca de modo e a escala do arrasto),
-             e transform cria BLOCO DE CONTENCAO para descendentes com
-             position:fixed — de dentro dele a caixa deixa de ser fixa em
-             relacao a viewport e passa a ser recortada pelo painel. Na v0.60
-             ela nasceu dentro e o menu saia cortado na borda direita, com
-             "Baixar a conversa (.md)" pela metade. Todos os outros popovers
-             (temabox, selmenu, audbox, preview) ja viviam aqui.
+        <!-- O POPOVER DE EXIBICAO. O markup nasce aqui e o mount o MOVE para o
+             .wrap (wrap.appendChild) — ver a nota do handler. Ele NAO pode
+             ficar dentro do .panel, que carrega transform, e o .panel envolve
+             o template inteiro: nao ha "depois do painel" neste literal.
         O POPOVER DE EXIBICAO. Os botões aqui dentro são os MESMOS de antes
              — mesma classe, mesmo handler, mesmo estado — só que agora com
              RÓTULO. Cinco glifos sem nome no cabeçalho eram o que o "não me faça
@@ -2380,6 +2376,16 @@ var PjePanel = (function () {
     // de alternadores a SELEÇÃO (ver acima), e nasceu o quinto item.
     const exibBtn = $(".exibicao");
     const exibBox = $(".exibbox");
+    // MOVIDO PARA O `.wrap` EM JS, e não no template: o `.panel` envolve o
+    // markup INTEIRO (ele só fecha na última linha), então "declarar depois do
+    // painel" não existe ali — é por isso que `.temabox`, `.selmenu`,
+    // `.audbox`, `.zipmenu` e `.preview` são todos `wrap.appendChild`.
+    // Sem isto o popover fica dentro de um elemento com `transform`, que cria
+    // BLOCO DE CONTENÇÃO para `position: fixed`: as coordenadas passam a ser
+    // relativas ao painel (medido: `left: 940px` computado contra x=1021 na
+    // tela) e o `overflow: hidden` dele recorta a caixa — o menu saía com
+    // "Baixar a conversa (.md)" cortado pela metade na borda direita.
+    wrap.appendChild(exibBox);
     function fecharExib() {
       if (exibBox.hidden) return;
       exibBox.hidden = true;
