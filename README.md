@@ -342,9 +342,12 @@ chat comum: funciona **em qualquer modelo**, Claude, Gemini ou GPT.
 
 Cada gabinete tem seu jeito de escrever. Em **📚 Modelos** você cadastra as suas
 peças-modelo — sentenças, decisões, despachos, ofícios, atas, mandados — organizadas por
-espécie. Ao ligar o modo minuta, escolha a espécie em **Seguir modelos** e o assistente
-recebe as suas peças daquela categoria: ele analisa, adota como base a mais adequada ao
-caso e aproveita a estrutura das seções, as fórmulas de praxe e o linguajar das demais.
+espécie. Ao ligar o modo minuta, **basta escolher a espécie do ato**: as suas
+peças-modelo daquela espécie já vão junto, e a caixa diz quantas são (“Seguir as minhas
+3 peças-modelo”). O assistente analisa, adota como base a mais adequada ao caso e
+aproveita a estrutura das seções, as fórmulas de praxe e o linguajar das demais. Sem
+nenhuma cadastrada, no lugar da caixa aparece o convite para cadastrar — nomeando a
+espécie.
 
 **Já tem as peças no Word? Arraste todas de uma vez.** Em **Importar .docx** você solta
 5, 10, quantos arquivos quiser: cada um vira uma ficha já preenchida — o título sai do

@@ -46,6 +46,22 @@ páginas de extensão comuns e compartilham a paleta por `ui.css` — o que
 significa que um token trocado no `panel.css` e não espelhado ali produz **duas
 identidades visuais no mesmo produto**, sem nenhum teste acusando.
 
+> **A ORDEM DOS ARGUMENTOS NÃO É A MESMA NAS TRÊS FERRAMENTAS, e errar não dá
+> erro — dá outro comportamento.** No `impressao.mjs` é
+> `<arquivo-de-saída> <porta> <baseline>`: sem o TERCEIRO argumento ele **grava**
+> em vez de comparar, e anuncia “impressão gravada” como se tudo estivesse bem.
+> Chamado com a baseline no lugar da saída, ele a SOBRESCREVE — o único motivo de
+> isso não ter destruído a referência nesta rodada é o `git` ter mostrado o
+> arquivo idêntico. **Rode sempre gravando num temporário** e passando a baseline
+> como o terceiro argumento; a prova que se quer é a linha
+> `N propriedades IGUAIS, 0 diferentes`, nunca a de gravação.
+
+> **`argv[2]` aqui é o DIRETÓRIO de saída, não a porta** — ao contrário do
+> `impressao.mjs` e dos `diag-*`, em que o segundo argumento é a porta. A ordem
+> é `telas.mjs <diretório> <porta>`. Invertendo, ele grava as capturas numa
+> pasta chamada `8981` e falha a conectar — e o erro fala de conexão, não de
+> argumento.
+
 Elas recebem um stub de `chrome` por `Page.addScriptToEvaluateOnNewDocument`,
 que roda ANTES de qualquer script da página; um `<script>` injetado depois
 chegaria tarde e o `popup.js` morreria no primeiro `storage.get`, produzindo uma

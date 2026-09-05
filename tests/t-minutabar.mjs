@@ -78,6 +78,7 @@ function montar(quantos) {
   );
   const w = dom.window;
   const dados = semear(quantos);
+  const ouvintes = [];
   const area = {
     get(ch, cb) {
       let out = {};
@@ -93,7 +94,14 @@ function montar(quantos) {
   };
   w.chrome = {
     runtime: { getURL: (p) => "chrome-extension://x/" + p, openOptionsPage() {}, lastError: null },
-    storage: { local: area, sync: area, onChanged: { addListener() {} } },
+    storage: {
+      local: area,
+      sync: area,
+      // Guardar os listeners e nao so aceita-los: com `addListener() {}` vazio,
+      // o caminho `MLIB.aoMudar` -> `atualizarSeletorMinuta` fica indemonstravel
+      // -- e e por ele que quem acabou de cadastrar ve a caixa nascer.
+      onChanged: { addListener: (f) => ouvintes.push(f) },
+    },
   };
   w.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   w.requestIdleCallback = (f) => setTimeout(f, 0);
@@ -140,7 +148,23 @@ function montar(quantos) {
     a.value = t;
     a.dispatchEvent(new w.Event("input", { bubbles: true }));
   };
-  return { w, raiz, painel, q, ligar, especie, tese };
+  // Grava um modelo e dispara o `storage.onChanged` como o Chrome faria --
+  // e o caminho de quem clica no convite, cadastra e volta.
+  function cadastrar(cat) {
+    const id = "novo" + (Object.keys(dados).length + 1);
+    dados["modelo:" + id] = {
+      id,
+      titulo: "Recém-cadastrado",
+      categoria: cat,
+      descricao: "",
+      texto: "Vistos etc.",
+      criadoEm: Date.now(),
+      atualizadoEm: Date.now(),
+    };
+    for (const f of ouvintes) f({ ["modelo:" + id]: { newValue: dados["modelo:" + id] } }, "local");
+  }
+
+  return { w, raiz, painel, q, ligar, especie, tese, cadastrar };
 }
 
 console.log("=== barra de minuta (jsdom, panel.js real) ===");
@@ -260,6 +284,64 @@ console.log("=== barra de minuta (jsdom, panel.js real) ===");
   ligar();
   especie("sentenca");
   ok(q(".mm-chk").checked, "religar o modo devolve a caixa a marcada");
+}
+
+// --- 8. o regime `sentido` (despacho) tem texto PROPRIO --------------------
+// Ele nao e uma variante de rotulo: e o terceiro regime, e o unico cujo campo
+// pede a DETERMINACAO em vez da tese. Nenhum dos oito retratos do arnes o
+// exercitava -- estado com texto proprio que ninguem tinha visto.
+{
+  const { q, ligar, especie, tese } = montar({ despacho: 1 });
+  ligar();
+  especie("despacho");
+  ok(!q(".minuta-tese").hidden, "despacho abre o campo de orientação");
+  ok(/determinar/i.test(q(".mt-lab").textContent),
+     "e o rótulo pede a DETERMINAÇÃO, não a tese", q(".mt-lab").textContent);
+  ok(/determinação é sua/i.test(q(".mt-nota").textContent),
+     "a nota de apoio fala em determinação", q(".mt-nota").textContent);
+  ok(q(".send").disabled, "sem a determinação o botão fica apagado (art. 19, §3º, II)");
+  tese("Cite-se o réu para contestar em 15 dias úteis.");
+  ok(!q(".send").disabled, "com ela, liga");
+  ok(!q(".minuta-modelo").hidden, "e a caixa de modelos de despacho aparece");
+}
+
+// --- 9. cadastrar e voltar acende a caixa SEM religar o modo ---------------
+// Este e o caminho que o convite promete: "+ Cadastrar pecas-modelo de X" abre
+// a biblioteca, o usuario grava e volta. Se a caixa so nascesse ao religar o
+// modo minuta, o convite entregaria menos do que anuncia.
+{
+  const { q, ligar, especie, cadastrar } = montar({});
+  ligar();
+  especie("sentenca");
+  ok(q(".minuta-modelo").hidden, "começa sem modelo nenhum");
+  ok(!q(".mm-add").hidden, "com o convite à mostra");
+  cadastrar("sentenca");
+  ok(!q(".minuta-modelo").hidden,
+     "gravar acende a caixa NA HORA, sem religar o modo");
+  ok(q(".mm-chk").checked, "já marcada");
+  ok(q(".mm-add").hidden, "e o convite dá lugar a ela");
+}
+
+// --- 10. o convite NOMEIA a especie, entao tem de ABRIR nela ---------------
+// O rotulo diz "Cadastrar pecas-modelo de Oficios"; abrir o formulario em
+// "Sentencas" desmentiria o que o usuario acabou de ler. `acordao` e o caso
+// que separa as duas escalas: a especie e `acordao`, a categoria e `decisao`.
+{
+  const { q, ligar, especie } = montar({});
+  ligar();
+  especie("oficio");
+  q(".mm-add").click();
+  ok(!q(".mlib").hidden, "o convite abre a biblioteca");
+  ok(q(".mlib-fc").value === "oficio",
+     "já na espécie que o rótulo prometeu", q(".mlib-fc").value);
+
+  const b = montar({});
+  b.ligar();
+  b.especie("acordao");
+  b.q(".mm-add").click();
+  ok(b.q(".mlib-fc").value === "decisao",
+     "e acórdão abre em Decisões, que é a categoria dele no MLIB",
+     b.q(".mlib-fc").value);
 }
 
 console.log(ruins ? `  ${ruins} de ${n} FALHARAM` : `  ${n}/${n} asserções`);

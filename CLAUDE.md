@@ -4618,6 +4618,33 @@ sobre o estado PADRÃO; a terceira acusava o usuário antes de ele fazer nada.
   resultado em `tests/espelho/` é grep que não achou nada.** Provado por
   MUTAÇÃO nas duas metades (tirar o `cat` do acórdão derruba 2 asserções; fazer
   a caixa nunca sumir derruba outras 2).
+- **O CONVITE NOMEIA A ESPÉCIE, ENTÃO TEM DE ABRIR NELA.** `+ Cadastrar
+  peças-modelo de Ofícios` abria o formulário da biblioteca em **Sentenças** —
+  `abrirMlibForm(null)` fixava `mlibFC.value = "sentenca"` desde sempre, e isso
+  era inofensivo enquanto o botão se chamava só "Cadastrar". **O rótulo virou
+  promessa no instante em que passou a nomear a espécie**, e a mesma linha de
+  código passou a mentir sem ter mudado. Hoje `abrirMlib({form, cat})` repassa
+  `catDosModelos()`, e o valor é conferido **depois** de atribuído: `select.value`
+  com um id fora da lista deixa o campo VAZIO em silêncio (a armadilha do
+  `#model` do popup). É a mesma lição do OCR: **ao acrescentar uma capacidade,
+  varrer os rótulos que a MENCIONAM — eles viram promessa no instante em que ela
+  passa a existir.**
+- **O `README.md` e o `help.html` descreviam o `<select>` que deixou de
+  existir** (“escolha a espécie em **Seguir modelos**”), e o estado vazio da
+  própria biblioteca também (“escolha a categoria em Seguir modelos”). Mudança de
+  UI é mudança de DOCUMENTAÇÃO: `grep` pelo rótulo do controle removido, em
+  `src/`, no README e no guia. O que fica é o **changelog** — ali a frase é
+  datada e descreve o que era verdade naquela versão.
+- **O regime `sentido` (despacho) tem TEXTO PRÓPRIO e nenhum dos oito retratos
+  o exercitava.** É o terceiro regime, e o único cujo campo pede a
+  DETERMINAÇÃO (“A determinação é sua”) em vez da tese. Hoje são **onze**
+  estados medidos, e o `t-minutabar` o cobre. Regra: **regime novo, cena nova** —
+  estado com texto próprio que ninguém fotografou é estado que ninguém viu.
+- **Cadastrar e voltar acende a caixa SEM religar o modo** (`MLIB.aoMudar` →
+  `atualizarSeletorMinuta(true)`), e isso não tinha teste porque o stub do
+  harness trazia `onChanged: { addListener() {} }` — **vazio**. Um stub que
+  aceita o listener e nunca o chama torna o caminho INDEMONSTRÁVEL, do mesmo
+  jeito que o `PJE.lerAnexo` que devolvia `null` na v0.59. Provado por mutação.
 - **NÃO fundir o textarea da tese com o campo de instrução do compositor** —
   são dois campos de texto no mesmo gesto e é o "faz pensar" que sobra, mas a
   `INSTRUCAO_MINUTA_PADRAO` está duplicada em dois arquivos com teste de
@@ -5460,6 +5487,14 @@ cada folha, `declarados(cadeia) ⊇ usados(folha)`. **A cadeia importa** —
   `setDocs`, que **aborta e leva junto o resto do content.js** — sumiu a seleção
   em faixa inteira, sem nenhum sintoma que apontasse para a causa. Estado lido
   por callback vive no TOPO, junto do `const panel`.
+- **TESTE DE MUTAÇÃO SEM `assert` NO ALVO É TESTE DE MUTAÇÃO QUE NÃO RODOU.**
+  `str.replace(a, b, 1)` **não avisa quando `a` não casa** — devolve a string
+  intacta. Um script que imprime “mutação aplicada” incondicionalmente entrega
+  um falso NEGATIVO convincente: a suíte segue verde e a conclusão é “o teste
+  novo é fraco”, quando o produto nunca foi mutado. Aconteceu nesta rodada, com
+  a mutança certa e a indentação errada. Todo script de mutação começa com
+  `assert s.count(velho) == 1`. Mesma família do `grep` que só acha resultado em
+  `tests/espelho/`.
 - Não há bundler. Valide sintaxe com `node --check src/*.js`.
 - **`node --check` NÃO pega variável inexistente** — ele só valida sintaxe, e um
   `ReferenceError` de runtime derruba a função inteira. Foi assim que um

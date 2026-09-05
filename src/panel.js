@@ -6125,7 +6125,7 @@ var PjePanel = (function () {
       minutaModeloAdd.addEventListener("click", (e) => {
         e.preventDefault();
         if (!temMlib || !modelosHabilitado) return;
-        abrirMlib({ form: true });
+        abrirMlib({ form: true, cat: catDosModelos() });
       });
     }
 
@@ -6171,7 +6171,7 @@ var PjePanel = (function () {
       opts = opts || {};
       mlibEl.hidden = false;
       mlibDelArm = null;
-      if (opts.form) abrirMlibForm(null);
+      if (opts.form) abrirMlibForm(null, { cat: opts.cat });
       else fecharMlibForm();
       renderMlibList();
       if (!opts.form) mlibCard.focus();
@@ -6192,7 +6192,13 @@ var PjePanel = (function () {
       mlibEditId = m && !rascunho ? m.id : null;
       mlibIdNovo = rascunho ? m.id : m ? null : temMlib ? MLIB.novoId() : "";
       mlibFT.value = m ? m.titulo : "";
-      mlibFC.value = m ? m.categoria || "outro" : "sentenca";
+      // A categoria pedida vem do convite da barra de minuta, que NOMEIA a
+      // especie ("Cadastrar pecas-modelo de Oficios"): abrir o formulario em
+      // "Sentencas" desmentiria o rotulo que acabou de ser lido. Confere-se o
+      // valor DEPOIS de atribuir, porque `select.value` com um id fora da lista
+      // deixa o campo VAZIO em silencio -- a mesma armadilha do `#model`.
+      mlibFC.value = m ? m.categoria || "outro" : o.cat || "sentenca";
+      if (!mlibFC.value) mlibFC.value = "sentenca";
       mlibFD.value = m ? m.descricao || "" : "";
       mlibFX.value = m ? m.texto : "";
       mlibErr.textContent = "";
@@ -6262,7 +6268,7 @@ var PjePanel = (function () {
           (podeImportar
             ? "Traga vários arquivos <b>.docx</b> ou <b>.rtf</b> de uma vez — você confere tudo antes de cadastrar."
             : "Cole o texto de uma peça sua para cadastrar a primeira.") +
-          " Depois, ao gerar uma minuta, escolha a categoria em <b>Seguir modelos</b>." +
+          " Depois, ao gerar uma minuta, elas vão junto assim que você escolher a <b>espécie do ato</b>." +
           '<div class="mempty-acts">' +
           (podeImportar
             ? '<button class="mempty-imp plib-save" title="Importar peças-modelo de arquivos .docx ou .rtf — pode escolher vários de uma vez, e você confere tudo antes de cadastrar">' +
