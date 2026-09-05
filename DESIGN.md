@@ -1720,14 +1720,59 @@ chat, não ao lado. O passo 1 do estado vazio troca "na lista ao lado" por "na
 gaveta acima" pelo mesmo mecanismo dos rótulos longo/curto do segmented
 (`.op-l`/`.op-s`) — dois `<span>`, escolha no CSS, zero JS.
 
-### Popup e página de opções: a MESMA tela, em duas densidades
+### Popup e página de opções: os MESMOS componentes, em duas navegações
 
-`popup.html` e `options.html` compartilham o `popup.js` — e agora também a
-estrutura: chip de estado, três cartões de provedor, cartão do provedor ativo
-(chave + modelo + segmented de raciocínio), instruções personalizadas com chips
-de persona, a linha `Testar chave` + `Salvar` e a caixa `.privacy`. A página de
-opções não é outra tela: é a mesma com respiro e com os textos longos que não
-cabem nos 600px de altura do popup do Chrome.
+`popup.html` e `options.html` compartilham o `popup.js` — e também os
+componentes: chip de estado, quatro cartões de provedor, cartão do provedor
+ativo (chave + modelo + segmented de raciocínio), instruções personalizadas com
+chips de persona, a linha `Testar chave` + `Salvar` e a caixa `.privacy`.
+
+> **REVISÃO DE DECISÃO (v0.60.2).** O título desta seção era *"a MESMA tela, em
+> duas densidades"*, e a página de opções era a mesma coluna de 560px, com
+> respiro. Isso deixou de se sustentar quando a tela passou a reunir SETE
+> assuntos — chave, modelo, instruções, aparência, privacidade, bibliotecas,
+> apoio — num scroll de ~3.500px sem nenhum mapa. Uma coluna estreita cercada de
+> vazio numa tela de 1400 não é respiro: é desperdício com desorientação junto.
+>
+> O que se separou foi a **navegação**, não o componente: nenhum id, nenhuma
+> classe e nenhuma linha de `popup.js` mudaram, e os blocos foram MOVIDOS para
+> dentro de `<section>`. O popup segue sendo a coluna única — ele tem 460×600px
+> e é o console rápido.
+>
+> **Isto NÃO reabre os acordeões `<details class="keybox">`**, que saíram por
+> outra razão e continuam fora: eles davam à página de opções um COMPONENTE
+> próprio, e um caminho no `popup.js` que só ela exercitava.
+
+**Anatomia da página de configuração (v0.60.2)**
+
+```
+.cfg-top   (sticky)  marca · [chip de estado] · [Testar chave] [Salvar]
+.cfg-wrap  (grid: --w-cfg-nav | 1fr, max --w-cfg)
+ ├ .cfg-nav   (sticky)  7 links com ícone → âncora de cada seção
+ └ .cfg-main            7 × .cfg-sec (cartão --surface/--line/--r-box)
+                        cada uma com .cfg-hd (h2 + eyebrow-n opcional)
+```
+
+- **Âncora, não aba.** Tudo continua numa página só, e é isso que mantém o
+  `#saveHint` verdadeiro por construção: nenhum campo editado fica escondido
+  atrás de outra aba na hora de salvar. `<a href="#…">` dá deep link de graça.
+- **A barra superior nasceu junto e pela mesma razão**: com as seções
+  espalhadas, uma `.save-row` no meio do fluxo deixaria o usuário editando a
+  Aparência sem enxergar onde se salva.
+- **O `.save-hint` anima a LARGURA ali** (`grid-template-columns: 0fr→1fr`), e
+  não a altura como no ui.css. Numa barra fixa, altura variável é a faixa que
+  cresce sob o cursor — o defeito do `.hint-key` que a v0.60 aposentou.
+- **`aria-current="true"` é o estado do item corrente**, escrito pelo
+  `options-nav.js`; uma classe seria uma segunda verdade para divergir dele.
+- **Medida de leitura de 660px** dentro do cartão de ~790px. Ganhar espaço não é
+  obrigação de usá-lo: a linha inteira dava ~110 caracteres em 13px. Quem usa a
+  largura toda é só o `.cfg-hd` e a `.prov-grid`, que são varridos, não lidos.
+  ⚠️ **`max-width` não se aplica a elemento inline não substituído** — o `.hint`
+  só é `block` dentro de `label.field`, e solto na seção ele ignorava a regra em
+  silêncio.
+- **No estreito (< 900px) a navegação vira FILEIRA rolável, com os rótulos.**
+  Ela já rola no eixo x, então esconder o texto não economiza nada — só devolve
+  os glifos mudos que o menu existe para eliminar.
 
 **`.privacy` — uma caixa, três fatos.** Fecha o bloco de ação com o que o usuário
 precisa saber antes de usar: a chave fica **neste navegador**, as peças marcadas

@@ -80,11 +80,24 @@ button {
   font-weight: 600;
 }
 .topo button:hover { background: var(--veu-2); }
-.primario {
-  background: var(--hd);
+/* `.topo .primario`, e nao `.primario`: `.topo button` tem especificidade
+   0,1,1 e vence um seletor de classe sozinho — e por isso o botao PRIMARIO
+   desta tela nunca foi primario. Medido: ele e o secundario tinham a MESMA
+   cor de fundo, a mesma tinta e a mesma borda. E a armadilha do `.hd button`
+   do painel, que ja custou o `.sigselo` e as abas: nao basta declarar o que se
+   quer, e preciso DESFAZER o que a regra generica impos.
+   O fundo tambem estava errado por outro motivo: `var(--hd)` e a CHROME, que
+   na v0.60 ficou branca — um botao primario branco com tinta branca. Quem
+   pinta acao aqui e o par `--btn-*`, como o `.btn` do ui.css. */
+.topo .primario {
+  background: linear-gradient(180deg, var(--btn-de), var(--btn-para));
   color: var(--on-acao);
   font-weight: 600;
-  border-color: var(--pje-2);
+  border-color: transparent;
+  box-shadow: var(--sh-btn);
+}
+.topo .primario:hover {
+  background: linear-gradient(180deg, var(--btn-de-h), var(--btn-para-h));
 }
 .primario:hover { filter: brightness(1.07); }
 button svg { flex: none; }
