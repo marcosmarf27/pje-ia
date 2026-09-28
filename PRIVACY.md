@@ -16,7 +16,7 @@ são enviados diretamente do seu navegador à API do provedor de IA que você es
 
 | Dado | Finalidade | Para onde vai |
 |---|---|---|
-| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — é o propósito único da extensão | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`), **Google** (`generativelanguage.googleapis.com`), **OpenAI** (`api.openai.com`) ou **OpenRouter** (`openrouter.ai`). Nos três primeiros nenhum outro serviço intermedia; o OpenRouter é, por definição, um **intermediário** — ver a seção 6. |
+| **Peças processuais que você marcar** (PDFs/HTML dos autos) e **suas mensagens de chat** | Análise por IA — uma das duas funções do propósito único da extensão (ver o fim desta seção) | Diretamente à API do provedor escolhido por você: **Anthropic** (`api.anthropic.com`), **Google** (`generativelanguage.googleapis.com`), **OpenAI** (`api.openai.com`) ou **OpenRouter** (`openrouter.ai`). Nos três primeiros nenhum outro serviço intermedia; o OpenRouter é, por definição, um **intermediário** — ver a seção 6. |
 | **Chaves de API** (Anthropic, Google, OpenAI e/ou OpenRouter) fornecidas por você | Autenticar as chamadas à API do respectivo provedor | Armazenadas **somente** no `chrome.storage.local` do seu navegador (não sincronizam entre dispositivos). Enviadas exclusivamente ao provedor correspondente, como cabeçalho de autenticação. Nunca chegam ao contexto da página do PJe. |
 | **Preferências** (modelo, nível de raciocínio, instruções personalizadas, modo de layout) | Funcionamento da interface | Somente `chrome.storage.local`. As instruções personalizadas são anexadas ao prompt enviado ao provedor escolhido. |
 | **Prompts salvos** (título e texto que você escreve na biblioteca de prompts) | Reaproveitar instruções suas nas conversas | `chrome.storage.sync`: ficam no seu navegador e, se você usar o Chrome com uma conta Google e a sincronização ligada, o próprio Chrome os replica nos seus outros dispositivos (o desenvolvedor não tem acesso). O texto do prompt vai ao provedor de IA junto da mensagem quando você o usa. |
@@ -28,10 +28,12 @@ são enviados diretamente do seu navegador à API do provedor de IA que você es
 | **Texto extraído das peças** (a saída de “Extrair o texto”, num `.md` único ou num `.zip` com um arquivo por peça) e o **pacote de carta precatória** | Levar o processo para fora da extensão — outra ferramenta, um script, um arquivo de caso; ou montar um envio de malote digital | **A lugar nenhum**: o arquivo é montado dentro do seu navegador e entregue pelo download comum. Nesta operação o único servidor acessado é o **do próprio tribunal**, com a sua sessão. Nada vai ao desenvolvedor nem a provedor de IA. O arquivo resultante é salvo por **você**, onde você escolher, e a partir daí deixa de estar sob controle da extensão. |
 | **Reconhecimento de texto (OCR) das páginas digitalizadas** | Ler a folha escaneada, que não tem camada de texto, ao extrair o texto do processo | **A lugar nenhum — o reconhecimento é inteiramente local.** O modelo de OCR (PP-OCRv6) vem dentro do pacote da extensão e roda no seu computador, num documento interno dela (`offscreen`). Nenhuma imagem de página é enviada a serviço de OCR, ao desenvolvedor ou a qualquer provedor de IA. |
 | **Sessão do PJe** (cookies do tribunal) | Baixar as peças que você marcar, pelo mesmo mecanismo que o próprio PJe usa | Os cookies são gerenciados pelo navegador e **nunca são lidos, armazenados ou exportados pela extensão** — as requisições ao tribunal usam a sessão já aberta por você, e o conteúdo baixado fica em cache temporário na memória da aba. |
+| **Ações em lote** (pôr ou retirar etiqueta e movimentar processos, pelo botão do popup) | Executar no PJe, em vários processos de uma vez, a ação que **você** escolheu e confirmou | As requisições vão **somente ao próprio tribunal**, com a sua sessão — nada vai ao desenvolvedor nem a provedor de IA. Fica gravado **neste computador** (`chrome.storage.local`) um **registro de cada ação**: data, número do processo, etiqueta ou saída escolhida, resultado e o seu perfil no PJe — sem cookie e sem conteúdo dos autos. Apagado sozinho após **30 dias**; o botão **Baixar registro** gera uma planilha, que você salva onde quiser. |
 
 Nenhum dado além dos listados acima é tratado. A coleta limita-se ao estritamente
-necessário ao propósito único da extensão (análise, por IA, das peças que **você**
-selecionar), em conformidade com a política de Uso Limitado (*Limited Use*) da Chrome
+necessário ao propósito único da extensão — **ser o assistente de trabalho de quem opera
+o PJe**: analisar com IA as peças que **você** selecionar e executar no PJe, em lote, as
+etiquetas e movimentações que **você** escolher e confirmar —, em conformidade com a política de Uso Limitado (*Limited Use*) da Chrome
 Web Store.
 
 ## 2. O que a extensão NÃO faz
@@ -43,7 +45,11 @@ Web Store.
   acesso a eles.
 - **Não lê sua navegação**: o painel só é injetado em telas de autos digitais do PJe
   (páginas `*.jus.br` que contêm a linha do tempo do processo); em qualquer outra
-  página `.jus.br` o script termina sem tocar no DOM.
+  página `.jus.br` o script termina sem tocar no DOM. O painel de **ações em lote** só é
+  montado quando você o pede pelo botão do popup, na aba que está na frente.
+- **Não escreve no PJe por conta própria**: pôr ou retirar etiqueta e movimentar processos
+  só acontecem nos processos que você marcou, com a ação que você escolheu e confirmou em dois
+  cliques. A extensão nunca faz isso sozinha, e o assistente de IA não tem como acioná-las.
 - **Não envia nada automaticamente**: nenhum documento sai do navegador sem uma ação
   explícita sua (marcar peças e enviar uma mensagem).
 - **Não usa serviço externo de OCR**: o reconhecimento das páginas digitalizadas é feito por um
@@ -183,6 +189,9 @@ própria licença e o próprio funcionamento — a política aqui descrita não 
   recentes; **Descartar**, no editor, apaga na hora. Não sincronizam entre dispositivos.
   Ao gerar o `.docx` ou imprimir a partir do editor, o arquivo resultante é salvo por
   **você**, onde você escolher, e deixa de estar sob controle da extensão.
+- **Registro das ações em lote** fica no `chrome.storage.local` por 30 dias (no máximo
+  5.000 linhas): número do processo, ação, etiqueta ou saída, resultado e o perfil do PJe.
+  Não guarda cookie nem conteúdo dos autos, e não sai deste computador.
 - **Modelos de peças** (biblioteca “Modelos”) também ficam no `chrome.storage.local`, sem
   poda automática e sem sincronizar. Se você cadastrar uma peça real como modelo, o texto
   pode conter dados de **outro** processo; ele fica só neste navegador e o botão **excluir**
