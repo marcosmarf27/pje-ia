@@ -1,16 +1,24 @@
 # Política de Privacidade — TecJustiça PJe (Análise de Processos)
 
-**Última atualização: 5 de agosto de 2026**
+**Última atualização: 1º de outubro de 2026**
 
 A extensão **TecJustiça PJe — Análise de Processos** ("a extensão") adiciona um painel de chat
 com IA à tela de autos digitais do PJe (Processo Judicial Eletrônico). Esta política
 descreve, de forma completa, quais dados a extensão trata, para onde eles vão e o que
 **nunca** é feito com eles.
 
-**Resumo em uma frase:** a extensão não tem servidor próprio, não coleta telemetria e o
-desenvolvedor **nunca tem acesso a nenhum dado seu** — os documentos que você selecionar
-são enviados diretamente do seu navegador à API do provedor de IA que você escolheu
-(Anthropic, Google, OpenAI ou OpenRouter), autenticados pela **sua própria chave de API**.
+**Resumo em uma frase:** a extensão não coleta telemetria e, no funcionamento padrão, não
+passa por servidor nenhum do desenvolvedor — os documentos que você selecionar são enviados
+diretamente do seu navegador à API do provedor de IA que você escolheu (Anthropic, Google,
+OpenAI ou OpenRouter), autenticados pela **sua própria chave de API**.
+
+**A única exceção é opcional e vem desligada:** a **triagem na conta TecJustiça**
+(`pjece.tecjustica.com`, serviço do mesmo desenvolvedor). Ela só funciona depois que **você**
+cola nas opções a chave de integração da **sua** conta e autoriza o acesso ao site; a partir
+daí, os processos que você mandar à triagem vão para a sua conta — o número do processo e os
+dados que o painel do PJe já mostra, **nunca** as peças, as partes ou o teor dos autos. O
+processo sigiloso vai com a marca de sigilo, e o modo de sigilo da sua conta decide o que fazer
+com ele. Detalhes na seção 3-B.
 
 ## 1. Dados tratados e finalidade
 
@@ -28,30 +36,42 @@ são enviados diretamente do seu navegador à API do provedor de IA que você es
 | **Texto extraído das peças** (a saída de “Extrair o texto”, num `.md` único ou num `.zip` com um arquivo por peça) e o **pacote de carta precatória** | Levar o processo para fora da extensão — outra ferramenta, um script, um arquivo de caso; ou montar um envio de malote digital | **A lugar nenhum**: o arquivo é montado dentro do seu navegador e entregue pelo download comum. Nesta operação o único servidor acessado é o **do próprio tribunal**, com a sua sessão. Nada vai ao desenvolvedor nem a provedor de IA. O arquivo resultante é salvo por **você**, onde você escolher, e a partir daí deixa de estar sob controle da extensão. |
 | **Reconhecimento de texto (OCR) das páginas digitalizadas** | Ler a folha escaneada, que não tem camada de texto, ao extrair o texto do processo | **A lugar nenhum — o reconhecimento é inteiramente local.** O modelo de OCR (PP-OCRv6) vem dentro do pacote da extensão e roda no seu computador, num documento interno dela (`offscreen`). Nenhuma imagem de página é enviada a serviço de OCR, ao desenvolvedor ou a qualquer provedor de IA. |
 | **Sessão do PJe** (cookies do tribunal) | Baixar as peças que você marcar, pelo mesmo mecanismo que o próprio PJe usa | Os cookies são gerenciados pelo navegador e **nunca são lidos, armazenados ou exportados pela extensão** — as requisições ao tribunal usam a sessão já aberta por você, e o conteúdo baixado fica em cache temporário na memória da aba. |
+| **Triagem na conta TecJustiça** (opcional, desligada até você conectar a sua conta nas opções) | Mandar os processos que você marcar no lote para a triagem da **sua** conta TecJustiça e mostrar o resultado de volta no lote e no card do painel do PJe | A `pjece.tecjustica.com`, na **sua** conta, autenticado pela chave de integração que você colou. Vai **só o que o painel do PJe já mostra**: número do processo, grau, tarefa (fila) e etiquetas em que ele está, classe, assunto, prioridade, órgão julgador, datas de chegada e do último movimento e os identificadores internos do painel. **Não vão** peças, partes, nem o teor dos autos — quem lê os autos é o servidor, com o cadastro do PJe que você fez nele. **Processo sigiloso vai com a marca de sigilo** do PJe; se ele é lido, bloqueado ou anonimizado quem decide é o modo de sigilo da sua conta no TecJustiça, não a extensão. Com a conta conectada, a extensão também consulta o resultado dos processos que estão na tela (lote e painel), mandando **só os números**. A chave fica no `chrome.storage.local`, só no *service worker*; **Desconectar**, nas opções, a apaga e devolve a permissão de acesso ao site. |
 | **Ações em lote** (pôr ou retirar etiqueta e movimentar processos, pelo botão do popup) | Executar no PJe, em vários processos de uma vez, a ação que **você** escolheu e confirmou | As requisições vão **somente ao próprio tribunal**, com a sua sessão — nada vai ao desenvolvedor nem a provedor de IA. Fica gravado **neste computador** (`chrome.storage.local`) um **registro de cada ação**: data, número do processo, etiqueta ou saída escolhida, resultado e o seu perfil no PJe — sem cookie e sem conteúdo dos autos. Apagado sozinho após **30 dias**; o botão **Baixar registro** gera uma planilha, que você salva onde quiser. |
 
 Nenhum dado além dos listados acima é tratado. A coleta limita-se ao estritamente
 necessário ao propósito único da extensão — **ser o assistente de trabalho de quem opera
-o PJe**: analisar com IA as peças que **você** selecionar e executar no PJe, em lote, as
-etiquetas e movimentações que **você** escolher e confirmar —, em conformidade com a política de Uso Limitado (*Limited Use*) da Chrome
+o PJe**: analisar com IA as peças que **você** selecionar; executar no PJe, em lote, as
+etiquetas e movimentações que **você** escolher e confirmar; e, se **você** conectar a sua
+conta TecJustiça, mandar os processos que escolher para a triagem dela e mostrar o
+resultado —, em conformidade com a política de Uso Limitado (*Limited Use*) da Chrome
 Web Store.
 
 ## 2. O que a extensão NÃO faz
 
-- **Não tem servidor próprio**: não existe backend do desenvolvedor; nenhum dado passa
-  por infraestrutura nossa.
+- **Não passa por servidor do desenvolvedor, salvo a triagem que você ligar**: o chat, o
+  lote, as exportações e o modo sigiloso não passam por infraestrutura nossa. A única
+  exceção é a triagem na conta TecJustiça (seção 3-B), que vem **desligada** e só funciona
+  com a chave da **sua** conta.
 - **Não coleta telemetria, analytics ou estatísticas de uso** de nenhum tipo.
 - **Não vende, aluga ou compartilha dados** com terceiros — o desenvolvedor sequer tem
   acesso a eles.
 - **Não lê sua navegação**: o painel só é injetado em telas de autos digitais do PJe
   (páginas `*.jus.br` que contêm a linha do tempo do processo); em qualquer outra
   página `.jus.br` o script termina sem tocar no DOM. O painel de **ações em lote** só é
-  montado quando você o pede pelo botão do popup, na aba que está na frente.
+  montado quando você o pede pelo botão do popup (ou pelo botão "Ações em lote nesta fila" do
+  painel), na aba que está na frente. No painel do usuário, alguns tribunais carregam a lista
+  de processos de `frontend.prd.cnj.cloud` (o sistema do CNJ que serve o PJe); ali a extensão
+  só entra **se você permitir** (o Chrome pergunta quando você pede o botão no popup ou conecta a
+  triagem), e só põe esse botão e, com a triagem conectada, a faixa do resultado em cada card — ela lê o
+  número do processo, e nunca as partes.
 - **Não escreve no PJe por conta própria**: pôr ou retirar etiqueta e movimentar processos
   só acontecem nos processos que você marcou, com a ação que você escolheu e confirmou em dois
   cliques. A extensão nunca faz isso sozinha, e o assistente de IA não tem como acioná-las.
 - **Não envia nada automaticamente**: nenhum documento sai do navegador sem uma ação
-  explícita sua (marcar peças e enviar uma mensagem).
+  explícita sua (marcar peças e enviar uma mensagem). Com a triagem conectada, a consulta
+  do **resultado** dos processos na tela é automática, mas leva só os números deles — e
+  **mandar** processos à triagem é sempre um gesto seu, confirmado em dois cliques.
 - **Não usa serviço externo de OCR**: o reconhecimento das páginas digitalizadas é feito por um
   modelo que acompanha a extensão e roda **no seu computador** — a imagem da folha não sai daqui.
 - **Não usa os dados para publicidade** nem para determinar crédito ou qualquer
@@ -160,6 +180,107 @@ valores que a extensão reconheceu; ela não inventa o que não foi detectado. A
 revisão do que sai continua sendo sua — e a caixa de conferência antes do envio
 é o momento de fazê-la.
 
+## 3-B. Triagem na conta TecJustiça (opcional)
+
+Nas **Ações em lote** (botão do popup), os processos marcados podem ir para a triagem da sua
+conta no **TecJustiça** (`pjece.tecjustica.com`), serviço do mesmo desenvolvedor.
+
+- **Vem desligada.** Nada é enviado até você, nas opções da extensão, colar a **chave de
+  integração** da sua conta (criada no site, em *Configuração › Usar no Claude e outros*) e
+  clicar em **Conectar**. É nesse clique que o Chrome pede a permissão de acesso ao site —
+  quem nunca usar o recurso não recebe essa permissão.
+- **O que vai**: o número do processo, o grau, a tarefa e as etiquetas em que ele está no
+  painel, a classe, o assunto, a prioridade, o órgão julgador, as datas que o painel mostra e
+  os identificadores internos do painel. **Não vão** peças, partes, nem o teor dos autos: o
+  servidor lê os autos por conta própria, com o cadastro do PJe que você fez nele — isso é
+  regido pelos termos do próprio TecJustiça, não por esta política.
+- **Processo sigiloso vai com a marca de sigilo** (`sigiloso: true`), como o PJe o marca. Se ele
+  é lido, bloqueado ou anonimizado é decisão do **modo de sigilo da sua conta** no TecJustiça
+  (desde 29/09/2026), não da extensão; a tela da extensão diz isso antes de você mandar.
+- **A conferência é na extensão.** Antes de mandar, você vê a lista dos processos e escolhe o
+  modelo, se quer a minuta do próximo ato e uma observação livre — e a **observação vai junto**
+  para o TecJustiça, com a escolha. Ao mandar, a leitura começa na sua conta (enquanto o serviço
+  não tiver esse recurso, o lote fica em rascunho e a extensão oferece o botão para começar no
+  site). Nenhuma aba abre sozinha.
+- **O resultado volta** ao lado de cada processo no lote e no card do painel do PJe. Para
+  isso, com a conta conectada, a extensão consulta o site com os **números** dos processos
+  que estão na tela, e só enquanto a aba está visível. Só a sua conta vê os seus resultados.
+- **Etiqueta no PJe**: gravar a etiqueta sugerida pela triagem é um gesto seu — pelo botão, com
+  confirmação, ou marcando **"Pôr a etiqueta no PJe sozinho"** ao mandar os processos (é esse
+  clique que autoriza). Com a opção marcada, qualquer aba do PJe do mesmo endereço aberta neste
+  navegador grava a etiqueta quando o resultado chega, mesmo com a janela fechada, e cada uma
+  fica no registro das ações; vale para todos os processos, sigilosos inclusive, e a autorização
+  vence em 48 horas. Para a triagem escolher, vão ao TecJustiça os **nomes das etiquetas da sua
+  unidade** (o cadastro do PJe, não as peças). Depois de gravar, a extensão conta ao TecJustiça
+  **qual etiqueta ficou no processo** (o nome, se foi posta, se o processo já a tinha ou se não
+  gravou, e a hora), para a ficha do site mostrar "Etiqueta posta no PJe em…". A extensão só grava um nome que já existe no
+  cadastro ou que está na lista configurada no site (os `TRIAGEM - …` e as etiquetas próprias);
+  esses, se a unidade ainda não os tem, o próprio PJe cria ao gravar, e passam a aparecer para
+  a unidade. Nome fora dessas listas é recusado.
+- **Partes confirmadas no site**: a triagem pode apontar pessoas que faltam no cadastro de
+  partes; você confirma cada uma no site, e a ação **"Incluir partes confirmadas"** da janela as
+  inclui no PJe — com prévia, dois cliques, uma pessoa por vez e conferência no PJe depois. A
+  extensão busca no TecJustiça só as que você confirmou (número, nome, papel) e devolve a ele o
+  resultado de cada uma. O **nome de cada pessoa incluída** fica no registro das ações deste
+  computador, pelos mesmos 30 dias. Não há desfazer: o PJe não tem como retirar parte por aqui.
+- **Onde fica a chave**: no `chrome.storage.local` deste navegador, lida só pelo *service
+  worker* da extensão; nunca chega à página do PJe e nunca vai na URL. **Desconectar**, nas
+  opções, apaga a chave e devolve a permissão.
+- Cada envio fica no **registro das ações em lote** deste computador (data, número do lote
+  no TecJustiça, quantidade de processos), pelos mesmos 30 dias.
+- **Andamento ao vivo**: com um lote em leitura e a janela ou o card à vista, a extensão mantém
+  uma conexão de acompanhamento com o site (a chave vai no cabeçalho, nunca na URL), que traz o
+  resultado de cada processo assim que fica pronto. Ela fecha sozinha quando o lote termina ou
+  quando nada mais está sendo mostrado. Cada envio leva um identificador aleatório para o
+  servidor não criar um lote repetido se o mesmo envio chegar duas vezes.
+
+## 3-C. Assistente do acervo (na janela de ações em lote)
+
+A aba **Assistente** da janela de ações em lote atende pedidos em português ("os processos da
+tarefa X com a etiqueta Y") conversando com um modelo de IA pela **sua** chave: a da **OpenAI**, a
+do **Google (Gemini)** ou a do **OpenRouter** — o provedor do modelo que você usa no chat, quando
+ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em uso.
+
+- **Só age quando você pede, e não grava nada sozinho.** Ele responde com um cartão que lista os
+  processos e oferece as ações; pôr ou retirar etiqueta e mandar à triagem acontecem só com o seu
+  clique de confirmação no cartão, pelos mesmos caminhos (e o mesmo registro de 30 dias) da aba
+  Manual.
+- **O que vai ao provedor**: o seu pedido; os **nomes** de **todas** as tarefas (com a quantidade de
+  processos) e de **todas** as etiquetas da unidade, lidos ao abrir o assistente, para ele entender
+  "a fila de analisar" sem o nome exato;
+  quantidades; **números de processos** (os sigilosos inclusive, marcados) e, quando ele olha o que há
+  numa fila ou etiqueta, os **dados que o painel do PJe já mostra** de cada um (assunto, classe,
+  tarefa, etiquetas, prioridade, data de chegada e último movimento — **nunca as partes**); se uma
+  fila anda em lote e as **saídas** dela; e, quando você pergunta por um
+  processo, a **lista das peças** (tipo oficial e data), os **movimentos** e — quando você pede
+  para ele ler ou analisar o processo — o **TEOR das peças que ele lê** (o texto de peças do
+  editor, de PDFs e das folhas digitalizadas, reconhecidas por OCR no seu computador). Esse texto
+  contém **nomes, documentos e fatos das partes**, e vai sem anonimização. **Processo sigiloso é
+  tratado como qualquer outro** (desde 30/09/2026): o número vai ao modelo, marcado como sigiloso, e
+  quando ele consulta ou lê o processo, peças, movimentos e teor vão ao provedor, sem anonimização.
+  Na primeira vez em cada processo, a conversa mostra um aviso lembrando a Res. CNJ
+  615/2025 (art. 19, §3º, IV), que veda IA privada ou externa em documento sigiloso salvo
+  anonimização na origem: a decisão, e a observância da regra do seu tribunal, são suas.
+- Na OpenAI o pedido vai com **`store: false`** (ela não guarda a conversa para reuso); no
+  OpenRouter, com a mesma recusa de provedores que treinam com os dados usada no chat. Vai direto do
+  seu navegador ao provedor, pela página interna da extensão — a chave não passa pela página do
+  tribunal.
+- A conversa vive só enquanto a janela está aberta; fechar a aba a apaga. O custo aproximado aparece
+  embaixo da caixa de escrever.
+
+## 3-D. Leitor dos autos e cores das etiquetas (sem IA)
+
+- O **Leitor dos autos** não usa IA nem envia nada a terceiro: as peças e os movimentos são lidos
+  do PJe, pela sua sessão já aberta, e mostrados só no seu computador. O conteúdo das peças é
+  desenhado numa página interna da extensão e não fica guardado depois que você fecha o leitor.
+- O que o leitor **guarda**, no `chrome.storage.local` do seu navegador: por processo (pelo
+  endereço do tribunal, o grau e o número interno do processo), quais peças você marcou como
+  **lidas** ou **favoritas** e a página em que parou; e as suas preferências de exibição. Não guarda
+  o conteúdo das peças. Fica limitado aos 400 processos mais recentes e a um ano.
+- As **cores das etiquetas** são da extensão, não do PJe: ficam no `chrome.storage.local`, junto com
+  os **nomes** das etiquetas que o Acervo e o leitor já viram (para a lista das configurações, no
+  máximo 500). Nada disso é gravado no PJe nem sai do navegador.
+
 ## 4. Responsabilidade sobre dados de processos (LGPD)
 
 Autos judiciais podem conter dados pessoais e dados sensíveis de partes, testemunhas e
@@ -245,8 +366,9 @@ própria licença e o próprio funcionamento — a política aqui descrita não 
   sincronização da sua conta Google. Sem conta ou com a sincronização desligada, eles
   ficam apenas neste navegador. Não coloque dados sigilosos dos autos no texto de um
   prompt salvo — a biblioteca serve para instruções genéricas e reutilizáveis.
-- As chaves de API vivem apenas no *service worker* da extensão e **nunca são expostas
-  ao contexto da página** do PJe.
+- As chaves de API — e a chave de integração do TecJustiça, quando você conecta a triagem —
+  vivem apenas no *service worker* da extensão e **nunca são expostas ao contexto da
+  página** do PJe.
 - Toda comunicação usa HTTPS.
 - **Exclusão**: desinstalar a extensão apaga todos os dados locais. As chaves também
   podem ser apagadas a qualquer momento na tela de opções. Arquivos na Files API da
