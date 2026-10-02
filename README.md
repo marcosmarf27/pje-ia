@@ -11,12 +11,12 @@
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/imgfakkieoijdhdpafjjlefcckbmbppm"><img alt="Instalar na Chrome Web Store" src="https://img.shields.io/badge/Chrome%20Web%20Store-instalar-2563EB?style=flat-square&logo=googlechrome&logoColor=white"></a>
   <img alt="Gratuita" src="https://img.shields.io/badge/pre%C3%A7o-gratuita-0F172A?style=flat-square">
-  <img alt="Qualquer tribunal com PJe" src="https://img.shields.io/badge/PJe-qualquer%20tribunal-0F172A?style=flat-square">
+  <img alt="TJs e TRFs com PJe" src="https://img.shields.io/badge/PJe-TJs%20e%20TRFs-0F172A?style=flat-square">
   <a href="https://tecjustica.substack.com/"><img alt="Blog TecJustiça" src="https://img.shields.io/badge/blog-TecJusti%C3%A7a-2563EB?style=flat-square"></a>
 </p>
 
 Extensão gratuita para o Chrome que trabalha **dentro das telas do PJe** (Processo Judicial
-Eletrônico), em qualquer tribunal que use o sistema — TJs, TRFs e TRTs. São três recursos
+Eletrônico), nos tribunais que usam o PJe tradicional — TJs, TRFs e outros. São três recursos
 independentes:
 
 | | Para quê | Precisa de chave de IA? |
@@ -35,7 +35,8 @@ Na tela do processo, clique em **Analisar com IA**, marque as peças e pergunte 
 
 - **A resposta usa só o que você marcou** e diz de onde saiu cada informação: a peça, o número
   dela no PJe e a folha. Quando falta uma peça que mudaria a resposta, ela avisa qual é.
-- **Folhas digitalizadas** são lidas por OCR no seu computador.
+- **Folhas digitalizadas também são lidas** — pelo próprio modelo de IA ou, no modo sigiloso,
+  no agente e na extração de texto, por OCR no seu computador.
 - **Linha do tempo processual** com as datas oficiais dos movimentos — publicação, intimação,
   decurso, trânsito —, que quase nunca viram peça com texto.
 - **Minutar**: despacho, decisão ou sentença num editor de verdade, com `.docx`. Sentença e
@@ -91,11 +92,13 @@ Pelo ícone da extensão, em qualquer tela do PJe.
    popup ensina a criar: [OpenAI](https://platform.openai.com/api-keys) (GPT),
    [Anthropic](https://console.anthropic.com/settings/keys) (Claude),
    [Google](https://aistudio.google.com/apikey) (Gemini) ou
-   [OpenRouter](https://openrouter.ai/keys) (centenas de modelos com uma chave só).
+   [OpenRouter](https://openrouter.ai/settings/keys) (centenas de modelos com uma chave só).
 3. Abra um processo no PJe e clique em **Analisar com IA** ou em **Ler os autos**.
 
 O uso da IA é pago diretamente ao provedor, pelo que você usar; a página de ajuda da extensão
 mostra os preços. O Leitor, as cores das etiquetas e as ações em lote da aba Manual não usam IA.
+
+A interface nova **PJe KZ**, da Justiça do Trabalho, ainda não é lida — a extensão avisa quando é o caso.
 
 | Provedor | Bom para |
 |---|---|
