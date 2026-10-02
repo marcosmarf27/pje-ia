@@ -1,0 +1,66 @@
+name: Relatar um problema
+description: Algo na extensão TecJustiça PJe não funcionou como deveria
+labels: ["problema"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar. **Não cole dados de processos** — nomes, CPF, número de processo em segredo de justiça, trechos das peças. Descreva o que aconteceu com palavras ou com uma captura em que esses dados estejam cobertos.
+  - type: input
+    id: versao
+    attributes:
+      label: Versão da extensão
+      description: Aparece no popup, ao lado do nome da extensão (o número completo fica em chrome://extensions).
+      placeholder: "0.75.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: recurso
+    attributes:
+      label: Em que parte da extensão
+      options:
+        - Chat com IA sobre os autos
+        - Minuta / editor
+        - Mapa mental
+        - Leitor dos autos
+        - Acervo Inteligente — aba Manual (etiquetas, movimentar)
+        - Acervo Inteligente — aba Agente
+        - Modo sigiloso
+        - Configurações / chave de API
+        - PJe Agent (TJCE e JFCE)
+        - Outra
+    validations:
+      required: true
+  - type: input
+    id: tribunal
+    attributes:
+      label: Tribunal e grau
+      placeholder: "TJCE, 1º grau"
+    validations:
+      required: true
+  - type: input
+    id: modelo
+    attributes:
+      label: Provedor e modelo de IA (se usou IA)
+      placeholder: "OpenAI — GPT-6 Luna"
+  - type: textarea
+    id: oque
+    attributes:
+      label: O que aconteceu e o que você esperava
+      description: Inclua a mensagem de erro exatamente como apareceu, se houve.
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Abri os autos de um processo de 40 peças
+        2. Marquei as peças "principais"
+        3. Cliquei em Enviar e...
+  - type: textarea
+    id: console
+    attributes:
+      label: Console (opcional)
+      description: Se souber, abra o F12 → Console na aba do PJe e cole as linhas vermelhas — sem dados de processos.
+      render: text

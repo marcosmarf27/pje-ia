@@ -1,6 +1,6 @@
 # Política de Privacidade — TecJustiça PJe (Análise de Processos)
 
-**Última atualização: 1º de outubro de 2026**
+**Última atualização: 2 de outubro de 2026**
 
 A extensão **TecJustiça PJe — Análise de Processos** ("a extensão") adiciona um painel de chat
 com IA à tela de autos digitais do PJe (Processo Judicial Eletrônico). Esta política
@@ -59,7 +59,7 @@ Web Store.
 - **Não lê sua navegação**: o painel só é injetado em telas de autos digitais do PJe
   (páginas `*.jus.br` que contêm a linha do tempo do processo); em qualquer outra
   página `.jus.br` o script termina sem tocar no DOM. O painel de **ações em lote** só é
-  montado quando você o pede pelo botão do popup (ou pelo botão "Ações em lote nesta fila" do
+  montado quando você o pede pelo botão do popup (ou pelo botão "Acervo Inteligente" do
   painel), na aba que está na frente. No painel do usuário, alguns tribunais carregam a lista
   de processos de `frontend.prd.cnj.cloud` (o sistema do CNJ que serve o PJe); ali a extensão
   só entra **se você permitir** (o Chrome pergunta quando você pede o botão no popup ou conecta a
@@ -228,23 +228,47 @@ conta no **TecJustiça** (`pjece.tecjustica.com`), serviço do mesmo desenvolved
   opções, apaga a chave e devolve a permissão.
 - Cada envio fica no **registro das ações em lote** deste computador (data, número do lote
   no TecJustiça, quantidade de processos), pelos mesmos 30 dias.
+- **A triagem na tela dos autos** (desde a v0.74): com a conta conectada, ao abrir os autos de um
+  processo a extensão consulta o TecJustiça com o **número** daquele processo (e o grau) para
+  mostrar o resultado da triagem ao lado de "Ler os autos". Enquanto a triagem anda, repete a
+  consulta no mesmo ritmo da faixa do painel, e só com a aba visível. Nada mais vai.
+- **A minuta no editor do PJe** (desde a v0.74): na tarefa de minutar, **só no clique** do botão
+  "Minuta do PJe Agent" (ou do item no botão direito), a extensão pede ao TecJustiça a lista das
+  minutas da sua conta para aquele **número** e grau, e o texto da minuta que você escolher. O
+  número sai do próprio PJe, numa leitura da rota REST do processo da tarefa (sem abrir outra
+  tela). A minuta escolhida é escrita no editor do PJe, na sua máquina; nada é salvo nem assinado
+  pela extensão.
 - **Andamento ao vivo**: com um lote em leitura e a janela ou o card à vista, a extensão mantém
   uma conexão de acompanhamento com o site (a chave vai no cabeçalho, nunca na URL), que traz o
   resultado de cada processo assim que fica pronto. Ela fecha sozinha quando o lote termina ou
   quando nada mais está sendo mostrado. Cada envio leva um identificador aleatório para o
   servidor não criar um lote repetido se o mesmo envio chegar duas vezes.
 
-## 3-C. Assistente do acervo (na janela de ações em lote)
+## 3-C. Agente do Acervo Inteligente (na janela de ações em lote)
 
-A aba **Assistente** da janela de ações em lote atende pedidos em português ("os processos da
+A aba **Agente** do Acervo Inteligente atende pedidos em português ("os processos da
 tarefa X com a etiqueta Y") conversando com um modelo de IA pela **sua** chave: a da **OpenAI**, a
 do **Google (Gemini)** ou a do **OpenRouter** — o provedor do modelo que você usa no chat, quando
 ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em uso.
 
 - **Só age quando você pede, e não grava nada sozinho.** Ele responde com um cartão que lista os
-  processos e oferece as ações; pôr ou retirar etiqueta e mandar à triagem acontecem só com o seu
-  clique de confirmação no cartão, pelos mesmos caminhos (e o mesmo registro de 30 dias) da aba
-  Manual.
+  processos e oferece as ações; pôr ou retirar etiqueta, movimentar e mandar à triagem acontecem só
+  com o seu clique de confirmação no cartão, pelos mesmos caminhos (e o mesmo registro de 30 dias)
+  da aba Manual.
+- **Análise de vários processos de uma vez** (desde a versão 0.71.0): quando você pede para analisar
+  vários processos, a extensão lê de 1 a 7 ao mesmo tempo (você escolhe quantos) e, para cada um, faz
+  uma chamada própria ao mesmo provedor com a lista de peças, os movimentos e o teor das peças lidas —
+  as mesmas categorias de dado descritas abaixo, só que de vários processos. Acima de 10 processos
+  (ou de US$ 0,50 estimados, ajustável nas Configurações) a tela mostra o tamanho do trabalho e espera
+  o seu "Começar".
+- **Cadastro de partes** (desde a versão 0.71.0): o agente lê o cadastro de partes de um processo
+  (nome, papel e situação de cada parte — nunca documentos, filiação ou endereço) e o compara com os
+  autos; quem falta e é pessoa física você inclui no PJe pelo cartão, uma pessoa por vez, com dois
+  cliques. O nome incluído vai ao registro das ações (30 dias, neste navegador). Desde a 0.73.0,
+  quando os autos trazem o **CPF** de quem falta, a extensão o **consulta no cadastro de pessoas do
+  próprio tribunal** (uma consulta por pessoa proposta, só com dígito verificador válido), para não
+  incluir em duplicata quem já está lá. O CPF e o CNPJ **nunca são guardados**: não vão à conversa
+  salva nem ao registro das ações (que leva só o identificador interno da pessoa no PJe).
 - **O que vai ao provedor**: o seu pedido; os **nomes** de **todas** as tarefas (com a quantidade de
   processos) e de **todas** as etiquetas da unidade, lidos ao abrir o assistente, para ele entender
   "a fila de analisar" sem o nome exato;
@@ -258,14 +282,20 @@ ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em u
   contém **nomes, documentos e fatos das partes**, e vai sem anonimização. **Processo sigiloso é
   tratado como qualquer outro** (desde 30/09/2026): o número vai ao modelo, marcado como sigiloso, e
   quando ele consulta ou lê o processo, peças, movimentos e teor vão ao provedor, sem anonimização.
-  Na primeira vez em cada processo, a conversa mostra um aviso lembrando a Res. CNJ
-  615/2025 (art. 19, §3º, IV), que veda IA privada ou externa em documento sigiloso salvo
-  anonimização na origem: a decisão, e a observância da regra do seu tribunal, são suas.
+  O processo aparece marcado como sigiloso no cartão. A Res. CNJ 615/2025 (art. 19, §3º, IV) veda
+  IA privada ou externa em documento sigiloso salvo anonimização na origem: a decisão, e a
+  observância da regra do seu tribunal, são suas.
 - Na OpenAI o pedido vai com **`store: false`** (ela não guarda a conversa para reuso); no
   OpenRouter, com a mesma recusa de provedores que treinam com os dados usada no chat. Vai direto do
   seu navegador ao provedor, pela página interna da extensão — a chave não passa pela página do
   tribunal.
-- A conversa vive só enquanto a janela está aberta; fechar a aba a apaga. O custo aproximado aparece
+- **O que fica guardado no seu computador** (desde a versão 0.71.0): as **conversas** com o agente e o
+  **resultado das análises** de cada processo (situação, próximo ato, sugestões, prazos, alertas,
+  resumo, partes e a resposta à sua pergunta), por **14 dias**, no mesmo banco local da memória de caso
+  (§3), por endereço do PJe e perfil — nunca na página do tribunal, e nunca enviado a lugar nenhum. É o
+  que permite reabrir uma conversa e reaproveitar a análise de um processo que não andou (sem pagar de
+  novo). O teor das peças **não** é guardado. O mesmo interruptor da memória de caso desliga isto e
+  **apaga tudo na hora**; "Apagar todas" no menu de conversas também apaga. O custo aproximado aparece
   embaixo da caixa de escrever.
 
 ## 3-D. Leitor dos autos e cores das etiquetas (sem IA)

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Instalar a extensão
+    url: https://chromewebstore.google.com/detail/imgfakkieoijdhdpafjjlefcckbmbppm
+    about: A Chrome Web Store é o único canal de instalação.
+  - name: Política de privacidade
+    url: https://github.com/marcosmarf27/pje-ia/blob/main/PRIVACY.md
+    about: Para onde vão os dados e o que nunca é feito com eles.
+  - name: Novidades e artigos
+    url: https://tecjustica.substack.com/
+    about: O blog TecJustiça no Substack.

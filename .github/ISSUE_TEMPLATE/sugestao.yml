@@ -1,0 +1,23 @@
+name: Sugerir um recurso
+description: Uma ideia para a extensão TecJustiça PJe
+labels: ["sugestão"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Conte o problema do seu dia a dia que a ideia resolveria — é isso que ajuda a desenhar a solução. **Não cole dados de processos.**
+  - type: textarea
+    id: problema
+    attributes:
+      label: O que você quer fazer e hoje não consegue (ou dá muito trabalho)
+    validations:
+      required: true
+  - type: textarea
+    id: ideia
+    attributes:
+      label: Como você imagina que poderia funcionar
+  - type: input
+    id: funcao
+    attributes:
+      label: Sua função (opcional)
+      placeholder: "Servidor de secretaria, assessor de gabinete, advogado…"
