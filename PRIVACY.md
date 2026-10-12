@@ -330,7 +330,8 @@ ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em u
   sua sessão; **os nomes das partes não são lidos nem guardados**. Nada é gravado no PJe.
 - **O que guarda**, no `chrome.storage.local` deste navegador, sem sincronizar:
   - a **última leitura** (os dados acima, para a janela abrir sem esperar), trocada a cada nova
-    leitura, e os **totais de cada dia** (só números) por 180 dias, para o gráfico de tendência;
+    leitura, e os **totais de cada dia** (só números, os de cada quadro de cada visão) por 180 dias,
+    para a comparação que aparece ao lado de cada número ("era 7,4% há 30 dias");
   - o que **você** escolhe no painel: as estrelas de favorito, a régua que você ajustou, as filas
     que você marcou como "fora da conta", as preferências da tela e a data da sua última visita.
     Fica até você apagar. (Os post-its da versão 0.80, que saíram na 0.81, continuam guardados
@@ -341,6 +342,10 @@ ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em u
   3-C), com a sua chave. Para mostrar o selo **«Analisado»**, o painel lê das análises que o Agente
   já guardou neste navegador (seção 3-C) só o número do processo, a data, a situação curta e o
   próximo ato. Montar o painel, o quadro e as exportações não usa IA.
+- **Busca por nome de parte**, só quando você clica em **Procurar «…» como parte no PJe**: o nome
+  que você digitou vai **só ao PJe do próprio tribunal**, com a sua sessão, pelo mesmo filtro de
+  parte da tela de filas dele; voltam os números dos processos, que ficam só na tela aberta. O
+  nome não é guardado, não vai à IA e não entra nas exportações (nem no nome do arquivo).
 - **Exportar** uma lista gera uma planilha (.xlsx ou .csv) que você salva onde quiser, sem nome
   de parte; a partir daí ela deixa de estar sob controle da extensão.
 
