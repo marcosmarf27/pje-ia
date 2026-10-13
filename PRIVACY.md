@@ -1,6 +1,6 @@
 # Política de Privacidade — TecJustiça PJe (Análise de Processos)
 
-**Última atualização: 10 de outubro de 2026**
+**Última atualização: 13 de outubro de 2026**
 
 A extensão **TecJustiça PJe — Análise de Processos** ("a extensão") adiciona um painel de chat
 com IA à tela de autos digitais do PJe (Processo Judicial Eletrônico). Esta política
@@ -247,9 +247,11 @@ conta no **TecJustiça** (`pjece.tecjustica.com`), serviço do mesmo desenvolved
 ## 3-C. Agente do Acervo Inteligente (na janela de ações em lote)
 
 A aba **Agente** do Acervo Inteligente atende pedidos em português ("os processos da
-tarefa X com a etiqueta Y") conversando com um modelo de IA pela **sua** chave: a da **OpenAI**, a
-do **Google (Gemini)** ou a do **OpenRouter** — o provedor do modelo que você usa no chat, quando
-ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em uso.
+tarefa X com a etiqueta Y") conversando com um modelo de IA pela **sua** chave, sempre a do
+**provedor do modelo escolhido nas Configurações** — o mesmo do chat: **Anthropic (Claude)** (desde a
+versão 0.83.0), **OpenAI**, **Google (Gemini)** ou **OpenRouter**. A chave de outro provedor nunca é
+usada no lugar; sem a chave do provedor escolhido, o agente não roda e a tela diz qual falta. A tela
+diz o modelo em uso.
 
 - **Só age quando você pede, e não grava nada sozinho.** Ele responde com um cartão que lista os
   processos e oferece as ações; pôr ou retirar etiqueta, movimentar e mandar à triagem acontecem só
@@ -296,7 +298,8 @@ ele serve; senão, o primeiro com chave, nessa ordem. A tela diz qual está em u
   IA privada ou externa em documento sigiloso salvo anonimização na origem: a decisão, e a
   observância da regra do seu tribunal, são suas.
 - Na OpenAI o pedido vai com **`store: false`** (ela não guarda a conversa para reuso); no
-  OpenRouter, com a mesma recusa de provedores que treinam com os dados usada no chat. Vai direto do
+  OpenRouter, com a mesma recusa de provedores que treinam com os dados usada no chat; na Anthropic,
+  pela mesma API de Mensagens do chat, sob os termos da sua conta. Vai direto do
   seu navegador ao provedor, pela página interna da extensão — a chave não passa pela página do
   tribunal.
 - **O que fica guardado no seu computador** (desde a versão 0.71.0): as **conversas** com o agente e o
