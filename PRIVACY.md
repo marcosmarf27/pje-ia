@@ -277,9 +277,19 @@ diz o modelo em uso.
   curtas sobre as peças que leu (o que falta, um prazo, uma prova) e a extensão as **guarda neste
   navegador** (`chrome.storage.local`, sem sincronizar), para mostrá-las ao lado de cada peça na tela
   dos autos e no Leitor dos autos. As notas são escritas pelo modelo a partir do teor das peças e podem
-  conter **nomes e fatos das partes**. **Nada é gravado no PJe**, outra pessoa não as vê, e o texto
-  delas **não volta à IA** (nem numa conversa retomada). Ficam até você descolar, até 365 dias, e no
-  máximo 100 processos (os mais antigos saem primeiro).
+  conter **nomes e fatos das partes**. **Nada é gravado no PJe**, outra pessoa só as vê se você as
+  enviar (abaixo), e o texto delas **não volta à IA** (nem numa conversa retomada). Ficam até você
+  descolar, até 365 dias, e no máximo 100 processos (os mais antigos saem primeiro).
+- **Mandar os post-its a um colega** (desde a versão 0.85.0), só no seu clique: a página **Post-its:
+  enviar ou receber** gera um **arquivo** com o texto das notas dos processos que você marcar (com o
+  número de cada processo, o nome que você escrever, se escrever, e — desde a versão 0.85.1 — um
+  **código aleatório deste navegador**, criado na primeira vez e guardado nele, que não identifica você:
+  serve só para a extensão de quem recebe reconhecer que dois arquivos vieram da mesma pessoa, mesmo sem
+  nome, e não confundir as notas de dois colegas) e o **baixa no seu computador**. Você
+  o manda como quiser (WhatsApp, e-mail…): ele **não passa por nenhum servidor nosso**. Quem recebe
+  escolhe o arquivo na mesma página; a extensão confere o que vem nele, mostra antes de colar e grava as
+  notas no navegador dele, como as do Assistente dele. Nada disso vai à IA. Como o arquivo pode conter
+  nomes e fatos das partes, mande-o só a quem trabalha nesses processos.
 - **O que vai ao provedor**: o seu pedido; os **nomes** de **todas** as tarefas (com a quantidade de
   processos) e de **todas** as etiquetas da unidade, lidos ao abrir o assistente, para ele entender
   "a fila de analisar" sem o nome exato;
@@ -396,7 +406,9 @@ própria licença e o próprio funcionamento — a política aqui descrita não 
   e as suas escolhas (favoritos, régua, filas fora da conta) ficam no `chrome.storage.local`, sem
   sincronizar; detalhes na seção 3-E.
 - **Post-its do agente nas peças**: no `chrome.storage.local`, sem sincronizar, até 365 dias e 100
-  processos (os mais antigos saem primeiro); descolar apaga na hora. Detalhes na seção 3-C.
+  processos (os mais antigos saem primeiro); descolar apaga na hora. Os recebidos de um colega ficam do
+  mesmo jeito, e o nome que você escreveu para enviar fica lembrado para a próxima vez. Detalhes na
+  seção 3-C.
 - **Modelos de peças** (biblioteca “Modelos”) também ficam no `chrome.storage.local`, sem
   poda automática e sem sincronizar. Se você cadastrar uma peça real como modelo, o texto
   pode conter dados de **outro** processo; ele fica só neste navegador e o botão **excluir**
