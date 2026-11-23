@@ -1,6 +1,6 @@
 # Política de Privacidade — TecJustiça PJe (Análise de Processos)
 
-**Última atualização: 13 de outubro de 2026**
+**Última atualização: 23 de novembro de 2026**
 
 A extensão **TecJustiça PJe — Análise de Processos** ("a extensão") adiciona um painel de chat
 com IA à tela de autos digitais do PJe (Processo Judicial Eletrônico). Esta política
@@ -328,6 +328,28 @@ diz o modelo em uso.
   novo). O teor das peças **não** é guardado. O mesmo interruptor da memória de caso desliga isto e
   **apaga tudo na hora**; "Apagar todas" no menu de conversas também apaga. O custo aproximado aparece
   embaixo da caixa de escrever.
+
+## 3-C-1. O modo Agente do chat dos autos (desde a versão 0.86.0)
+
+No painel de chat da tela dos autos, a caixa de escrever tem dois modos: **Peças marcadas** (o envio de
+sempre, descrito na seção 3) e **Agente**. No modo **Agente**, o mesmo agente da seção 3-C, com o processo aberto
+na tela, **escolhe sozinho** as peças que a pergunta pede e as lê:
+
+- **O que vai ao provedor**: a sua pergunta; o número do processo da tela e o identificador interno dele no PJe;
+  a **lista das peças** (tipo oficial e data); os **movimentos**; o **TEOR das peças que ele lê** — o texto das
+  peças do editor, dos PDFs e das folhas digitalizadas, reconhecidas por OCR **no seu computador** —, com
+  **nomes, documentos e fatos das partes**; quando o OCR lê mal uma folha (ou quando você pede), a **IMAGEM dessa
+  folha**, como na seção 3-C; o **cadastro de partes**, quando você pergunta quem está nele (nome, papel e
+  situação — nunca documentos, filiação ou endereço); e as suas **instruções personalizadas** das Configurações.
+  As peças que você marca vão como "leia estas primeiro" (o id e o tipo de cada uma).
+- **Por onde vai**: como na seção 3-C — da página interna da extensão direto ao provedor do modelo escolhido nas
+  Configurações, com a **sua** chave daquele provedor; a chave não passa pela página do tribunal.
+- **Sem anonimização.** O modo Agente não passa pelo modo sigiloso (seção 3-A): com ele ligado, o chat fica em
+  **Peças marcadas**, e uma conversa do Agente já começada não continua enquanto ele estiver ligado.
+- **O que fica no seu computador**: a conversa (as perguntas e as respostas, o modo dela e quais peças o agente
+  leu), na mesma memória de caso do chat (seção 5), com o mesmo interruptor que desliga e apaga tudo. As peças
+  baixadas para o agente ficam no mesmo lugar das baixadas pelo chat. Os post-its que ele colar seguem a regra da
+  seção 3-C.
 
 ## 3-D. Leitor dos autos e cores das etiquetas (sem IA)
 
